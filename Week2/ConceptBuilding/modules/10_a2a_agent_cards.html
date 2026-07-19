@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>10 · A2A Agent Cards — Week 2 Mastery</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">← Mastery index</a>
+      <a href="09_mcp_servers_clients.html">Prev · 09 MCP</a>
+      <a href="11_framework_landscape.html">Next · 11 Frameworks</a>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">Module 10 · Day 2 PM · MCP/A2A track</div>
+      <h1>A2A Agent Cards</h1>
+      <p class="lead">
+        Agent-to-Agent (A2A) uses a published <strong>Agent Card</strong> JSON document so one agent
+        can discover another’s identity, capabilities, skills, and auth before handing work off.
+        Week 2 ships a <strong>local A2A-style simulation</strong> (read a card file, planner →
+        comms) — not a full remote protocol exchange. ACP concepts are treated as merged into A2A
+        under the Linux Foundation.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">Offline-first</span>
+        <span class="chip">data/inventory.json</span>
+        <span class="chip">Maps W2D2PM a2a_handoff</span>
+        <span class="chip">June 2026 vocabulary</span>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="Table of contents">
+      <h2>On this page</h2>
+      <ol>
+        <li><a href="#why">Why Agent Cards (MCP vs A2A)</a></li>
+        <li><a href="#card-shape">Card shape: identity, skills, auth, capabilities</a></li>
+        <li><a href="#discovery">Discovery: local_file vs network</a></li>
+        <li><a href="#ship">Day 2 PM ship map</a></li>
+        <li><a href="#beginner">Beginner exercises (B1–B8)</a></li>
+        <li><a href="#intermediate">Intermediate exercises (I1–I8)</a></li>
+        <li><a href="#advanced">Advanced exercises (A1–A8)</a></li>
+        <li><a href="#check">Self-check &amp; stretch</a></li>
+      </ol>
+    </nav>
+
+    <!-- ========== WHY ========== -->
+    <section class="section" id="why">
+      <h2>Why Agent Cards</h2>
+      <p>
+        Module 09 covered <strong>MCP</strong>: agent → tool/server. This module covers
+        <strong>A2A</strong>: agent → agent. You do not invent peer APIs ad hoc; you publish a
+        card the planner (or supervisor) can read, then hand off only skills the card declares.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Protocol</th><th>Connects</th><th>Day 2 lab artifact</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>MCP</td>
+            <td>Agent → tool / server</td>
+            <td>Inventory stock lookup (<code class="inline">inventory_server.py</code>)</td>
+          </tr>
+          <tr>
+            <td>A2A</td>
+            <td>Agent → agent</td>
+            <td><code class="inline">agent_card.json</code> + planner → comms handoff</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>ACP → A2A</strong>
+        Older Agent Communication Protocol (ACP) ideas for agent identity and discovery are treated
+        here as <em>merged into A2A</em> under the Linux Foundation. Classroom vocabulary is
+        <strong>A2A + Agent Cards</strong>. Do not teach a separate ACP stack in Week 2.
+      </div>
+      <div class="callout warn">
+        <strong>Local simulation only</strong>
+        Lab code loads a JSON file and simulates handoff. It is not a remote A2A wire protocol,
+        registry crawl, or streaming task session. Say that out loud when you demo.
+      </div>
+      <pre><code># Mental model (ASCII)
+
+  Planner agent                    Comms agent
+  ┌──────────────┐                 ┌──────────────┐
+  │ decide handoff│ ──discover──▶  │ Agent Card   │
+  │ (stock check) │    local_file  │ name, skills │
+  │               │ ──handoff───▶  │ auth schemes │
+  └──────────────┘                 └──────────────┘
+         │                                │
+         ▼                                ▼
+   data/inventory.json              skill: notify_delay
+   (SKU qty vs reorder)             (queued notification)</code></pre>
+    </section>
+
+    <!-- ========== CARD SHAPE ========== -->
+    <section class="section" id="card-shape">
+      <h2>Card shape</h2>
+      <p>
+        Day 2 PM publishes a card shaped like the following (mirrors
+        <code class="inline">W2D2/W2D2PM/d2pmt3c01_agent_card_validate.py</code>):
+      </p>
+<pre><code>{
+  "name": "comms-agent",
+  "description": "Sends customer status updates for logistics and supply exceptions",
+  "url": "local://comms-agent",
+  "version": "0.1.0",
+  "protocol": "a2a",
+  "skills": [
+    {
+      "id": "notify_delay",
+      "description": "Notify a customer about a delay or stock exception"
+    },
+    {
+      "id": "summarize_shipment",
+      "description": "Summarize shipment or inventory status for operators"
+    }
+  ],
+  "authentication": {
+    "schemes": ["none"]
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  }
+}</code></pre>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Role</th><th>Lab note</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">name</code> / <code class="inline">description</code></td>
+            <td>Identity for operators and planners</td>
+            <td>Appears in handoff artifacts as <code class="inline">handoff_to</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">url</code></td>
+            <td>Where to reach the agent</td>
+            <td>Lab uses <code class="inline">local://…</code>, not HTTPS</td>
+          </tr>
+          <tr>
+            <td><code class="inline">skills[]</code></td>
+            <td>Allowed handoff intents</td>
+            <td>Comms must only use declared skill ids</td>
+          </tr>
+          <tr>
+            <td><code class="inline">authentication</code></td>
+            <td>How callers prove identity</td>
+            <td>Lab: <code class="inline">["none"]</code>; production: bearer / OAuth / mTLS</td>
+          </tr>
+          <tr>
+            <td><code class="inline">capabilities</code></td>
+            <td>Streaming / push / etc.</td>
+            <td>Keep false in the simulation; discuss as concept</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ========== DISCOVERY ========== -->
+    <section class="section" id="discovery">
+      <h2>Discovery modes</h2>
+      <table>
+        <thead>
+          <tr><th>Mode</th><th>Meaning</th><th>Week 2</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">local_file</code></td>
+            <td>Read <code class="inline">agent_card.json</code> from disk</td>
+            <td>Required path for the ship lab</td>
+          </tr>
+          <tr>
+            <td><code class="inline">network</code></td>
+            <td>Fetch card from a well-known URL / registry</td>
+            <td>Concept only — slides, not implemented</td>
+          </tr>
+        </tbody>
+      </table>
+<pre><code>discovery = {
+  "mode": "local_file",
+  "path": "agent_card.json",
+  "note": "Production A2A discovers cards over the network; lab reads a file.",
+}</code></pre>
+    </section>
+
+    <!-- ========== SHIP MAP ========== -->
+    <section class="section" id="ship">
+      <h2>Day 2 PM ship map</h2>
+      <p>
+        After MCP inventory works, learners publish the card and run the handoff CLI from the
+        <code class="inline">Week2</code> root:
+      </p>
+<pre><code># Terminal A — MCP (module 09)
+uv run python W2D2\W2D2PM\d2pmt2c01_mcp_server.py --self-test
+
+# Terminal B — A2A handoff (this module)
+uv run python W2D2\W2D2PM\d2pmt3c02_a2a_task.py</code></pre>
+      <p>
+        Expected behavior for <code class="inline">SKU-1002</code> (corrugated box medium): qty 85
+        ≤ reorder 120 → planner sets <code class="inline">handoff=True</code> → comms uses skill
+        <code class="inline">notify_delay</code> → artifact under Day 2 outputs.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Ship piece</th><th>Where</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Card validation</td><td><code class="inline">W2D2/W2D2PM/d2pmt3c01_agent_card_validate.py</code></td></tr>
+          <tr><td>Task lifecycle</td><td><code class="inline">W2D2/W2D2PM/d2pmt3c02_a2a_task.py</code></td></tr>
+          <tr><td>Decision schema</td><td><code class="inline">WorkflowDecision</code> in <code class="inline">schemas.py</code></td></tr>
+          <tr><td>Inventory fixture (ConceptBuilding)</td><td><code class="inline">ConceptBuilding/data/inventory.json</code></td></tr>
+          <tr><td>Assessment check</td><td>Card skills appear in handoff output</td></tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Working directory for exercises</strong>
+        Copy cells into a notebook with cwd = <code class="inline">Week2/ConceptBuilding</code> so
+        <code class="inline">data/inventory.json</code> resolves. Day 2 ship scripts themselves
+        run from <code class="inline">Week2</code> and load the PM card path.
+      </div>
+    </section>
+
+    <!-- ========== BEGINNER ========== -->
+    <section class="section" id="beginner">
+      <h2><span class="level beginner">Beginner</span> Card literacy &amp; inventory facts</h2>
+      <p>
+        Goal: read inventory rows, sketch a card, and explain MCP vs A2A in one sentence each —
+        no remote protocol required.
+      </p>
+
+      <div class="exercise" id="b1">
+        <div class="ex-label">Exercise B1 — Load inventory</div>
+        <p>
+          Load <code class="inline">data/inventory.json</code> and print warehouse, item count, and
+          every SKU with <code class="inline">qty_on_hand &lt;= reorder_point</code>.
+        </p>
+<pre><code>import json
+from pathlib import Path
+
+inv = json.loads(Path("data/inventory.json").read_text(encoding="utf-8"))
+print(inv["warehouse"], len(inv["items"]))
+low = [i for i in inv["items"] if i["qty_on_hand"] &lt;= i["reorder_point"]]
+for row in low:
+    print(row["sku"], row["name"], row["qty_on_hand"], "/", row["reorder_point"])</code></pre>
+      </div>
+
+      <div class="exercise" id="b2">
+        <div class="ex-label">Exercise B2 — One-sentence protocol quiz</div>
+        <p>
+          Fill the dict. MCP connects agent→?; A2A connects agent→?. Print both strings.
+        </p>
+<pre><code>quiz = {
+    "mcp_connects": "agent_to_tool_or_server",  # fill
+    "a2a_connects": "agent_to_agent",           # fill
+}
+assert "tool" in quiz["mcp_connects"] or "server" in quiz["mcp_connects"]
+assert "agent" in quiz["a2a_connects"]
+print(quiz)</code></pre>
+      </div>
+
+      <div class="exercise" id="b3">
+        <div class="ex-label">Exercise B3 — Sketch agent_card.json in memory</div>
+        <p>
+          Build a Python dict matching the Day 2 card fields (name, description, url, version,
+          protocol, skills, authentication, capabilities). Print as indented JSON.
+        </p>
+<pre><code>import json
+
+agent_card = {
+    "name": "comms-agent",
+    "description": "Sends customer status updates for logistics and supply exceptions",
+    "url": "local://comms-agent",
+    "version": "0.1.0",
+    "protocol": "a2a",
+    "skills": [
+        {"id": "notify_delay", "description": "Notify a customer about a delay or stock exception"},
+        {"id": "summarize_shipment", "description": "Summarize shipment or inventory status for operators"},
+    ],
+    "authentication": {"schemes": ["none"]},
+    "capabilities": {"streaming": False, "pushNotifications": False},
+}
+print(json.dumps(agent_card, indent=2))</code></pre>
+      </div>
+
+      <div class="exercise" id="b4">
+        <div class="ex-label">Exercise B4 — Write the card file</div>
+        <p>
+          Write your dict to <code class="inline">data/agent_card_lab.json</code> (lab copy under
+          ConceptBuilding). Confirm the file exists and re-load it.
+        </p>
+<pre><code>from pathlib import Path
+import json
+
+path = Path("data/agent_card_lab.json")
+path.write_text(json.dumps(agent_card, indent=2), encoding="utf-8")
+reloaded = json.loads(path.read_text(encoding="utf-8"))
+assert reloaded["name"] == "comms-agent"
+print("Wrote", path.resolve())</code></pre>
+      </div>
+
+      <div class="exercise" id="b5">
+        <div class="ex-label">Exercise B5 — Skill id allowlist</div>
+        <p>
+          From the card, extract skill ids into a set. Given proposed skills
+          <code class="inline">notify_delay</code>, <code class="inline">release_hold</code>,
+          <code class="inline">summarize_shipment</code>, print allowed vs rejected.
+        </p>
+<pre><code>allowed = {s["id"] for s in agent_card["skills"]}
+proposed = ["notify_delay", "release_hold", "summarize_shipment"]
+for skill in proposed:
+    status = "ALLOWED" if skill in allowed else "REJECTED"
+    print(status, skill)</code></pre>
+      </div>
+
+      <div class="exercise" id="b6">
+        <div class="ex-label">Exercise B6 — Auth schemes readout</div>
+        <p>
+          Print authentication schemes. Add a comment in a string explaining why lab uses
+          <code class="inline">none</code> and what a production scheme might be.
+        </p>
+<pre><code>schemes = agent_card["authentication"]["schemes"]
+note = (
+    "Lab uses schemes=['none'] because handoff is local-file simulation. "
+    "Production A2A cards often declare bearer, oauth2, or mutual_tls."
+)
+print(schemes)
+print(note)</code></pre>
+      </div>
+
+      <div class="exercise" id="b7">
+        <div class="ex-label">Exercise B7 — Capabilities flags</div>
+        <p>
+          Assert streaming and pushNotifications are false on the lab card. Print a one-line
+          operator note: “local handoff does not stream.”
+        </p>
+<pre><code>caps = agent_card["capabilities"]
+assert caps["streaming"] is False
+assert caps["pushNotifications"] is False
+print("operator_note: local handoff does not stream; capabilities stay false in lab.")</code></pre>
+      </div>
+
+      <div class="exercise" id="b8">
+        <div class="ex-label">Exercise B8 — ACP merged note</div>
+        <p>
+          Store a teaching note dict that records ACP → A2A merger. Assert the classroom protocol
+          name is <code class="inline">a2a</code>.
+        </p>
+<pre><code>teaching = {
+    "legacy_name": "ACP",
+    "classroom_protocol": "a2a",
+    "foundation_note": "ACP concepts merged into A2A under the Linux Foundation",
+}
+assert teaching["classroom_protocol"] == agent_card["protocol"]
+print(teaching)</code></pre>
+      </div>
+    </section>
+
+    <!-- ========== INTERMEDIATE ========== -->
+    <section class="section" id="intermediate">
+      <h2><span class="level intermediate">Intermediate</span> Validate &amp; hand off</h2>
+      <p>
+        Goal: Pydantic-validate the card, decide handoff from inventory SKUs, and simulate
+        planner → comms using only declared skills — same shape as
+        <code class="inline">d2pmt3c02_a2a_task.py</code>.
+      </p>
+
+      <div class="exercise" id="i1">
+        <div class="ex-label">Exercise I1 — Pydantic AgentCard model</div>
+        <p>
+          Define nested models for Skill, Authentication, Capabilities, and AgentCard. Validate
+          your lab JSON.
+        </p>
+<pre><code>from pydantic import BaseModel, Field
+
+class Skill(BaseModel):
+    id: str
+    description: str
+
+class Authentication(BaseModel):
+    schemes: list[str]
+
+class Capabilities(BaseModel):
+    streaming: bool = False
+    pushNotifications: bool = False
+
+class AgentCard(BaseModel):
+    name: str
+    description: str
+    url: str
+    version: str = "0.1.0"
+    protocol: str = "a2a"
+    skills: list[Skill]
+    authentication: Authentication
+    capabilities: Capabilities = Field(default_factory=Capabilities)
+
+card = AgentCard.model_validate(agent_card)
+print(card.name, [s.id for s in card.skills])</code></pre>
+      </div>
+
+      <div class="exercise" id="i2">
+        <div class="ex-label">Exercise I2 — Reject a bad card</div>
+        <p>
+          Attempt to validate a card missing <code class="inline">skills</code>. Catch
+          <code class="inline">ValidationError</code> and print the error count.
+        </p>
+<pre><code>from pydantic import ValidationError
+
+bad = {k: v for k, v in agent_card.items() if k != "skills"}
+try:
+    AgentCard.model_validate(bad)
+    print("unexpected success")
+except ValidationError as exc:
+    print("rejected_bad_card", exc.error_count())</code></pre>
+      </div>
+
+      <div class="exercise" id="i3">
+        <div class="ex-label">Exercise I3 — get_stock helper</div>
+        <p>
+          Implement <code class="inline">get_stock(sku)</code> against
+          <code class="inline">data/inventory.json</code>. Return found flag, qty, reorder_point,
+          and <code class="inline">source: "local_file"</code>.
+        </p>
+<pre><code>def get_stock(sku: str) -> dict:
+    inv = json.loads(Path("data/inventory.json").read_text(encoding="utf-8"))
+    for item in inv["items"]:
+        if item["sku"] == sku:
+            return {
+                "found": True,
+                "sku": sku,
+                "name": item["name"],
+                "qty_on_hand": item["qty_on_hand"],
+                "reorder_point": item["reorder_point"],
+                "warehouse": inv["warehouse"],
+                "source": "local_file",
+            }
+    return {"found": False, "sku": sku, "source": "local_file"}
+
+print(get_stock("SKU-1002"))
+print(get_stock("SKU-9999"))</code></pre>
+      </div>
+
+      <div class="exercise" id="i4">
+        <div class="ex-label">Exercise I4 — Planner decide</div>
+        <p>
+          Mirror Day 2: handoff when found and qty ≤ reorder. Test
+          <code class="inline">SKU-1002</code> (should hand off) and
+          <code class="inline">SKU-1001</code> (healthy).
+        </p>
+<pre><code>def planner_decide(sku: str) -> dict:
+    stock = get_stock(sku)
+    needs = bool(stock.get("found")) and stock["qty_on_hand"] &lt;= stock["reorder_point"]
+    return {
+        "stock": stock,
+        "handoff": needs,
+        "message": (
+            f"SKU {sku} is at or below reorder point."
+            if needs
+            else f"SKU {sku} has healthy stock."
+        ),
+    }
+
+print(planner_decide("SKU-1002"))
+print(planner_decide("SKU-1001"))</code></pre>
+      </div>
+
+      <div class="exercise" id="i5">
+        <div class="ex-label">Exercise I5 — Comms agent uses a skill</div>
+        <p>
+          Implement <code class="inline">comms_agent_handle(message, card)</code> that returns
+          agent name, <code class="inline">skill_used: "notify_delay"</code>, notification text,
+          and status <code class="inline">queued</code>. Assert the skill exists on the card.
+        </p>
+<pre><code>def comms_agent_handle(message: str, card: dict) -> dict:
+    skill_ids = {s["id"] for s in card["skills"]}
+    skill = "notify_delay"
+    assert skill in skill_ids, f"{skill} not on card"
+    return {
+        "agent": card["name"],
+        "skill_used": skill,
+        "notification": message,
+        "status": "queued",
+    }
+
+plan = planner_decide("SKU-1002")
+handoff = comms_agent_handle(plan["message"], agent_card) if plan["handoff"] else None
+print(handoff)</code></pre>
+      </div>
+
+      <div class="exercise" id="i6">
+        <div class="ex-label">Exercise I6 — Full handoff payload</div>
+        <p>
+          Assemble the Day 2-style payload: agent_card, planner, comms_result. Write
+          <code class="inline">data/a2a_handoff_SKU-1002.json</code>.
+        </p>
+<pre><code>sku = "SKU-1002"
+plan = planner_decide(sku)
+comms_result = (
+    comms_agent_handle(plan["message"], agent_card) if plan["handoff"] else None
+)
+payload = {
+    "agent_card": agent_card,
+    "planner": plan,
+    "comms_result": comms_result,
+    "discovery": {"mode": "local_file", "path": "data/agent_card_lab.json"},
+}
+out = Path("data") / f"a2a_handoff_{sku}.json"
+out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+print("Wrote", out, "handoff=", bool(comms_result))</code></pre>
+      </div>
+
+      <div class="exercise" id="i7">
+        <div class="ex-label">Exercise I7 — WorkflowDecision sketch</div>
+        <p>
+          Define a small Pydantic <code class="inline">WorkflowDecision</code> (lane, case_id,
+          stage, summary, handoff_to). Build one for the SKU-1002 run with
+          <code class="inline">stage="a2a_handoff"</code> and
+          <code class="inline">lane="supply"</code>.
+        </p>
+<pre><code>from typing import Literal
+
+class WorkflowDecision(BaseModel):
+    lane: Literal["insurance", "banking", "logistics", "supply"]
+    case_id: str
+    stage: str
+    summary: str
+    needs_human_approval: bool = False
+    tools_used: list[str] = Field(default_factory=list)
+    handoff_to: str | None = None
+
+decision = WorkflowDecision(
+    lane="supply",
+    case_id=sku,
+    stage="a2a_handoff",
+    summary=plan["message"],
+    tools_used=["get_stock"],
+    handoff_to=agent_card["name"] if comms_result else None,
+)
+print(decision.model_dump_json(indent=2))</code></pre>
+      </div>
+
+      <div class="exercise" id="i8">
+        <div class="ex-label">Exercise I8 — Discovery mode switch (concept)</div>
+        <p>
+          Write a function <code class="inline">load_card(mode, path=None, url=None)</code> that
+          loads from file when <code class="inline">mode=="local_file"</code>, and raises
+          <code class="inline">NotImplementedError</code> for <code class="inline">network</code>
+          with a clear message.
+        </p>
+<pre><code>def load_card(mode: str, path: str | None = None, url: str | None = None) -> dict:
+    if mode == "local_file":
+        assert path, "path required for local_file"
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    if mode == "network":
+        raise NotImplementedError(
+            f"network discovery not in Week 2 lab (would fetch {url}). Use local_file."
+        )
+    raise ValueError(f"unknown discovery mode: {mode}")
+
+print(load_card("local_file", path="data/agent_card_lab.json")["name"])
+try:
+    load_card("network", url="https://example.invalid/.well-known/agent.json")
+except NotImplementedError as exc:
+    print("expected:", exc)</code></pre>
+      </div>
+    </section>
+
+    <!-- ========== ADVANCED ========== -->
+    <section class="section" id="advanced">
+      <h2><span class="level advanced">Advanced</span> Guardrails, batch SKUs, ship parity</h2>
+      <p>
+        Goal: harden the simulation — skill gating, auth stubs, multi-SKU batch, and parity with
+        Day 2 assessment expectations.
+      </p>
+
+      <div class="exercise" id="a1">
+        <div class="ex-label">Exercise A1 — Skill-gated handoff</div>
+        <p>
+          Change comms so the caller must pass <code class="inline">skill_id</code>. Reject unknown
+          skills with a structured error dict (do not raise) so planners can log it.
+        </p>
+<pre><code>def comms_agent_handle_gated(message: str, card: dict, skill_id: str) -> dict:
+    skill_ids = {s["id"] for s in card["skills"]}
+    if skill_id not in skill_ids:
+        return {
+            "agent": card["name"],
+            "skill_used": None,
+            "status": "rejected",
+            "error": f"skill_not_on_card:{skill_id}",
+        }
+    return {
+        "agent": card["name"],
+        "skill_used": skill_id,
+        "notification": message,
+        "status": "queued",
+    }
+
+print(comms_agent_handle_gated("low stock", agent_card, "notify_delay"))
+print(comms_agent_handle_gated("low stock", agent_card, "release_hold"))</code></pre>
+      </div>
+
+      <div class="exercise" id="a2">
+        <div class="ex-label">Exercise A2 — Choose skill from message intent</div>
+        <p>
+          If message contains “reorder” or “stock”, use <code class="inline">notify_delay</code>;
+          if it contains “summary” or “status”, use <code class="inline">summarize_shipment</code>;
+          else reject.
+        </p>
+<pre><code>def pick_skill(message: str) -> str | None:
+    m = message.lower()
+    if "reorder" in m or "stock" in m or "below" in m:
+        return "notify_delay"
+    if "summary" in m or "status" in m:
+        return "summarize_shipment"
+    return None
+
+msg = planner_decide("SKU-1002")["message"]
+skill = pick_skill(msg)
+print(msg, "→", skill)
+print(comms_agent_handle_gated(msg, agent_card, skill or "missing"))</code></pre>
+      </div>
+
+      <div class="exercise" id="a3">
+        <div class="ex-label">Exercise A3 — Auth gate stub</div>
+        <p>
+          Add <code class="inline">require_auth(card, token)</code>. If schemes is only
+          <code class="inline">none</code>, allow any token including <code class="inline">None</code>.
+          If schemes include <code class="inline">bearer</code>, require
+          <code class="inline">token == "lab-secret"</code>.
+        </p>
+<pre><code>def require_auth(card: dict, token: str | None) -> bool:
+    schemes = card["authentication"]["schemes"]
+    if schemes == ["none"]:
+        return True
+    if "bearer" in schemes:
+        return token == "lab-secret"
+    return False
+
+secure_card = json.loads(json.dumps(agent_card))
+secure_card["authentication"]["schemes"] = ["bearer"]
+print("lab none:", require_auth(agent_card, None))
+print("bearer bad:", require_auth(secure_card, "nope"))
+print("bearer ok:", require_auth(secure_card, "lab-secret"))</code></pre>
+      </div>
+
+      <div class="exercise" id="a4">
+        <div class="ex-label">Exercise A4 — Batch all low-stock SKUs</div>
+        <p>
+          Scan inventory; for every low SKU run planner → gated comms. Collect a list of handoff
+          records. Assert at least one handoff (SKU-1002 is low).
+        </p>
+<pre><code>inv = json.loads(Path("data/inventory.json").read_text(encoding="utf-8"))
+records = []
+for item in inv["items"]:
+    plan = planner_decide(item["sku"])
+    if not plan["handoff"]:
+        continue
+    skill = pick_skill(plan["message"])
+    result = comms_agent_handle_gated(plan["message"], agent_card, skill or "missing")
+    records.append({"sku": item["sku"], "planner": plan, "comms": result})
+
+assert any(r["sku"] == "SKU-1002" for r in records)
+print("handoffs", len(records))
+for r in records:
+    print(r["sku"], r["comms"]["status"], r["comms"].get("skill_used"))</code></pre>
+      </div>
+
+      <div class="exercise" id="a5">
+        <div class="ex-label">Exercise A5 — Idempotency key on handoff</div>
+        <p>
+          Operator-facing handoffs should be replay-safe. Add
+          <code class="inline">idempotency_key = f"{sku}:{skill_used}"</code> to each queued
+          result. Deduplicate a replayed list.
+        </p>
+<pre><code>def with_idempotency(sku: str, result: dict) -> dict:
+    out = dict(result)
+    out["idempotency_key"] = f"{sku}:{result.get('skill_used')}"
+    return out
+
+raw = [with_idempotency(r["sku"], r["comms"]) for r in records]
+raw_replay = raw + raw  # accidental double send
+seen = set()
+deduped = []
+for row in raw_replay:
+    key = row["idempotency_key"]
+    if key in seen:
+        continue
+    seen.add(key)
+    deduped.append(row)
+print("raw", len(raw_replay), "deduped", len(deduped))</code></pre>
+      </div>
+
+      <div class="exercise" id="a6">
+        <div class="ex-label">Exercise A6 — Assessment-style assertion</div>
+        <p>
+          Day 2 pass criterion: card skills are used in the handoff output. Write a checker that
+          fails if <code class="inline">comms_result.skill_used</code> is missing from the card.
+        </p>
+<pre><code>def assert_ship_skills(payload: dict) -> None:
+    card_skills = {s["id"] for s in payload["agent_card"]["skills"]}
+    result = payload.get("comms_result")
+    assert result is not None, "expected handoff for low-stock SKU"
+    assert result["skill_used"] in card_skills
+    print("ship_ok", result["skill_used"])
+
+demo = json.loads(Path("data/a2a_handoff_SKU-1002.json").read_text(encoding="utf-8"))
+assert_ship_skills(demo)</code></pre>
+      </div>
+
+      <div class="exercise" id="a7">
+        <div class="ex-label">Exercise A7 — Compare MCP tool vs A2A skill</div>
+        <p>
+          Build a comparison table as a list of dicts (printable). Emphasize: MCP exposes
+          <code class="inline">get_stock</code>-like tools; A2A exposes peer skills like
+          <code class="inline">notify_delay</code>.
+        </p>
+<pre><code>comparison = [
+    {
+        "layer": "MCP",
+        "direction": "agent→tool",
+        "example": "get_stock / inventory MCP server",
+        "discovery": "server tool list",
+    },
+    {
+        "layer": "A2A",
+        "direction": "agent→agent",
+        "example": "notify_delay skill on comms-agent card",
+        "discovery": "Agent Card (local_file in lab)",
+    },
+]
+for row in comparison:
+    print(f"{row['layer']}: {row['direction']} | {row['example']} | {row['discovery']}")</code></pre>
+      </div>
+
+      <div class="exercise" id="a8">
+        <div class="ex-label">Exercise A8 — Operator summary for Day 2 ship</div>
+        <p>
+          Write a function that returns a concise operator-facing summary string for a completed
+          handoff payload (warehouse, SKU, skill, status, discovery mode). Print it for
+          SKU-1002.
+        </p>
+<pre><code>def operator_summary(payload: dict) -> str:
+    stock = payload["planner"]["stock"]
+    comms = payload["comms_result"]
+    mode = payload.get("discovery", {}).get("mode", "local_file")
+    return (
+        f"[{stock.get('warehouse')}] {stock.get('sku')} "
+        f"qty={stock.get('qty_on_hand')}/{stock.get('reorder_point')} → "
+        f"handoff {comms['agent']} skill={comms['skill_used']} "
+        f"status={comms['status']} discovery={mode}"
+    )
+
+print(operator_summary(demo))</code></pre>
+      </div>
+    </section>
+
+    <!-- ========== CHECK ========== -->
+    <section class="section" id="check">
+      <h2>Self-check</h2>
+      <ul>
+        <li>Can you state MCP vs A2A in one sentence each?</li>
+        <li>Does your card validate with Pydantic and include skills + auth + capabilities?</li>
+        <li>Does planner hand off only when inventory is at/below reorder (e.g. SKU-1002)?</li>
+        <li>Does comms use a skill that appears on the card?</li>
+        <li>Can you explain why discovery is <code class="inline">local_file</code> in lab vs network in production?</li>
+        <li>Do you remember ACP is merged into A2A for classroom purposes?</li>
+      </ul>
+      <div class="callout">
+        <strong>Stretch (optional, provider-backed Day 2 path)</strong>
+        From <code class="inline">Week2</code> root run
+        <code class="inline">uv run python W2D2\W2D2PM\d2pmt3c02_a2a_task.py</code>
+        and compare the written artifact to your ConceptBuilding lab JSON. Names and skill ids should align
+        after <code class="inline">W2D2/W2D2PM/d2pmt3c01_agent_card_validate.py</code>.
+      </div>
+<pre><code># Quick inventory truth table (from data/inventory.json)
+# SKU-1001  420 / 100  healthy
+# SKU-1002   85 / 120  LOW → handoff
+# SKU-2001   18 /  25  LOW → handoff
+# SKU-3001   12 /  30  LOW → handoff
+# SKU-4001    7 /  15  LOW → handoff</code></pre>
+    </section>
+
+    <nav class="nav-footer">
+      <a href="09_mcp_servers_clients.html">← 09 · MCP servers &amp; clients</a>
+      <a href="11_framework_landscape.html">11 · Framework landscape →</a>
+    </nav>
+  </div>
+</body>
+</html>

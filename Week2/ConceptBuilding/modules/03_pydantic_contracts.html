@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>03 — Pydantic v2 Contracts | Week 2 Mastery</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">Mastery index</a>
+      <a href="02_dotenv_provider_budgets.html">Prev: 02 dotenv &amp; budgets</a>
+      <a href="04_provider_routing.html">Next: 04 provider routing</a>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">Module 03 · Week 2 · June 2026 APIs</div>
+      <h1>Pydantic v2 — tool contracts &amp; structured outputs</h1>
+      <p class="lead">
+        Agents speak JSON. Pydantic turns that JSON into validated Python objects before tools
+        run and after models reply. This module covers the contracts you reuse all week:
+        <code class="inline">TriageDecision</code>, <code class="inline">CostLog</code>,
+        claim id patterns, citation-backed answers, and write-tool idempotency keys.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">pydantic v2</span>
+        <span class="chip">model_validate / model_dump</span>
+        <span class="chip">Field · Literal · ConfigDict</span>
+        <span class="chip">Notebook cwd: Week2/ConceptBuilding</span>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="Table of contents">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#why">Why contracts matter</a></li>
+        <li><a href="#setup">Setup &amp; lab fixtures</a></li>
+        <li><a href="#beginner">Beginner — BaseModel, Field, errors, nesting</a></li>
+        <li><a href="#intermediate">Intermediate — JSON Schema, TriageDecision, citations</a></li>
+        <li><a href="#advanced">Advanced — validators, idempotency, forbid extra, agent output</a></li>
+        <li><a href="#cheat">API cheat sheet (June 2026)</a></li>
+        <li><a href="#week-map">Where this shows up in Week 2</a></li>
+      </ol>
+    </nav>
+
+    <!-- ========== WHY ========== -->
+    <section class="section" id="why">
+      <h2>Why contracts matter</h2>
+      <p>
+        Without a contract, an agent can invent field names, drop required keys, or format
+        claim ids as bare digits. A Pydantic model rejects bad payloads early and returns a
+        clear <code class="inline">ValidationError</code> the planner can recover from.
+      </p>
+<pre>
+  agent JSON args / structured reply
+            |
+            v
+   +------------------+
+   |  Pydantic model  |  model_validate / model_validate_json
+   +--------+---------+
+            |
+     ok? ---+--- no ---> ValidationError (tell planner)
+            |
+           yes
+            |
+            v
+   typed Python object ---> tool body / TriageDecision / CostLog
+            |
+            v
+   model_dump() / model_dump_json() ---> logs, APIs, CLI ship artifact
+</pre>
+      <div class="callout">
+        <strong>Operator-facing rule</strong>
+        Never invent claim, loan, policy, or shipment records. Contracts validate shape;
+        domain tools supply facts. Write ops (goodwill credit, hold release) need learner
+        approval plus an idempotency key.
+      </div>
+    </section>
+
+    <!-- ========== SETUP ========== -->
+    <section class="section" id="setup">
+      <h2>Setup &amp; lab fixtures</h2>
+      <p>
+        Open a blank notebook with working directory <code class="inline">Week2/ConceptBuilding</code>
+        so relative paths resolve. Confirm fixtures exist:
+      </p>
+<pre>
+from pathlib import Path
+
+assert Path("data/fnol_emails.csv").exists()
+assert Path("data/claim_narratives_10.json").exists()
+print("fixtures ok")
+</pre>
+      <table>
+        <thead>
+          <tr><th>File</th><th>Use in this module</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">data/fnol_emails.csv</code></td>
+            <td>Email rows with ground-truth claim ids, urgency, route queues</td>
+          </tr>
+          <tr>
+            <td><code class="inline">data/claim_narratives_10.json</code></td>
+            <td>Narrative text + intake queues for nested / batch validation</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout warn">
+        <strong>v1 vs v2 naming</strong>
+        Use <code class="inline">model_validate</code>, <code class="inline">model_dump</code>,
+        and <code class="inline">model_json_schema()</code> — not the Pydantic v1
+        <code class="inline">parse_obj</code> / <code class="inline">dict()</code> /
+        <code class="inline">schema()</code> names.
+      </div>
+    </section>
+
+    <!-- ========== BEGINNER ========== -->
+    <section class="section" id="beginner">
+      <h2><span class="level beginner">Beginner</span> BaseModel, Field, validation errors, nested models</h2>
+      <p>
+        Goal: define models, constrain fields, read validation errors, and nest objects.
+        All examples use June 2026 Pydantic v2 APIs.
+      </p>
+
+      <h3>Concept — BaseModel + Field</h3>
+<pre>
+from typing import Literal
+
+from pydantic import BaseModel, Field, ValidationError
+
+
+class ClaimIdOnly(BaseModel):
+    """Minimal tool argument: one patterned string."""
+
+    claim_id: str = Field(
+        ...,
+        pattern=r"^CLM-\d{6}$",
+        description="Claim id like CLM-424063",
+    )
+
+
+good = ClaimIdOnly(claim_id="CLM-424063")
+print(good.model_dump())
+# {'claim_id': 'CLM-424063'}
+</pre>
+
+      <h3>Concept — model_validate vs constructor</h3>
+      <p>
+        Prefer <code class="inline">Model.model_validate(dict)</code> when the payload comes
+        from JSON/tool args. The constructor is fine for hand-written Python.
+      </p>
+<pre>
+payload = {"claim_id": "CLM-748422"}
+parsed = ClaimIdOnly.model_validate(payload)
+print(parsed.claim_id)
+</pre>
+
+      <h3>Concept — ValidationError shape</h3>
+<pre>
+try:
+    ClaimIdOnly.model_validate({"claim_id": "424063"})
+except ValidationError as exc:
+    err = exc.errors()[0]
+    print(err["type"], err["loc"], err["msg"])
+</pre>
+
+      <h3>Concept — nested models</h3>
+<pre>
+class EmailMeta(BaseModel):
+    email_id: str
+    urgency: Literal["low", "medium", "high"]
+
+
+class FnolRow(BaseModel):
+    meta: EmailMeta
+    subject: str
+    claim_number: str | None = None
+
+
+row = FnolRow.model_validate(
+    {
+        "meta": {"email_id": "CLN-001", "urgency": "high"},
+        "subject": "Property claim CLM-424063 — fence damage",
+        "claim_number": "CLM-424063",
+    }
+)
+print(row.meta.email_id, row.claim_number)
+</pre>
+
+      <!-- B1 -->
+      <div class="exercise" id="b1">
+        <div class="ex-label">Exercise B1 — First BaseModel</div>
+        <p>
+          Define <code class="inline">PolicyRef</code> with required
+          <code class="inline">policy_id: str</code>. Validate
+          <code class="inline">{"policy_id": "POL-787532354"}</code> and print
+          <code class="inline">model_dump()</code>.
+        </p>
+<pre>
+# your code
+</pre>
+      </div>
+
+      <!-- B2 -->
+      <div class="exercise" id="b2">
+        <div class="ex-label">Exercise B2 — Field constraints</div>
+        <p>
+          Add <code class="inline">confidence: float = Field(..., ge=0.0, le=1.0)</code> to a
+          tiny model. Show that <code class="inline">1.5</code> raises
+          <code class="inline">ValidationError</code> and print the error message.
+        </p>
+<pre>
+from pydantic import BaseModel, Field, ValidationError
+
+class Score(BaseModel):
+    confidence: float = Field(..., ge=0.0, le=1.0)
+
+# try / except here
+</pre>
+      </div>
+
+      <!-- B3 -->
+      <div class="exercise" id="b3">
+        <div class="ex-label">Exercise B3 — Literal urgency</div>
+        <p>
+          Model an FNOL email category using
+          <code class="inline">Literal["fnol", "inquiry", "servicing", "fraud_review"]</code>
+          and urgency <code class="inline">Literal["low", "medium", "high"]</code>.
+          Validate one dict matching CSV row CLN-001.
+        </p>
+<pre>
+import csv
+from pathlib import Path
+
+with Path("data/fnol_emails.csv").open(encoding="utf-8") as f:
+    rows = list(csv.DictReader(f))
+print(rows[0]["email_id"], rows[0]["urgency_ground_truth"])
+</pre>
+      </div>
+
+      <!-- B4 -->
+      <div class="exercise" id="b4">
+        <div class="ex-label">Exercise B4 — Optional claim number</div>
+        <p>
+          Some CSV rows have an empty claim number (inquiry / servicing). Model
+          <code class="inline">claim_number: str | None = None</code>. Validate CLN-007
+          (empty claim) and CLN-001 (present claim) without errors.
+        </p>
+<pre>
+# Hint: empty CSV cells become "" — coerce "" to None before validate, or use a before-validator later.
+</pre>
+      </div>
+
+      <!-- B5 -->
+      <div class="exercise" id="b5">
+        <div class="ex-label">Exercise B5 — Read ValidationError.errors()</div>
+        <p>
+          Call <code class="inline">model_validate</code> with a missing required field.
+          Print <code class="inline">exc.error_count()</code> and a list of
+          <code class="inline">(loc, msg)</code> pairs.
+        </p>
+<pre>
+try:
+    ClaimIdOnly.model_validate({})
+except ValidationError as exc:
+    ...
+</pre>
+      </div>
+
+      <!-- B6 -->
+      <div class="exercise" id="b6">
+        <div class="ex-label">Exercise B6 — Nested narrative record</div>
+        <p>
+          Load <code class="inline">data/claim_narratives_10.json</code>. Define nested models
+          for one narrative: outer wrapper optional; inner fields
+          <code class="inline">narrative_id</code>, <code class="inline">claim_id</code>,
+          <code class="inline">text</code>, <code class="inline">intake_queue</code>,
+          <code class="inline">adjudication_hint</code>. Validate NAR-001.
+        </p>
+<pre>
+import json
+from pathlib import Path
+
+blob = json.loads(Path("data/claim_narratives_10.json").read_text(encoding="utf-8"))
+first = blob["narratives"][0]
+print(first["narrative_id"], first["claim_id"])
+</pre>
+      </div>
+
+      <!-- B7 -->
+      <div class="exercise" id="b7">
+        <div class="ex-label">Exercise B7 — model_dump modes</div>
+        <p>
+          After validating a nested narrative, compare
+          <code class="inline">model_dump()</code>,
+          <code class="inline">model_dump(mode="json")</code>, and
+          <code class="inline">model_dump_json(indent=2)</code>. Note which returns a string.
+        </p>
+<pre>
+obj = ...  # your validated model
+print(type(obj.model_dump()), type(obj.model_dump_json()))
+</pre>
+      </div>
+
+      <!-- B8 -->
+      <div class="exercise" id="b8">
+        <div class="ex-label">Exercise B8 — Defaults and default_factory</div>
+        <p>
+          Build <code class="inline">ToolTrace</code> with
+          <code class="inline">tools_used: list[str] = Field(default_factory=list)</code>
+          and <code class="inline">needs_human_approval: bool = False</code>.
+          Construct two instances — one empty, one with tools — and dump both.
+        </p>
+<pre>
+class ToolTrace(BaseModel):
+    tools_used: list[str] = Field(default_factory=list)
+    needs_human_approval: bool = False
+</pre>
+      </div>
+
+      <!-- B9 -->
+      <div class="exercise" id="b9">
+        <div class="ex-label">Exercise B9 — Batch validate CSV subjects</div>
+        <p>
+          Define <code class="inline">EmailSubject</code> with
+          <code class="inline">email_id</code> and <code class="inline">subject</code>.
+          Validate the first five CSV rows; collect successes and failures separately.
+        </p>
+<pre>
+ok, bad = [], []
+for row in rows[:5]:
+    try:
+        ok.append(EmailSubject.model_validate(row))
+    except ValidationError as exc:
+        bad.append((row.get("email_id"), exc.error_count()))
+print(len(ok), len(bad))
+</pre>
+      </div>
+
+      <!-- B10 -->
+      <div class="exercise" id="b10">
+        <div class="ex-label">Exercise B10 — Field descriptions as docs</div>
+        <p>
+          Add <code class="inline">description=...</code> on every field of a small
+          <code class="inline">RouteHint</code> model (<code class="inline">route_queue</code>,
+          <code class="inline">urgency</code>). Call
+          <code class="inline">RouteHint.model_json_schema()</code> and confirm descriptions
+          appear under <code class="inline">properties</code>. (Warm-up for Intermediate.)
+        </p>
+<pre>
+schema = RouteHint.model_json_schema()
+print(schema["properties"]["route_queue"]["description"])
+</pre>
+      </div>
+
+      <div class="callout">
+        <strong>Beginner checkpoint</strong>
+        You can define models, constrain scalars, nest objects, and turn
+        <code class="inline">ValidationError</code> into actionable feedback.
+      </div>
+    </section>
+
+    <!-- ========== INTERMEDIATE ========== -->
+    <section class="section" id="intermediate">
+      <h2><span class="level intermediate">Intermediate</span> JSON Schema, TriageDecision, citations, claim patterns</h2>
+      <p>
+        Goal: export schemas for tool calling, mirror Week 2 ship artifacts, and ground
+        answers with citations. Claim ids follow <code class="inline">CLM-</code> + six digits.
+      </p>
+
+      <h3>Concept — model_json_schema for tools</h3>
+<pre>
+import json
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+
+class ClaimLookupInput(BaseModel):
+    """Arguments the agent must send to claim_lookup."""
+
+    claim_id: str = Field(..., pattern=r"^CLM-\d{6}$")
+
+
+tool_schema = {
+    "name": "claim_lookup",
+    "description": "Fetch claim routing metadata by claim id.",
+    "parameters": ClaimLookupInput.model_json_schema(),
+}
+print(json.dumps(tool_schema, indent=2))
+</pre>
+
+      <h3>Concept — TriageDecision (Week 2 ship shape)</h3>
+      <p>
+        Aligns with <code class="inline">W2D1/W2D1PM/d1pmt3c02_validate_triage_output.py</code>. Both provider paths must
+        validate the same object.
+      </p>
+<pre>
+class TriageDecision(BaseModel):
+    """Final structured decision returned by the operations assistant."""
+
+    lane: Literal["insurance", "banking", "logistics"] = Field(
+        ..., description="Domain lane that produced the decision"
+    )
+    case_id: str = Field(
+        ..., description="Primary case identifier (claim id, loan id, or container id)"
+    )
+    urgency: Literal["low", "medium", "high"] = Field(
+        ..., description="Operational urgency for queueing"
+    )
+    route_queue: str = Field(..., description="Destination work queue or team")
+    summary: str = Field(..., description="One-sentence operator-facing summary")
+    rationale: str = Field(..., description="Why this routing and urgency were chosen")
+    tools_used: list[str] = Field(default_factory=list)
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    needs_human_approval: bool = False
+</pre>
+
+      <h3>Concept — Citation / GroundedAnswer</h3>
+<pre>
+class Citation(BaseModel):
+    chunk_id: str
+    source_file: str
+    heading: str
+    excerpt: str
+
+
+class GroundedAnswer(BaseModel):
+    lane: Literal["insurance", "banking", "logistics"]
+    question: str
+    answer: str
+    citations: list[Citation] = Field(default_factory=list)
+    retrieval_steps: list[dict] = Field(default_factory=list)
+    session_id: str | None = None
+    cache_hit: bool = False
+    sufficient_evidence: bool = True
+</pre>
+
+      <!-- I1 -->
+      <div class="exercise" id="i1">
+        <div class="ex-label">Exercise I1 — Export claim_lookup schema</div>
+        <p>
+          Rebuild <code class="inline">ClaimLookupInput</code> with the
+          <code class="inline">CLM-\d{6}</code> pattern. Print
+          <code class="inline">model_json_schema()</code> and assert
+          <code class="inline">"pattern"</code> is present on <code class="inline">claim_id</code>.
+        </p>
+<pre>
+schema = ClaimLookupInput.model_json_schema()
+assert "pattern" in schema["properties"]["claim_id"]
+</pre>
+      </div>
+
+      <!-- I2 -->
+      <div class="exercise" id="i2">
+        <div class="ex-label">Exercise I2 — Reject bad claim ids</div>
+        <p>
+          Attempt to validate <code class="inline">"424063"</code>,
+          <code class="inline">"CLM-42"</code>, and <code class="inline">"CLM-424063"</code>.
+          Only the last should succeed.
+        </p>
+<pre>
+candidates = ["424063", "CLM-42", "CLM-424063"]
+for c in candidates:
+    try:
+        print("OK", ClaimLookupInput.model_validate({"claim_id": c}))
+    except ValidationError as exc:
+        print("NO", c, exc.errors()[0]["msg"])
+</pre>
+      </div>
+
+      <!-- I3 -->
+      <div class="exercise" id="i3">
+        <div class="ex-label">Exercise I3 — TriageDecision from FNOL CSV</div>
+        <p>
+          Using CLN-001 ground truth, build a valid <code class="inline">TriageDecision</code>
+          with <code class="inline">lane="insurance"</code>,
+          <code class="inline">case_id</code> from claim_number_ground_truth,
+          urgency and route_queue from the CSV, a one-sentence summary, and
+          <code class="inline">confidence=0.82</code>. Dump JSON.
+        </p>
+<pre>
+import csv
+from pathlib import Path
+
+row = next(
+    r for r in csv.DictReader(Path("data/fnol_emails.csv").open(encoding="utf-8"))
+    if r["email_id"] == "CLN-001"
+)
+# TriageDecision.model_validate({...})
+</pre>
+      </div>
+
+      <!-- I4 -->
+      <div class="exercise" id="i4">
+        <div class="ex-label">Exercise I4 — Schema required fields</div>
+        <p>
+          Call <code class="inline">TriageDecision.model_json_schema()</code>. List
+          <code class="inline">required</code>. Confirm optional defaults
+          (<code class="inline">tools_used</code>, <code class="inline">needs_human_approval</code>)
+          are not required.
+        </p>
+<pre>
+req = set(TriageDecision.model_json_schema()["required"])
+print(sorted(req))
+</pre>
+      </div>
+
+      <!-- I5 -->
+      <div class="exercise" id="i5">
+        <div class="ex-label">Exercise I5 — Batch narratives as ClaimNarrative</div>
+        <p>
+          Define <code class="inline">ClaimNarrative</code> matching the JSON fields.
+          Validate all ten narratives from
+          <code class="inline">data/claim_narratives_10.json</code>. Print count and any failures.
+        </p>
+<pre>
+import json
+from pathlib import Path
+
+raw = json.loads(Path("data/claim_narratives_10.json").read_text(encoding="utf-8"))
+narratives = [ClaimNarrative.model_validate(n) for n in raw["narratives"]]
+print(len(narratives), narratives[0].claim_id)
+</pre>
+      </div>
+
+      <!-- I6 -->
+      <div class="exercise" id="i6">
+        <div class="ex-label">Exercise I6 — Pattern every claim_id in narratives</div>
+        <p>
+          Strengthen <code class="inline">ClaimNarrative.claim_id</code> with
+          <code class="inline">Field(..., pattern=r"^CLM-\d{6}$")</code>.
+          Re-validate all ten — they should all pass.
+        </p>
+<pre>
+# after Field pattern added
+assert all(n.claim_id.startswith("CLM-") for n in narratives)
+</pre>
+      </div>
+
+      <!-- I7 -->
+      <div class="exercise" id="i7">
+        <div class="ex-label">Exercise I7 — GroundedAnswer with one citation</div>
+        <p>
+          Create a <code class="inline">GroundedAnswer</code> for question
+          &quot;What happened on CLM-424063?&quot; using narrative text from NAR-001 as the
+          citation excerpt and a fake <code class="inline">source_file</code> of
+          <code class="inline">data/claim_narratives_10.json</code>.
+        </p>
+<pre>
+answer = GroundedAnswer.model_validate({
+    "lane": "insurance",
+    "question": "What happened on CLM-424063?",
+    "answer": "Rear-end collision; airbags deployed; no injuries reported.",
+    "citations": [{
+        "chunk_id": "NAR-001",
+        "source_file": "data/claim_narratives_10.json",
+        "heading": "intake",
+        "excerpt": "...",  # paste from narrative text
+    }],
+    "sufficient_evidence": True,
+})
+print(answer.model_dump_json(indent=2))
+</pre>
+      </div>
+
+      <!-- I8 -->
+      <div class="exercise" id="i8">
+        <div class="ex-label">Exercise I8 — Join email + narrative by claim_id</div>
+        <p>
+          Find CSV rows whose claim_number_ground_truth appears in the narratives list.
+          For each match, build a small nested model
+          <code class="inline">JoinedCase(email_id, claim_id, urgency, intake_queue)</code>.
+          Print how many joins you get (expect overlaps like CLM-424063, CLM-748422, CLM-255335).
+        </p>
+<pre>
+# join keys from both fixtures via claim_id / claim_number_ground_truth
+</pre>
+      </div>
+
+      <!-- I9 -->
+      <div class="exercise" id="i9">
+        <div class="ex-label">Exercise I9 — Tool output contract</div>
+        <p>
+          Define <code class="inline">ClaimLookupOutput</code> with
+          <code class="inline">status: Literal["open", "closed", "investigation"]</code>,
+          urgency, and route_queue. Write a stub function that takes
+          <code class="inline">ClaimLookupInput</code> and returns
+          <code class="inline">ClaimLookupOutput</code> using CSV ground truth when the claim
+          exists.
+        </p>
+<pre>
+def claim_lookup(args: ClaimLookupInput) -> ClaimLookupOutput:
+    # look up args.claim_id in fnol_emails.csv ground-truth columns
+    ...
+</pre>
+      </div>
+
+      <!-- I10 -->
+      <div class="exercise" id="i10">
+        <div class="ex-label">Exercise I10 — model_validate_json round-trip</div>
+        <p>
+          Dump a <code class="inline">TriageDecision</code> with
+          <code class="inline">model_dump_json()</code>, then re-parse with
+          <code class="inline">TriageDecision.model_validate_json(raw)</code>.
+          Assert equality of <code class="inline">model_dump()</code> on both sides.
+        </p>
+<pre>
+raw = decision.model_dump_json()
+again = TriageDecision.model_validate_json(raw)
+assert again.model_dump() == decision.model_dump()
+</pre>
+      </div>
+
+      <!-- I11 -->
+      <div class="exercise" id="i11">
+        <div class="ex-label">Exercise I11 — Fraud tip route</div>
+        <p>
+          CLN-012 is a fraud tip on CLM-255335. Build a
+          <code class="inline">TriageDecision</code> with
+          <code class="inline">route_queue="special_investigations"</code>,
+          <code class="inline">urgency="high"</code>, and
+          <code class="inline">needs_human_approval=True</code>. Include
+          <code class="inline">tools_used=["claims_status"]</code>.
+        </p>
+<pre>
+# use CSV row CLN-012 ground truth
+</pre>
+      </div>
+
+      <div class="callout">
+        <strong>Intermediate checkpoint</strong>
+        You can export JSON Schema for tools, validate Week 2
+        <code class="inline">TriageDecision</code> / citation shapes, and enforce
+        <code class="inline">CLM-######</code> patterns against real fixtures.
+      </div>
+    </section>
+
+    <!-- ========== ADVANCED ========== -->
+    <section class="section" id="advanced">
+      <h2><span class="level advanced">Advanced</span> Validators, idempotency, CostLog, forbid extra, agent output</h2>
+      <p>
+        Goal: harden contracts for production-style agent loops — custom validators,
+        write-tool keys, cost budgets, reject unknown fields, and wire schemas into
+        structured model output.
+      </p>
+
+      <h3>Concept — field_validator &amp; model_validator</h3>
+<pre>
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+class ClaimRef(BaseModel):
+    claim_id: str = Field(..., pattern=r"^CLM-\d{6}$")
+
+    @field_validator("claim_id")
+    @classmethod
+    def uppercase_prefix(cls, v: str) -> str:
+        # normalize accidental lowercase prefix
+        if v.lower().startswith("clm-"):
+            return "CLM-" + v.split("-", 1)[1]
+        return v
+</pre>
+
+      <h3>Concept — ConfigDict extra=&quot;forbid&quot;</h3>
+<pre>
+from pydantic import ConfigDict
+
+
+class StrictToolArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    claim_id: str = Field(..., pattern=r"^CLM-\d{6}$")
+
+
+# StrictToolArgs.model_validate({"claim_id": "CLM-424063", "hack": 1})  # raises
+</pre>
+
+      <h3>Concept — Idempotency key model</h3>
+<pre>
+class WriteActionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["goodwill_credit", "release_hold"]
+    case_id: str
+    idempotency_key: str = Field(
+        ...,
+        min_length=8,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9._:-]+$",
+        description="Caller-supplied unique key; retries reuse the same receipt",
+    )
+    amount_usd: float | None = Field(default=None, ge=0)
+    reason: str | None = None
+
+    @model_validator(mode="after")
+    def credit_needs_amount(self) -> "WriteActionRequest":
+        if self.action == "goodwill_credit" and self.amount_usd is None:
+            raise ValueError("goodwill_credit requires amount_usd")
+        if self.action == "release_hold" and not self.reason:
+            raise ValueError("release_hold requires reason")
+        return self
+</pre>
+
+      <h3>Concept — CostLog (budget telemetry)</h3>
+<pre>
+class CostLog(BaseModel):
+    """Cost, token, and step telemetry written next to each run."""
+
+    session_id: str | None = None
+    provider: str
+    model: str
+    lane: str
+    steps_used: int
+    max_steps: int
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    max_tokens: int
+    total_cost_usd: float | None = None
+    max_budget_usd: float | None = None
+    stopped_reason: str
+
+    @model_validator(mode="after")
+    def within_budgets(self) -> "CostLog":
+        if self.steps_used > self.max_steps:
+            raise ValueError("steps_used exceeds max_steps")
+        if self.total_tokens > self.max_tokens:
+            raise ValueError("total_tokens exceeds max_tokens")
+        if (
+            self.max_budget_usd is not None
+            and self.total_cost_usd is not None
+            and self.total_cost_usd > self.max_budget_usd
+        ):
+            raise ValueError("total_cost_usd exceeds max_budget_usd")
+        return self
+</pre>
+
+      <h3>Concept — Structured output with agents</h3>
+<pre>
+# Pattern used across Week 2 provider paths:
+# 1) Export TriageDecision.model_json_schema() as the response schema / tool.
+# 2) Ask the model to return ONLY that JSON.
+# 3) Parse with TriageDecision.model_validate_json(raw) — never trust free text.
+# 4) On ValidationError, feed errors() back for one repair turn (budgeted).
+
+def parse_triage(raw: str) -> TriageDecision:
+    return TriageDecision.model_validate_json(raw)
+</pre>
+<pre>
+  LLM / SDK structured output
+            |
+            v
+   raw JSON string
+            |
+            v
+   TriageDecision.model_validate_json
+            |
+     +------+------+
+     |             |
+    ok           ValidationError
+     |             |
+     v             v
+  ship JSON    repair prompt (count against max_steps)
+</pre>
+
+      <!-- A1 -->
+      <div class="exercise" id="a1">
+        <div class="ex-label">Exercise A1 — Normalize claim_id prefix</div>
+        <p>
+          Implement a <code class="inline">field_validator</code> that accepts
+          <code class="inline">"clm-424063"</code> and normalizes to
+          <code class="inline">"CLM-424063"</code> while still rejecting
+          <code class="inline">"424063"</code>.
+        </p>
+<pre>
+# ClaimRef.model_validate({"claim_id": "clm-424063"}).claim_id == "CLM-424063"
+</pre>
+      </div>
+
+      <!-- A2 -->
+      <div class="exercise" id="a2">
+        <div class="ex-label">Exercise A2 — Forbid extra tool fields</div>
+        <p>
+          Create <code class="inline">StrictToolArgs</code> with
+          <code class="inline">ConfigDict(extra="forbid")</code>. Show that an injected
+          <code class="inline">"admin": true</code> key raises, and print the error type.
+        </p>
+<pre>
+try:
+    StrictToolArgs.model_validate({"claim_id": "CLM-424063", "admin": True})
+except ValidationError as exc:
+    print(exc.errors()[0]["type"])
+</pre>
+      </div>
+
+      <!-- A3 -->
+      <div class="exercise" id="a3">
+        <div class="ex-label">Exercise A3 — Idempotency key contract</div>
+        <p>
+          Validate a <code class="inline">WriteActionRequest</code> for
+          <code class="inline">release_hold</code> with
+          <code class="inline">case_id="MSKU789"</code>,
+          <code class="inline">idempotency_key="MSKU789-doc-fix"</code>, and a reason.
+          Then validate a duplicate key string and explain (in a comment) why the
+          <em>tool implementation</em>, not Pydantic alone, must store receipts.
+        </p>
+<pre>
+req = WriteActionRequest.model_validate({...})
+# Pydantic ensures shape; receipts dict / file store ensures once-only side effects
+</pre>
+      </div>
+
+      <!-- A4 -->
+      <div class="exercise" id="a4">
+        <div class="ex-label">Exercise A4 — Cross-field credit validation</div>
+        <p>
+          Attempt <code class="inline">goodwill_credit</code> without
+          <code class="inline">amount_usd</code> — expect failure. Then succeed with
+          <code class="inline">amount_usd=25.0</code>.
+        </p>
+<pre>
+# model_validator mode="after" as shown above
+</pre>
+      </div>
+
+      <!-- A5 -->
+      <div class="exercise" id="a5">
+        <div class="ex-label">Exercise A5 — CostLog within budget</div>
+        <p>
+          Build a valid <code class="inline">CostLog</code> for an insurance run:
+          provider/model of your choice, <code class="inline">steps_used=3</code>,
+          <code class="inline">max_steps=8</code>, tokens under cap,
+          <code class="inline">stopped_reason="completed"</code>.
+          Then craft one that exceeds <code class="inline">max_steps</code> and catch the error.
+        </p>
+<pre>
+log = CostLog.model_validate({
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5",
+    "lane": "insurance",
+    "steps_used": 3,
+    "max_steps": 8,
+    "input_tokens": 1200,
+    "output_tokens": 400,
+    "total_tokens": 1600,
+    "max_tokens": 100_000,
+    "total_cost_usd": 0.02,
+    "max_budget_usd": 1.0,
+    "stopped_reason": "completed",
+})
+</pre>
+      </div>
+
+      <!-- A6 -->
+      <div class="exercise" id="a6">
+        <div class="ex-label">Exercise A6 — Empty string to None for CSV claims</div>
+        <p>
+          CSV empty cells are <code class="inline">""</code>. Add a before-validator on
+          <code class="inline">claim_number</code> that turns <code class="inline">""</code>
+          into <code class="inline">None</code>, then validates optional pattern when present.
+          Run over all <code class="inline">fnol_emails.csv</code> rows without errors.
+        </p>
+<pre>
+from pydantic import field_validator
+
+class FnolEmail(BaseModel):
+    email_id: str
+    subject: str
+    claim_number_ground_truth: str | None = Field(
+        default=None, pattern=r"^CLM-\d{6}$"
+    )
+
+    @field_validator("claim_number_ground_truth", mode="before")
+    @classmethod
+    def empty_to_none(cls, v):
+        if v == "":
+            return None
+        return v
+</pre>
+      </div>
+
+      <!-- A7 -->
+      <div class="exercise" id="a7">
+        <div class="ex-label">Exercise A7 — Full tool I/O pair</div>
+        <p>
+          Define <code class="inline">PolicyLookupInput</code> /
+          <code class="inline">PolicyLookupOutput</code> with
+          <code class="inline">extra="forbid"</code> on inputs. Stub
+          <code class="inline">policy_lookup</code> that reads policy ids from the FNOL CSV
+          ground-truth column and returns a typed output (status + policy_id). Reject unknown
+          kwargs via the input model.
+        </p>
+<pre>
+def policy_lookup(args: PolicyLookupInput) -> PolicyLookupOutput:
+    ...
+</pre>
+      </div>
+
+      <!-- A8 -->
+      <div class="exercise" id="a8">
+        <div class="ex-label">Exercise A8 — Repair loop on bad TriageDecision</div>
+        <p>
+          Simulate an agent returning JSON missing <code class="inline">confidence</code>.
+          Catch <code class="inline">ValidationError</code>, format
+          <code class="inline">exc.errors()</code> into a short repair hint string, then
+          validate a corrected payload. Cap &quot;repairs&quot; at 1 (budget thinking).
+        </p>
+<pre>
+raw_bad = '''{
+  "lane": "insurance",
+  "case_id": "CLM-424063",
+  "urgency": "high",
+  "route_queue": "fnol_intake",
+  "summary": "Fence vandalism FNOL",
+  "rationale": "High urgency property loss with claim id present",
+  "tools_used": ["claims_status"]
+}'''
+# validate -> repair -> validate
+</pre>
+      </div>
+
+      <!-- A9 -->
+      <div class="exercise" id="a9">
+        <div class="ex-label">Exercise A9 — Bundle decision + cost</div>
+        <p>
+          Create a wrapper model <code class="inline">RunArtifact</code> with nested
+          <code class="inline">decision: TriageDecision</code> and
+          <code class="inline">cost: CostLog</code>. Populate from CLN-008 (urgent fire) and
+          a completed cost log. Dump once for &quot;ship&quot; JSON.
+        </p>
+<pre>
+class RunArtifact(BaseModel):
+    decision: TriageDecision
+    cost: CostLog
+</pre>
+      </div>
+
+      <!-- A10 -->
+      <div class="exercise" id="a10">
+        <div class="ex-label">Exercise A10 — Schema-driven structured output helper</div>
+        <p>
+          Write <code class="inline">def response_format(model: type[BaseModel]) -&gt; dict</code>
+          that returns a dict suitable for provider structured-output config:
+          <code class="inline">{"type": "json_schema", "json_schema": {"name": model.__name__, "schema": model.model_json_schema(), "strict": True}}</code>.
+          Generate it for <code class="inline">TriageDecision</code> and
+          <code class="inline">GroundedAnswer</code>.
+        </p>
+<pre>
+def response_format(model: type[BaseModel]) -> dict:
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": model.__name__,
+            "schema": model.model_json_schema(),
+            "strict": True,
+        },
+    }
+
+print(response_format(TriageDecision)["json_schema"]["name"])
+</pre>
+      </div>
+
+      <!-- A11 -->
+      <div class="exercise" id="a11">
+        <div class="ex-label">Exercise A11 — Narrative batch with forbid extras</div>
+        <p>
+          Validate all narratives with a strict model
+          (<code class="inline">extra="forbid"</code>). Then attempt to validate one narrative
+          dict with an injected <code class="inline">"hallucinated_field"</code> and confirm rejection.
+        </p>
+<pre>
+strict_ok = [StrictNarrative.model_validate(n) for n in raw["narratives"]]
+poisoned = {**raw["narratives"][0], "hallucinated_field": "nope"}
+# expect ValidationError
+</pre>
+      </div>
+
+      <!-- A12 -->
+      <div class="exercise" id="a12">
+        <div class="ex-label">Exercise A12 — End-to-end mini pipeline</div>
+        <p>
+          Pipeline (no LLM required): (1) load CLN-005 from CSV, (2) validate claim id pattern,
+          (3) find matching narrative if any else use email body as summary source,
+          (4) emit <code class="inline">TriageDecision</code>, (5) emit
+          <code class="inline">CostLog</code> with <code class="inline">steps_used=1</code>,
+          (6) wrap in <code class="inline">RunArtifact</code> and write
+          <code class="inline">model_dump_json</code> to stdout.
+        </p>
+<pre>
+# Read Path("data/fnol_emails.csv") and Path("data/claim_narratives_10.json")
+# Ship one RunArtifact JSON for CLN-005 / CLM-597471
+</pre>
+      </div>
+
+      <div class="callout">
+        <strong>Advanced checkpoint</strong>
+        You can harden tool inputs, gate write actions with idempotency keys, log costs
+        against budgets, reject surprise fields, and parse agent structured output into
+        the same contracts the Week 2 labs ship.
+      </div>
+    </section>
+
+    <!-- ========== CHEAT ========== -->
+    <section class="section" id="cheat">
+      <h2>API cheat sheet (June 2026 · Pydantic v2)</h2>
+      <table>
+        <thead>
+          <tr><th>API</th><th>Use</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">BaseModel</code></td>
+            <td>Declare a contract</td>
+          </tr>
+          <tr>
+            <td><code class="inline">Field(...)</code></td>
+            <td>Constraints, defaults, descriptions, patterns</td>
+          </tr>
+          <tr>
+            <td><code class="inline">Literal[...]</code></td>
+            <td>Closed enums for lanes, urgency, status</td>
+          </tr>
+          <tr>
+            <td><code class="inline">ConfigDict</code></td>
+            <td>Model config; prefer <code class="inline">extra="forbid"</code> on tool inputs</td>
+          </tr>
+          <tr>
+            <td><code class="inline">Model.model_validate(data)</code></td>
+            <td>Parse dict / object</td>
+          </tr>
+          <tr>
+            <td><code class="inline">Model.model_validate_json(s)</code></td>
+            <td>Parse JSON string from model/tool</td>
+          </tr>
+          <tr>
+            <td><code class="inline">obj.model_dump()</code></td>
+            <td>Python dict (optionally <code class="inline">mode="json"</code>)</td>
+          </tr>
+          <tr>
+            <td><code class="inline">obj.model_dump_json()</code></td>
+            <td>JSON string for logs / CLI ship</td>
+          </tr>
+          <tr>
+            <td><code class="inline">Model.model_json_schema()</code></td>
+            <td>JSON Schema for tools &amp; structured output</td>
+          </tr>
+          <tr>
+            <td><code class="inline">field_validator</code> / <code class="inline">model_validator</code></td>
+            <td>Normalize and cross-field rules</td>
+          </tr>
+          <tr>
+            <td><code class="inline">ValidationError.errors()</code></td>
+            <td>Machine-readable repair hints</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ========== WEEK MAP ========== -->
+    <section class="section" id="week-map">
+      <h2>Where this shows up in Week 2</h2>
+      <table>
+        <thead>
+          <tr><th>Day / artifact</th><th>Contract</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>D1 AM typed tools</td>
+            <td>Claim / policy lookup input-output models</td>
+          </tr>
+          <tr>
+            <td>D1 PM assistant</td>
+            <td><code class="inline">TriageDecision</code> + <code class="inline">CostLog</code></td>
+          </tr>
+          <tr>
+            <td>D1 write tools</td>
+            <td>Approval + <code class="inline">idempotency_key</code></td>
+          </tr>
+          <tr>
+            <td>D2 workflow</td>
+            <td><code class="inline">WorkflowDecision</code> / claim flow results</td>
+          </tr>
+          <tr>
+            <td>D3 RAG</td>
+            <td><code class="inline">GroundedAnswer</code> + <code class="inline">Citation</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout warn">
+        <strong>Next module</strong>
+        Provider routing keeps one codebase for Anthropic vs OpenRouter — both paths must
+        still validate the same <code class="inline">TriageDecision</code> schema.
+      </div>
+    </section>
+
+    <footer class="nav-footer">
+      <a href="02_dotenv_provider_budgets.html">← Prev: 02 dotenv &amp; budgets</a>
+      <a href="04_provider_routing.html">Next: 04 provider routing →</a>
+    </footer>
+  </div>
+</body>
+</html>

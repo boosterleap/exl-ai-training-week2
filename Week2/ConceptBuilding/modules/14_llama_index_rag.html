@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>14 — Optional LlamaIndex RAG comparison · Week 2 Mastery</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">Mastery index</a>
+      <a href="13_sentence_transformers.html">Prev: 13 Sentence Transformers</a>
+      <a href="15_networkx_graphrag.html">Next: 15 NetworkX GraphRAG</a>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">Module 14 · Week 2 Day 3 · June 2026 APIs</div>
+      <h1>Optional LlamaIndex + Chroma comparison</h1>
+      <p class="lead">
+        Explore how LlamaIndex can express retrieve → grade → refine over
+        <code class="inline">data/policies</code> and <code class="inline">data/rag_goldens.json</code>.
+        This is supplemental concept-building, not the rebuilt teaching runtime. The 34 Day 3
+        scripts use native Pinecone clients, SentenceTransformers, CrossEncoder, LangGraph,
+        NetworkX, Pydantic, and the Anthropic API. This module sketches
+        <code class="inline">VectorStoreIndex</code> +
+        <code class="inline">ChromaVectorStore</code> +
+        <code class="inline">HuggingFaceEmbedding</code>. API-backed LLM generation is stretch only.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">Offline-first</span>
+        <span class="chip">llama-index ≥ 0.12</span>
+        <span class="chip">Chroma persist</span>
+        <span class="chip">GroundedAnswer + citations</span>
+        <span class="chip">Supplemental comparison only</span>
+      </div>
+    </header>
+
+    <nav class="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#why">Why LlamaIndex here</a></li>
+        <li><a href="#beginner">Beginner — documents, chunks, keyword retrieve</a></li>
+        <li><a href="#intermediate">Intermediate — VectorStoreIndex + Chroma + grade/refine</a></li>
+        <li><a href="#advanced">Advanced — agentic loop, citations, LangGraph bridge</a></li>
+        <li><a href="#stretch">Stretch — API-backed LLM query engine</a></li>
+        <li><a href="#day3">Day 3 classroom map</a></li>
+      </ol>
+    </nav>
+
+    <!-- ========== WHY ========== -->
+    <section class="section" id="why">
+      <h2>Why compare LlamaIndex</h2>
+      <p>
+        Rebuilt Week 2 Day 3 keeps <strong>LangGraph</strong> as the orchestration brain and uses
+        native Pinecone clients for its primary runtime-tested retrieval path. It does
+        <strong>not</strong> import LlamaIndex in the teaching scripts. LlamaIndex is retained here
+        only as a retrieval-toolkit comparison: load policy markdown, embed with Hugging Face,
+        persist in the runtime-deferred Chroma alternative, and retrieve nodes. The architectural
+        lesson still applies: agentic RAG grades evidence and re-queries instead of calling a query
+        engine once.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Mode</th><th>Steps</th><th>Failure mode</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Single-pass RAG</td>
+            <td>Retrieve top-k → generate</td>
+            <td>Misses second clause (e.g. rental + out-of-state)</td>
+          </tr>
+          <tr>
+            <td>Agentic RAG</td>
+            <td>Plan → retrieve → grade → refine → retrieve → generate + citations</td>
+            <td>Costs more steps; needs a stop condition / max rounds</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Working directory</strong>
+        Copy exercises into a notebook whose cwd is <code class="inline">Week2/ConceptBuilding</code>
+        so paths like <code class="inline">data/policies</code> resolve. Packages:
+        <code class="inline">llama-index</code>,
+        <code class="inline">llama-index-vector-stores-chroma</code>,
+        <code class="inline">llama-index-embeddings-huggingface</code>,
+        <code class="inline">chromadb</code> (see Week2 <code class="inline">requirements.txt</code>).
+      </div>
+      <pre><code>data/policies/
+  POL-AUTO-001_coverage.md
+  POL-AUTO-001_exclusions.md
+  POL-HOME-010_water.md
+  POL-HOME-010_flood_rider.md
+  POL-HEALTH-020_prior_auth.md
+  POL-HEALTH-020_emergency.md
+data/rag_goldens.json   # G-001 .. G-005 required_chunk_ids</code></pre>
+    </section>
+
+    <!-- ========== BEGINNER ========== -->
+    <section class="section" id="beginner">
+      <h2><span class="level beginner">Beginner</span> Documents, section chunks, keyword retrieve</h2>
+      <p>
+        Start without embeddings or an LLM. Learn the same chunk IDs Day 3 goldens expect
+        (<code class="inline">stem#heading-slug</code>), then score overlap offline.
+      </p>
+
+      <h3>Mental model</h3>
+      <pre><code>Policy .md  --&gt;  section chunks  --&gt;  (later) TextNode + embed + Chroma
+                      |
+                      v
+              keyword top-k  --&gt;  grade vs goldens  --&gt;  refine query</code></pre>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B1 — List policy files</div>
+        <p>Confirm the six markdown fixtures exist under <code class="inline">data/policies</code>.</p>
+        <pre><code>from pathlib import Path
+
+POLICIES = Path("data/policies")
+files = sorted(POLICIES.glob("*.md"))
+assert len(files) &gt;= 6, files
+for p in files:
+    print(p.name, p.stat().st_size, "bytes")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B2 — Peek one coverage clause</div>
+        <p>Read rental reimbursement from the auto policy. You will cite this chunk later.</p>
+        <pre><code>text = (POLICIES / "POL-AUTO-001_coverage.md").read_text(encoding="utf-8")
+assert "Rental reimbursement" in text
+print(text[text.index("## Rental"): text.index("## Out-of-state")])</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B3 — Split markdown on ## headings</div>
+        <p>Mirror the shipped chunk contract: one chunk per section with stable citation identity.</p>
+        <pre><code>import re
+
+def slug(value: str) -&gt; str:
+    cleaned = re.sub(r"[^a-zA-Z0-9]+", "-", value.lower()).strip("-")
+    return cleaned or "section"
+
+def split_markdown(path: Path) -&gt; list[dict]:
+    policy_id = path.stem.split("_")[0]
+    chunks, heading, buffer = [], "intro", []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## "):
+            if buffer:
+                chunks.append({
+                    "chunk_id": f"{path.stem}#{slug(heading)}",
+                    "policy_id": policy_id,
+                    "source_file": path.name,
+                    "heading": heading,
+                    "text": "\n".join(buffer).strip(),
+                })
+                buffer = []
+            heading = line[3:].strip()
+        else:
+            buffer.append(line)
+    if buffer:
+        chunks.append({
+            "chunk_id": f"{path.stem}#{slug(heading)}",
+            "policy_id": policy_id,
+            "source_file": path.name,
+            "heading": heading,
+            "text": "\n".join(buffer).strip(),
+        })
+    return chunks
+
+sample = split_markdown(POLICIES / "POL-AUTO-001_coverage.md")
+print([c["chunk_id"] for c in sample])</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B4 — Build the full offline corpus</div>
+        <p>Load every policy file into one list. Expect rental + exclusions chunk IDs for G-001.</p>
+        <pre><code>corpus = []
+for path in sorted(POLICIES.glob("*.md")):
+    corpus.extend(split_markdown(path))
+print("chunks:", len(corpus))
+ids = {c["chunk_id"] for c in corpus}
+assert "POL-AUTO-001_coverage#rental-reimbursement" in ids
+assert "POL-AUTO-001_exclusions#rental-car-limits" in ids</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B5 — Tokenize + keyword score</div>
+        <p>Same idea as Week2 <code class="inline">data/rag/retrieval_utils.py</code> — no BM25 library needed.</p>
+        <pre><code>import math
+from collections import Counter
+
+def tokenize(text: str) -&gt; list[str]:
+    return re.findall(r"[a-z0-9]+", text.lower())
+
+def keyword_score(query: str, text: str) -&gt; float:
+    q, d = tokenize(query), tokenize(text)
+    if not q or not d:
+        return 0.0
+    counts = Counter(d)
+    score = 0.0
+    for token in set(q):
+        tf = counts.get(token, 0)
+        if tf:
+            score += 1.0 + math.log(1.0 + tf)
+    return score
+
+q = "rental car after theft out of state"
+for c in corpus:
+    c["score"] = keyword_score(q, c["text"] + " " + c["heading"])
+ranked = sorted(corpus, key=lambda x: x["score"], reverse=True)[:5]
+for c in ranked:
+    print(f"{c['score']:.2f}  {c['chunk_id']}")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B6 — Single-pass top-k helper</div>
+        <p>One retrieval round only. This is the baseline Day 3 demo compares against agentic.</p>
+        <pre><code>def top_k_chunks(query: str, chunks: list[dict], k: int = 3) -&gt; list[dict]:
+    scored = [
+        {**c, "score": keyword_score(query, c["text"] + " " + c["heading"])}
+        for c in chunks
+    ]
+    return sorted(scored, key=lambda x: x["score"], reverse=True)[:k]
+
+def single_pass_retrieve(query: str, chunks: list[dict], k: int = 3) -&gt; dict:
+    hits = top_k_chunks(query, chunks, k=k)
+    return {
+        "mode": "single_pass",
+        "query": query,
+        "steps": [{"round": 0, "query": query, "hits": [h["chunk_id"] for h in hits]}],
+        "chunks": hits,
+    }
+
+G001 = "After theft, is rental car covered if the driver lives out of state?"
+single = single_pass_retrieve(G001, corpus, k=3)
+print(single["steps"][0]["hits"])</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B7 — Load rag_goldens.json</div>
+        <p>Goldens define <em>required</em> chunk IDs — the grader’s ground truth, not the answer text.</p>
+        <pre><code>import json
+
+goldens = json.loads(Path("data/rag_goldens.json").read_text(encoding="utf-8"))["goldens"]
+by_id = {g["question_id"]: g for g in goldens}
+print(by_id["G-001"]["required_chunk_ids"])
+print(by_id["G-005"]["question"])</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B8 — Grade evidence (offline)</div>
+        <p>Return <code class="inline">sufficient</code> and <code class="inline">missing</code> — the heart of agentic RAG.</p>
+        <pre><code>def grade_evidence(question_id: str | None, chunk_ids: list[str]) -&gt; dict:
+    if not question_id:
+        return {"sufficient": True, "missing": []}
+    golden = by_id.get(question_id)
+    if golden is None:
+        return {"sufficient": True, "missing": []}
+    required = set(golden["required_chunk_ids"])
+    missing = sorted(required - set(chunk_ids))
+    return {"sufficient": not missing, "missing": missing, "question_id": question_id}
+
+hits = [h["chunk_id"] for h in single["chunks"]]
+print(grade_evidence("G-001", hits))
+# Often missing rental-car-limits on single-pass — that motivates refine.</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B9 — Document vs TextNode sketch</div>
+        <p>LlamaIndex core types you will use when leaving pure keyword mode (no API call).</p>
+        <pre><code># Sketch only — run after llama-index is installed
+from llama_index.core import Document
+from llama_index.core.schema import TextNode
+
+docs = [
+    Document(
+        text=c["text"],
+        metadata={
+            "chunk_id": c["chunk_id"],
+            "policy_id": c["policy_id"],
+            "source_file": c["source_file"],
+            "heading": c["heading"],
+        },
+        id_=c["chunk_id"],
+    )
+    for c in corpus
+]
+print("Documents:", len(docs))
+print("First meta:", docs[0].metadata)
+
+# Explicit nodes (optional — VectorStoreIndex can take Documents too)
+nodes = [
+    TextNode(text=d.text, metadata=d.metadata, id_=d.id_)
+    for d in docs
+]
+print("Nodes:", len(nodes))</code></pre>
+      </div>
+
+      <div class="callout warn">
+        <strong>ASCII only in notebooks</strong>
+        Prefer <code class="inline">-&gt;</code> and plain quotes in pasted cells. Avoid fancy arrows in code
+        if the cohort shares PowerShell or bash copy-paste quirks.
+      </div>
+    </section>
+
+    <!-- ========== INTERMEDIATE ========== -->
+    <section class="section" id="intermediate">
+      <h2><span class="level intermediate">Intermediate</span> VectorStoreIndex, Chroma, HF embed, refine</h2>
+      <p>
+        Wire LlamaIndex (June 2026 pattern):
+        <code class="inline">HuggingFaceEmbedding</code> +
+        <code class="inline">ChromaVectorStore</code> +
+        <code class="inline">StorageContext</code> +
+        <code class="inline">VectorStoreIndex.from_documents</code>.
+        Retrieval via <code class="inline">as_retriever</code> — not <code class="inline">as_query_engine</code>
+        until stretch (query engine needs an LLM).
+      </p>
+
+      <h3>Canonical index sketch</h3>
+      <pre><code>import chromadb
+from llama_index.core import Document, Settings, StorageContext, VectorStoreIndex
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.vector_stores.chroma import ChromaVectorStore
+
+Settings.embed_model = HuggingFaceEmbedding(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
+Settings.llm = None  # retrieval-only until stretch
+
+PERSIST = Path("data/chroma_concept_building_lab")
+PERSIST.mkdir(parents=True, exist_ok=True)
+client = chromadb.PersistentClient(path=str(PERSIST))
+collection = client.get_or_create_collection("concept_building_policy_chunks")
+vector_store = ChromaVectorStore(chroma_collection=collection)
+storage_context = StorageContext.from_defaults(vector_store=vector_store)
+
+documents = [
+    Document(text=c["text"], metadata={...}, id_=c["chunk_id"])
+    for c in corpus
+]
+index = VectorStoreIndex.from_documents(
+    documents,
+    storage_context=storage_context,
+    embed_model=Settings.embed_model,
+    show_progress=True,
+)
+retriever = index.as_retriever(similarity_top_k=3)
+nodes = retriever.retrieve(G001)</code></pre>
+      <div class="callout">
+        <strong>Gitignore note</strong>
+        Persist under <code class="inline">data/chroma_concept_building_lab/</code> for local labs; do not commit
+        the vector files. This runtime-deferred alternative maps to
+        <code class="inline">d3amt2c06_chroma_fallback.py</code>; Day 3's primary path uses Pinecone.
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I1 — Set Settings.embed_model (local HF)</div>
+        <p>First run downloads <code class="inline">all-MiniLM-L6-v2</code> once; then offline.</p>
+        <pre><code>from llama_index.core import Settings
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
+MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+Settings.embed_model = HuggingFaceEmbedding(model_name=MODEL)
+Settings.llm = None
+print("embed:", MODEL)
+print("llm disabled:", Settings.llm)</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I2 — Ephemeral Chroma + VectorStoreIndex</div>
+        <p>In-memory smoke test before touching disk persist.</p>
+        <pre><code>import chromadb
+from llama_index.core import Document, StorageContext, VectorStoreIndex
+from llama_index.vector_stores.chroma import ChromaVectorStore
+
+tiny = [
+    Document(
+        text="Rental reimbursement pays up to USD 40 per day for 30 days after theft.",
+        metadata={"chunk_id": "demo#rental", "heading": "Rental"},
+        id_="demo#rental",
+    ),
+    Document(
+        text="Rental limits exclude drivers living outside the rated garaging state.",
+        metadata={"chunk_id": "demo#limits", "heading": "Limits"},
+        id_="demo#limits",
+    ),
+]
+client = chromadb.EphemeralClient()
+col = client.create_collection("quickstart")
+vs = ChromaVectorStore(chroma_collection=col)
+ctx = StorageContext.from_defaults(vector_store=vs)
+index = VectorStoreIndex.from_documents(tiny, storage_context=ctx, embed_model=Settings.embed_model)
+hits = index.as_retriever(similarity_top_k=2).retrieve("theft rental out of state")
+for h in hits:
+    print(round(h.score or 0, 3), h.node.metadata.get("chunk_id"), h.text[:60])</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I3 — Persist policies into chroma_concept_building_lab</div>
+        <p>Rebuild collection from <code class="inline">corpus</code>. Delete old IDs if re-running.</p>
+        <pre><code>PERSIST = Path("data/chroma_concept_building_lab")
+PERSIST.mkdir(parents=True, exist_ok=True)
+client = chromadb.PersistentClient(path=str(PERSIST))
+name = "concept_building_policy_chunks"
+try:
+    client.delete_collection(name)
+except Exception:
+    pass
+col = client.get_or_create_collection(name)
+vs = ChromaVectorStore(chroma_collection=col)
+ctx = StorageContext.from_defaults(vector_store=vs)
+
+documents = [
+    Document(
+        text=c["text"],
+        metadata={
+            "chunk_id": c["chunk_id"],
+            "policy_id": c["policy_id"],
+            "source_file": c["source_file"],
+            "heading": c["heading"],
+            "lane": "insurance",
+        },
+        id_=c["chunk_id"],
+    )
+    for c in corpus
+]
+index = VectorStoreIndex.from_documents(
+    documents, storage_context=ctx, embed_model=Settings.embed_model, show_progress=True
+)
+print("indexed:", len(documents), "persist:", PERSIST.resolve())</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I4 — Reload from_vector_store</div>
+        <p>Do not re-embed every session — load Chroma + same HF model.</p>
+        <pre><code>client2 = chromadb.PersistentClient(path=str(PERSIST))
+col2 = client2.get_or_create_collection("concept_building_policy_chunks")
+vs2 = ChromaVectorStore(chroma_collection=col2)
+index2 = VectorStoreIndex.from_vector_store(vs2, embed_model=Settings.embed_model)
+retriever = index2.as_retriever(similarity_top_k=3)
+nodes = retriever.retrieve(G001)
+for n in nodes:
+    print(n.node.metadata.get("chunk_id"), round(n.score or 0, 3))</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I5 — Dense retrieve vs keyword single-pass</div>
+        <p>Compare hit sets for G-001. Dense may still miss exclusions — that is the teaching point.</p>
+        <pre><code>dense_ids = [n.node.metadata.get("chunk_id") for n in nodes]
+kw_ids = single["steps"][0]["hits"]
+print("dense:", dense_ids)
+print("keyword:", kw_ids)
+print("grade dense:", grade_evidence("G-001", dense_ids))
+print("grade keyword:", grade_evidence("G-001", kw_ids))</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I6 — Refine query helper</div>
+        <p>When grade fails, append heading tokens from current hits (same idea as retrieval_utils).</p>
+        <pre><code>def refine_query(base_query: str, hits: list[dict]) -&gt; str:
+    terms = []
+    for hit in hits:
+        terms.extend(tokenize(hit.get("heading", "")))
+    extra = " ".join(sorted(set(terms))[:4])
+    return f"{base_query} {extra}".strip()
+
+# From keyword hits shaped like corpus rows:
+kw_hits = single["chunks"]
+print("refined:", refine_query(G001, kw_hits))</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I7 — Agentic retrieve loop (keyword, offline)</div>
+        <p>Max 3 rounds. Stop when <code class="inline">grade["sufficient"]</code>. Prefer this in class without API spend.</p>
+        <pre><code>def dedupe_chunks(chunks: list[dict]) -&gt; list[dict]:
+    seen, out = set(), []
+    for c in chunks:
+        if c["chunk_id"] in seen:
+            continue
+        seen.add(c["chunk_id"])
+        out.append(c)
+    return out
+
+def agentic_retrieve(query, chunks, question_id=None, max_rounds=3, k=2):
+    steps, collected = [], []
+    current, grade = query, {"sufficient": False, "missing": []}
+    for r in range(max_rounds):
+        hits = top_k_chunks(current, chunks, k=k)
+        collected = dedupe_chunks(collected + hits)
+        ids = [c["chunk_id"] for c in collected]
+        grade = grade_evidence(question_id, ids)
+        steps.append({
+            "round": r,
+            "query": current,
+            "hits": [h["chunk_id"] for h in hits],
+            "sufficient": grade["sufficient"],
+            "missing": grade.get("missing", []),
+        })
+        if grade["sufficient"]:
+            break
+        current = refine_query(query, hits)
+    return {
+        "mode": "agentic_rag",
+        "query": query,
+        "steps": steps,
+        "chunks": collected,
+        "grade": grade,
+    }
+
+agentic = agentic_retrieve(G001, corpus, question_id="G-001", max_rounds=3, k=2)
+print("rounds:", len(agentic["steps"]), "sufficient:", agentic["grade"]["sufficient"])
+for s in agentic["steps"]:
+    print(s)</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I8 — Dense agentic round (retriever.retrieve)</div>
+        <p>Same loop, but each round calls LlamaIndex retriever instead of keyword top-k.</p>
+        <pre><code>def agentic_dense(query, retriever, question_id, max_rounds=3):
+    steps, collected_ids, collected_meta = [], [], []
+    current = query
+    grade = {"sufficient": False, "missing": []}
+    for r in range(max_rounds):
+        nodes = retriever.retrieve(current)
+        hits = []
+        for n in nodes:
+            cid = n.node.metadata.get("chunk_id") or n.node.node_id
+            hits.append({
+                "chunk_id": cid,
+                "heading": n.node.metadata.get("heading", ""),
+                "text": n.text,
+                "score": n.score,
+            })
+            if cid not in collected_ids:
+                collected_ids.append(cid)
+                collected_meta.append(hits[-1])
+        grade = grade_evidence(question_id, collected_ids)
+        steps.append({
+            "round": r,
+            "query": current,
+            "hits": [h["chunk_id"] for h in hits],
+            "missing": grade.get("missing", []),
+            "sufficient": grade["sufficient"],
+        })
+        if grade["sufficient"]:
+            break
+        current = refine_query(query, hits)
+    return {"steps": steps, "chunks": collected_meta, "grade": grade}
+
+dense_agentic = agentic_dense(G001, retriever, "G-001")
+print(dense_agentic["grade"])
+for s in dense_agentic["steps"]:
+    print(s["round"], s["hits"], "missing=", s["missing"])</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I9 — Metadata filter sketch (policy_id)</div>
+        <p>Concept: restrict retrieval to one policy before grading multi-policy questions.</p>
+        <pre><code>from llama_index.core.vector_stores import MetadataFilters, ExactMatchFilter
+
+# June 2026 LlamaIndex metadata filter pattern (names may vary slightly by minor version)
+filters = MetadataFilters(
+    filters=[ExactMatchFilter(key="policy_id", value="POL-AUTO-001")]
+)
+auto_retriever = index2.as_retriever(similarity_top_k=4, filters=filters)
+auto_hits = auto_retriever.retrieve(G001)
+print([h.node.metadata.get("chunk_id") for h in auto_hits])
+# If filters raise on your build, filter in Python after retrieve:
+manual = [
+    h for h in retriever.retrieve(G001)
+    if h.node.metadata.get("policy_id") == "POL-AUTO-001"
+]
+print("manual filter:", [h.node.metadata.get("chunk_id") for h in manual])</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I10 — Side-by-side trace table for G-005</div>
+        <p>Emergency MRI needs prior-auth + emergency definition chunks.</p>
+        <pre><code>G005 = by_id["G-005"]["question"]
+s5 = single_pass_retrieve(G005, corpus, k=2)
+a5 = agentic_retrieve(G005, corpus, question_id="G-005", max_rounds=3, k=2)
+print("Q:", G005)
+print("single hits:", s5["steps"][0]["hits"], grade_evidence("G-005", s5["steps"][0]["hits"]))
+print("agentic rounds:", len(a5["steps"]), a5["grade"])
+print("required:", by_id["G-005"]["required_chunk_ids"])</code></pre>
+      </div>
+    </section>
+
+    <!-- ========== ADVANCED ========== -->
+    <section class="section" id="advanced">
+      <h2><span class="level advanced">Advanced</span> Citations, GroundedAnswer, graph bridge</h2>
+      <p>
+        Rebuilt Day 3 ships typed cited answers and an integrated operator response. Build an
+        equivalent local contract here, compose excerpts from retrieved chunks, then compare its
+        shape with the native LangGraph retrieve → grade → generate nodes.
+      </p>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A1 — Citation + GroundedAnswer models</div>
+        <p>Match the typed citation shape produced by <code class="inline">W2D3/W2D3AM/d3amt1c01_cited_answer.py</code> and carried by <code class="inline">d3pmt6c02_integrated_assistant.py</code>.</p>
+        <pre><code>from typing import Literal
+from pydantic import BaseModel, Field
+
+class Citation(BaseModel):
+    chunk_id: str
+    source_file: str
+    heading: str
+    excerpt: str
+
+class GroundedAnswer(BaseModel):
+    lane: Literal["insurance", "banking", "logistics"]
+    question: str
+    answer: str
+    citations: list[Citation] = Field(default_factory=list)
+    retrieval_steps: list[dict] = Field(default_factory=list)
+    session_id: str | None = None
+    cache_hit: bool = False
+    sufficient_evidence: bool = True
+
+print(GroundedAnswer.model_json_schema()["properties"].keys())</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A2 — Build citations from agentic chunks</div>
+        <p>Excerpt = first ~180 chars. Never invent chunk_ids.</p>
+        <pre><code>def make_citations(chunks: list[dict], limit: int = 4) -&gt; list[Citation]:
+    out = []
+    for c in chunks[:limit]:
+        out.append(Citation(
+            chunk_id=c["chunk_id"],
+            source_file=c.get("source_file", ""),
+            heading=c.get("heading", ""),
+            excerpt=(c.get("text") or "")[:180].replace("\n", " ").strip(),
+        ))
+    return out
+
+cites = make_citations(agentic["chunks"])
+for c in cites:
+    print(c.chunk_id, "-&gt;", c.excerpt[:70], "...")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A3 — Offline compose_answer (no LLM)</div>
+        <p>Template answer from headings + sufficient flag. Stretch later swaps in an LLM.</p>
+        <pre><code>def compose_answer(question: str, retrieval: dict) -&gt; GroundedAnswer:
+    chunks = retrieval.get("chunks", [])
+    grade = retrieval.get("grade", {})
+    cites = make_citations(chunks)
+    if not grade.get("sufficient", False):
+        answer = (
+            "Insufficient evidence for a full answer. Missing: "
+            + ", ".join(grade.get("missing", []))
+        )
+    else:
+        headings = "; ".join(c.heading for c in cites)
+        answer = (
+            f"Based on policy sections [{headings}], the combined clauses address: {question}"
+        )
+    return GroundedAnswer(
+        lane="insurance",
+        question=question,
+        answer=answer,
+        citations=cites,
+        retrieval_steps=retrieval.get("steps", []),
+        sufficient_evidence=bool(grade.get("sufficient")),
+    )
+
+ga = compose_answer(G001, agentic)
+print(ga.model_dump_json(indent=2)[:800])</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A4 — Citation validity check</div>
+        <p>Assessment rule: citation points to a real corpus chunk_id.</p>
+        <pre><code>valid_ids = {c["chunk_id"] for c in corpus}
+
+def citations_valid(ga: GroundedAnswer) -&gt; bool:
+    if not ga.citations:
+        return False
+    return all(c.chunk_id in valid_ids for c in ga.citations)
+
+assert citations_valid(ga)
+bad = ga.model_copy(deep=True)
+bad.citations[0].chunk_id = "POL-FAKE#nope"
+assert not citations_valid(bad)
+print("citation checks OK")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A5 — LangGraph-shaped nodes (offline)</div>
+        <p>Same topology as the W2D3 AM topic 01 grounded loop: retrieve → grade → generate.</p>
+        <pre><code>from typing import TypedDict
+
+class RagState(TypedDict):
+    question: str
+    question_id: str | None
+    retrieval: dict
+    answer: str
+    citations: list[dict]
+    sufficient_evidence: bool
+    event_trace: list[dict]
+
+def retrieve_node(state: RagState) -&gt; dict:
+    retrieval = agentic_retrieve(
+        state["question"], corpus, question_id=state.get("question_id"), max_rounds=3, k=2
+    )
+    return {
+        "retrieval": retrieval,
+        "event_trace": [
+            *state.get("event_trace", []),
+            {"node": "retrieve", "rounds": len(retrieval["steps"])},
+        ],
+    }
+
+def grade_node(state: RagState) -&gt; dict:
+    grade = state["retrieval"].get("grade", {})
+    return {
+        "sufficient_evidence": bool(grade.get("sufficient")),
+        "event_trace": [
+            *state.get("event_trace", []),
+            {"node": "grade", "sufficient": grade.get("sufficient"), "missing": grade.get("missing", [])},
+        ],
+    }
+
+def generate_node(state: RagState) -&gt; dict:
+    ga = compose_answer(state["question"], state["retrieval"])
+    return {
+        "answer": ga.answer,
+        "citations": [c.model_dump() for c in ga.citations],
+        "sufficient_evidence": ga.sufficient_evidence,
+        "event_trace": [
+            *state.get("event_trace", []),
+            {"node": "generate", "citations": len(ga.citations)},
+        ],
+    }
+
+state: RagState = {
+    "question": G001,
+    "question_id": "G-001",
+    "retrieval": {},
+    "answer": "",
+    "citations": [],
+    "sufficient_evidence": False,
+    "event_trace": [],
+}
+state = {**state, **retrieve_node(state)}
+state = {**state, **grade_node(state)}
+state = {**state, **generate_node(state)}
+print(state["event_trace"])
+print(state["answer"][:200])</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A6 — Conditional refine edge</div>
+        <p>If grade fails after retrieve, route to refine; else generate. Sketch routing function.</p>
+        <pre><code>def route_after_grade(state: RagState) -&gt; str:
+    if state.get("sufficient_evidence"):
+        return "generate"
+    rounds = len(state.get("retrieval", {}).get("steps", []))
+    if rounds &gt;= 3:
+        return "generate"  # stop and admit insufficient
+    return "refine"
+
+print(route_after_grade(state))
+
+# With LangGraph (concept):
+# graph.add_conditional_edges("grade", route_after_grade, {"generate": "generate", "refine": "refine"})</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A7 — Batch goldens eval (offline)</div>
+        <p>Score how many questions become sufficient under agentic vs single-pass.</p>
+        <pre><code>def eval_mode(mode: str) -&gt; dict:
+    ok = 0
+    rows = []
+    for g in goldens:
+        qid, q = g["question_id"], g["question"]
+        if mode == "single":
+            result = single_pass_retrieve(q, corpus, k=3)
+            ids = result["steps"][0]["hits"]
+            grade = grade_evidence(qid, ids)
+        else:
+            result = agentic_retrieve(q, corpus, question_id=qid, max_rounds=3, k=2)
+            grade = result["grade"]
+        ok += int(grade["sufficient"])
+        rows.append((qid, grade["sufficient"], grade.get("missing", [])))
+    return {"mode": mode, "n_ok": ok, "n": len(goldens), "rows": rows}
+
+print(eval_mode("single"))
+print(eval_mode("agentic"))</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A8 — Expose retrieval_steps in the response</div>
+        <p>Day 3 H1 healthcare asks to expose retrieval steps — operators must see re-query rounds.</p>
+        <pre><code>def operator_view(ga: GroundedAnswer) -&gt; dict:
+    return {
+        "answer": ga.answer,
+        "sufficient_evidence": ga.sufficient_evidence,
+        "citation_ids": [c.chunk_id for c in ga.citations],
+        "retrieval_steps": ga.retrieval_steps,
+    }
+
+view = operator_view(ga)
+assert "retrieval_steps" in view
+assert isinstance(view["retrieval_steps"], list)
+print(json.dumps(view, indent=2)[:900])</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A9 — Hybrid: keyword OR dense union before grade</div>
+        <p>When dense alone misses a clause, union keyword hits for the same query.</p>
+        <pre><code>def hybrid_hits(query: str, k: int = 3) -&gt; list[dict]:
+    kw = top_k_chunks(query, corpus, k=k)
+    dense = retriever.retrieve(query)
+    by_id_map = {c["chunk_id"]: c for c in corpus}
+    merged = {c["chunk_id"]: c for c in kw}
+    for n in dense:
+        cid = n.node.metadata.get("chunk_id")
+        if cid and cid in by_id_map:
+            merged[cid] = by_id_map[cid]
+    return list(merged.values())
+
+hyb = hybrid_hits(G001, k=3)
+print([c["chunk_id"] for c in hyb])
+print(grade_evidence("G-001", [c["chunk_id"] for c in hyb]))</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A10 — Write trace JSON like the topic 01 artifact</div>
+        <p>Classroom artifact: compare single vs agentic for one question_id.</p>
+        <pre><code>out_dir = Path("data/outputs_concept_building")
+out_dir.mkdir(parents=True, exist_ok=True)
+payload = {
+    "question_id": "G-001",
+    "query": G001,
+    "single_pass": single,
+    "agentic_rag": agentic,
+    "lesson": "Agentic RAG re-queries when evidence is incomplete.",
+}
+path = out_dir / "agentic_rag_G-001.json"
+path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+print("Wrote", path)</code></pre>
+      </div>
+
+      <div class="callout warn">
+        <strong>Write operations</strong>
+        Index rebuilds and answer caches are local lab writes. Goodwill credits / hold releases
+        in other lanes still need learner approval + idempotency keys — RAG citations never invent
+        claim, loan, or shipment records.
+      </div>
+    </section>
+
+    <!-- ========== STRETCH ========== -->
+    <section class="section" id="stretch">
+      <h2>Stretch — API-backed LLM query engine</h2>
+      <div class="callout warn">
+        <strong>Optional · spends API budget</strong>
+        This optional comparison can stay retrieval-only until its goldens pass. The actual rebuilt
+        classroom path already requires Anthropic API generation and must not be described as offline.
+      </div>
+      <pre><code># STRETCH — do not run in CI
+import os
+from dotenv import load_dotenv
+load_dotenv("../.env")  # Week2/.env when cwd is ConceptBuilding/
+
+from llama_index.llms.anthropic import Anthropic
+Settings.llm = Anthropic(
+    model=os.environ["ANTHROPIC_MODEL"],
+    api_key=os.environ["ANTHROPIC_API_KEY"],
+)
+
+qe = index2.as_query_engine(similarity_top_k=3)
+# response = qe.query(G001)  # Anthropic API call
+# Prefer: retrieve nodes yourself, then ask the LLM to answer ONLY from citations.</code></pre>
+      <p>
+        Rebuilt Day 3 uses a LangGraph generate node and structured typed citations rather than a
+        free-form LlamaIndex query-engine string.
+      </p>
+    </section>
+
+    <!-- ========== DAY 3 MAP ========== -->
+    <section class="section" id="day3">
+      <h2>Day 3 classroom map</h2>
+      <table>
+        <thead>
+          <tr><th>Session piece</th><th>This module</th><th>Repo script / notebook</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Single-pass vs agentic demo</td>
+            <td>B6–B8, I7, A10</td>
+            <td><code class="inline">W2D3/W2D3AM/_CONCEPTS.ipynb</code> §1; API-backed path is <code class="inline">d3amt1c01_cited_answer.py</code> → <code class="inline">d3amt1c03_bounded_langgraph_rag.py</code></td>
+          </tr>
+          <tr>
+            <td>Chroma + HF index</td>
+            <td>I1–I4</td>
+            <td>Primary: <code class="inline">d3amt2c02_pinecone_index.py</code>; alternative: <code class="inline">d3amt2c06_chroma_fallback.py</code></td>
+          </tr>
+          <tr>
+            <td>retrieve → grade → generate</td>
+            <td>A5–A6</td>
+            <td><code class="inline">W2D3/W2D3AM/d3amt1c03_bounded_langgraph_rag.py</code></td>
+          </tr>
+          <tr>
+            <td>Citations / assessment</td>
+            <td>A1–A4, A8</td>
+            <td><code class="inline">d3amt1c01_cited_answer.py</code> and <code class="inline">d3pmt6c02_integrated_assistant.py</code></td>
+          </tr>
+          <tr>
+            <td>Next: GraphRAG</td>
+            <td>—</td>
+            <td>Module 15 NetworkX multi-hop supplier KG</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Pass criteria preview</strong>
+        Demo a grounded answer with at least one citation whose <code class="inline">chunk_id</code>
+        exists in the policy corpus — inventing a clause fails the spot-check.
+      </div>
+    </section>
+
+    <footer class="nav-footer">
+      <a href="13_sentence_transformers.html">← Prev: 13 Sentence Transformers</a>
+      <a href="../index.html">Index</a>
+      <a href="15_networkx_graphrag.html">Next: 15 NetworkX GraphRAG →</a>
+    </footer>
+  </div>
+</body>
+</html>

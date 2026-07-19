@@ -1,0 +1,139 @@
+{
+  "cases": [
+    {
+      "case_id": "UW-001",
+      "applicant": "Northwind Retail LLC",
+      "product": "commercial_property",
+      "requested_limit_usd": 2500000,
+      "risk_flags": ["coastal_flood_zone"],
+      "documents_complete": true,
+      "recommended_action": "refer_underwriter"
+    },
+    {
+      "case_id": "UW-002",
+      "applicant": "Blue Harbor Logistics",
+      "product": "cargo",
+      "requested_limit_usd": 800000,
+      "risk_flags": [],
+      "documents_complete": true,
+      "recommended_action": "auto_approve"
+    },
+    {
+      "case_id": "UW-003",
+      "applicant": "Summit Clinics",
+      "product": "professional_liability",
+      "requested_limit_usd": 5000000,
+      "risk_flags": ["prior_claims"],
+      "documents_complete": false,
+      "recommended_action": "request_documents"
+    },
+    {
+      "case_id": "UW-004",
+      "applicant": "Cedar Grove Apartments",
+      "product": "commercial_property",
+      "requested_limit_usd": 1200000,
+      "risk_flags": ["older_wiring"],
+      "documents_complete": true,
+      "recommended_action": "refer_underwriter"
+    },
+    {
+      "case_id": "UW-005",
+      "applicant": "PixelForge Studios",
+      "product": "cyber",
+      "requested_limit_usd": 1000000,
+      "risk_flags": [],
+      "documents_complete": true,
+      "recommended_action": "auto_approve"
+    },
+    {
+      "case_id": "UW-006",
+      "applicant": "Riverbend Bakery",
+      "product": "bop",
+      "requested_limit_usd": 350000,
+      "risk_flags": [],
+      "documents_complete": true,
+      "recommended_action": "auto_approve"
+    },
+    {
+      "case_id": "UW-007",
+      "applicant": "Atlas Fleet Services",
+      "product": "auto_fleet",
+      "requested_limit_usd": 3000000,
+      "risk_flags": ["high_mileage", "prior_claims"],
+      "documents_complete": true,
+      "recommended_action": "refer_underwriter"
+    },
+    {
+      "case_id": "UW-008",
+      "applicant": "Harborview Dental",
+      "product": "professional_liability",
+      "requested_limit_usd": 2000000,
+      "risk_flags": [],
+      "documents_complete": false,
+      "recommended_action": "request_documents"
+    },
+    {
+      "case_id": "UW-009",
+      "applicant": "GreenLine Transit",
+      "product": "auto_fleet",
+      "requested_limit_usd": 4500000,
+      "risk_flags": ["urban_routes"],
+      "documents_complete": true,
+      "recommended_action": "refer_underwriter"
+    },
+    {
+      "case_id": "UW-010",
+      "applicant": "Oak & Iron Manufacturing",
+      "product": "commercial_property",
+      "requested_limit_usd": 6000000,
+      "risk_flags": ["hazardous_materials"],
+      "documents_complete": true,
+      "recommended_action": "refer_underwriter"
+    },
+    {
+      "case_id": "UW-011",
+      "applicant": "BrightPath Tutoring",
+      "product": "bop",
+      "requested_limit_usd": 250000,
+      "risk_flags": [],
+      "documents_complete": true,
+      "recommended_action": "auto_approve"
+    },
+    {
+      "case_id": "UW-012",
+      "applicant": "Nova Payments Inc",
+      "product": "cyber",
+      "requested_limit_usd": 4000000,
+      "risk_flags": ["pci_scope"],
+      "documents_complete": false,
+      "recommended_action": "request_documents"
+    },
+    {
+      "case_id": "UW-013",
+      "applicant": "Lakeside Marina",
+      "product": "commercial_property",
+      "requested_limit_usd": 1750000,
+      "risk_flags": ["coastal_flood_zone"],
+      "documents_complete": true,
+      "recommended_action": "refer_underwriter"
+    },
+    {
+      "case_id": "UW-014",
+      "applicant": "Cascade Softgoods",
+      "product": "cargo",
+      "requested_limit_usd": 600000,
+      "risk_flags": [],
+      "documents_complete": true,
+      "recommended_action": "auto_approve"
+    },
+    {
+      "case_id": "UW-015",
+      "applicant": "Metro Care Network",
+      "product": "professional_liability",
+      "requested_limit_usd": 8000000,
+      "risk_flags": ["prior_claims", "multi_state"],
+      "documents_complete": true,
+      "recommended_action": "refer_underwriter"
+    }
+  ]
+}

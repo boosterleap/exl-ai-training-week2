@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>05 — LangChain core &amp; providers · Week 2 Mastery</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">← Mastery index</a>
+      <a href="04_provider_routing.html">Prev: 04 Provider routing</a>
+      <a href="06_langgraph_checkpoint_hitl.html">Next: 06 LangGraph</a>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">Module 05 · June 2026 · Offline-first</div>
+      <h1>langchain-core + OpenAI / Anthropic providers</h1>
+      <p class="lead">
+        Master the <strong>message / tool / chat-model layer</strong> that sits under LangGraph.
+        OpenRouter cohorts use <code class="inline">ChatOpenAI</code> with an OpenRouter
+        <code class="inline">base_url</code>; Anthropic cohorts use
+        <code class="inline">ChatAnthropic</code>. Same messages, same
+        <code class="inline">bind_tools</code>, same ReAct shape — LangGraph owns the loop.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">langchain-core ≥ 0.3</span>
+        <span class="chip">langchain-openai ≥ 0.3</span>
+        <span class="chip">langchain-anthropic ≥ 0.3</span>
+        <span class="chip">Maps to W2D1 OpenRouter path</span>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="Table of contents">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#why">Why this layer exists</a></li>
+        <li><a href="#beginner">Beginner — messages &amp; prompts</a></li>
+        <li><a href="#intermediate">Intermediate — tools, bind_tools, dual providers</a></li>
+        <li><a href="#advanced">Advanced — stream, usage, mini ReAct</a></li>
+        <li><a href="#cheatsheet">Cheatsheet &amp; pitfalls</a></li>
+        <li><a href="#checklist">Exit checklist</a></li>
+      </ol>
+    </nav>
+
+    <!-- ═══════════════════════════════════════════ WHY -->
+    <section class="section" id="why">
+      <h2>Why this layer exists</h2>
+      <p>
+        In Week 2, <strong>LangGraph</strong> is the orchestrator (state, edges, checkpoints, HITL).
+        <strong>langchain-core</strong> is the shared vocabulary: message types, tool schemas, and
+        the chat-model interface. Provider packages implement that interface:
+      </p>
+      <table>
+        <thead>
+          <tr><th>Package</th><th>Role for this cohort</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">langchain-core</code></td>
+            <td><code class="inline">HumanMessage</code>, <code class="inline">AIMessage</code>,
+              <code class="inline">ToolMessage</code>, <code class="inline">@tool</code>,
+              <code class="inline">ChatPromptTemplate</code>, Runnable APIs</td>
+          </tr>
+          <tr>
+            <td><code class="inline">langchain-openai</code></td>
+            <td><code class="inline">ChatOpenAI</code> — used for <strong>OpenRouter</strong>
+              (OpenAI-compatible HTTP API via <code class="inline">base_url</code>)</td>
+          </tr>
+          <tr>
+            <td><code class="inline">langchain-anthropic</code></td>
+            <td><code class="inline">ChatAnthropic</code> — direct Claude path when
+              <code class="inline">LLM_PROVIDER=anthropic</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">langgraph</code></td>
+            <td>Next module — wraps these models in
+              <code class="inline">create_react_agent</code> / custom graphs</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Mental model</strong>
+        Think of langchain as the <em>model + tool adapter</em>. You do not need LangChain agents
+        or LCEL chains for the OpenRouter lab — bind tools on a chat model, then let LangGraph
+        run the ReAct loop. Module 04 chose the provider; this module builds the objects that
+        provider code will invoke.
+      </div>
+      <div class="callout warn">
+        <strong>Offline-first rule</strong>
+        Every Beginner and Intermediate exercise runs with zero API calls. Sections marked
+        <span class="chip strong">API stretch</span> need keys in <code class="inline">Week2/.env</code>
+        and spend tokens — skip them until you have budget approval.
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════ BEGINNER -->
+    <section class="section" id="beginner">
+      <h2>
+        <span class="level beginner">Beginner</span>
+        Messages &amp; ChatPromptTemplate
+      </h2>
+      <p>
+        LangGraph state almost always stores a list of <code class="inline">BaseMessage</code>
+        objects. Roles are typed classes — not free-form dicts — so tool-calling and checkpointing
+        stay consistent across providers.
+      </p>
+
+      <h3>1. Four message types you will see every day</h3>
+<pre><code>from langchain_core.messages import (
+    SystemMessage,
+    HumanMessage,
+    AIMessage,
+    ToolMessage,
+)
+
+messages = [
+    SystemMessage(content="You are an FNOL triage assistant. Be concise."),
+    HumanMessage(content="Policy POL-1001 reports water damage. Triage please."),
+    AIMessage(
+        content="",
+        tool_calls=[{
+            "id": "call_01",
+            "name": "lookup_policy",
+            "args": {"policy_id": "POL-1001"},
+        }],
+    ),
+    ToolMessage(
+        content='{"policy_id": "POL-1001", "status": "active", "deductible": 500}',
+        tool_call_id="call_01",
+        name="lookup_policy",
+    ),
+    AIMessage(content="Active policy. Recommend intake with $500 deductible noted."),
+]
+
+for m in messages:
+    print(type(m).__name__, "->", repr(m.content)[:60])</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Type</th><th>Who writes it</th><th>Key fields</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">SystemMessage</code></td>
+            <td>You / graph setup</td>
+            <td><code class="inline">content</code> — persona, lane rules, output contract</td>
+          </tr>
+          <tr>
+            <td><code class="inline">HumanMessage</code></td>
+            <td>Operator / CLI / UI</td>
+            <td><code class="inline">content</code> — user turn</td>
+          </tr>
+          <tr>
+            <td><code class="inline">AIMessage</code></td>
+            <td>Chat model</td>
+            <td><code class="inline">content</code>, optional <code class="inline">tool_calls</code>,
+              <code class="inline">usage_metadata</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">ToolMessage</code></td>
+            <td>Your runtime after executing a tool</td>
+            <td><code class="inline">content</code>, <code class="inline">tool_call_id</code>
+              (must match the call), optional <code class="inline">name</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout">
+        <strong>ReAct sequence (offline sketch)</strong>
+        Human → AI (with <code class="inline">tool_calls</code>) → Tool → AI (final text).
+        LangGraph’s prebuilt ReAct agent produces exactly this pattern; you are learning the
+        atoms before the graph.
+      </div>
+
+      <div class="exercise" id="ex01">
+        <div class="ex-label">Exercise B1 — Build a five-message logistics trace</div>
+        <p>
+          Build a five-message list for logistics: system rule, human asking about shipment
+          <code class="inline">SHP-77</code>, an <code class="inline">AIMessage</code> that
+          requests <code class="inline">get_shipment</code>, a matching
+          <code class="inline">ToolMessage</code> with fake JSON status
+          <code class="inline">"on_hold"</code>, and a final assistant text that refuses a
+          hold release without approval. Print
+          <code class="inline">[type(m).__name__ for m in messages]</code>.
+        </p>
+<pre><code># Expected shape (names only):
+# ['SystemMessage', 'HumanMessage', 'AIMessage', 'ToolMessage', 'AIMessage']</code></pre>
+      </div>
+
+      <div class="exercise" id="ex02">
+        <div class="ex-label">Exercise B2 — Match ToolMessages to tool_call ids</div>
+        <p>
+          Given an <code class="inline">AIMessage</code> with two tool calls
+          (<code class="inline">lookup_claim</code> and <code class="inline">lookup_policy</code>),
+          write two <code class="inline">ToolMessage</code>s whose
+          <code class="inline">tool_call_id</code> values match. Assert with a small loop that
+          every <code class="inline">tool_calls[].id</code> has exactly one matching ToolMessage.
+        </p>
+<pre><code>ai = AIMessage(
+    content="",
+    tool_calls=[
+        {"id": "c1", "name": "lookup_claim", "args": {"claim_id": "CLM-9"}},
+        {"id": "c2", "name": "lookup_policy", "args": {"policy_id": "POL-1"}},
+    ],
+)
+# TODO: tool_msgs = [...]; assert ids match</code></pre>
+      </div>
+
+      <h3>2. ChatPromptTemplate — fill slots, keep roles</h3>
+      <p>
+        Templates turn variables into message lists without string-concat bugs. Useful for
+        system prompts that inject lane name, schema JSON, or max-step budgets.
+      </p>
+<pre><code>from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a {lane} operations assistant. Be factual."),
+    MessagesPlaceholder("history"),
+    ("human", "{question}"),
+])
+
+rendered = prompt.invoke({
+    "lane": "banking",
+    "history": [HumanMessage(content="Earlier: loan LN-10042")],
+    "question": "What is the payoff quote?",
+})
+
+# rendered is a ChatPromptValue; .to_messages() → list[BaseMessage]
+for m in rendered.to_messages():
+    print(type(m).__name__, m.content)</code></pre>
+
+      <div class="exercise" id="ex03">
+        <div class="ex-label">Exercise B3 — ChatPromptTemplate with schema slot</div>
+        <p>
+          Create a <code class="inline">ChatPromptTemplate</code> with:
+          (1) system string containing <code class="inline">{schema}</code>,
+          (2) a <code class="inline">MessagesPlaceholder("messages")</code>,
+          (3) human <code class="inline">{input}</code>.
+          Invoke it with a tiny JSON schema string, one prior HumanMessage in
+          <code class="inline">messages</code>, and a new input. Confirm
+          <code class="inline">len(rendered.to_messages()) == 3</code>.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex04">
+        <div class="ex-label">Exercise B4 — role_counts helper for traces</div>
+        <p>
+          Write a helper <code class="inline">role_counts(messages) -&gt; dict[str, int]</code>
+          that tallies message class names. Run it on your B1 list. You will reuse this helper
+          when debugging LangGraph traces in module 06.
+        </p>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════ INTERMEDIATE -->
+    <section class="section" id="intermediate">
+      <h2>
+        <span class="level intermediate">Intermediate</span>
+        Tools, bind_tools, dual providers
+      </h2>
+
+      <h3>3. Defining tools — <code class="inline">@tool</code> and Pydantic args</h3>
+      <p>
+        Models only see a JSON schema + description. Your function body is the source of truth
+        for side effects. Prefer explicit Pydantic models when args are more than one or two fields
+        (matches module 03 contracts).
+      </p>
+<pre><code>from pydantic import BaseModel, Field
+from langchain_core.tools import tool
+
+class ShipmentLookupArgs(BaseModel):
+    shipment_id: str = Field(description="Stable shipment id, e.g. SHP-77")
+
+@tool(args_schema=ShipmentLookupArgs)
+def get_shipment(shipment_id: str) -> dict:
+    """Return status and hold flag for a shipment id. Read-only."""
+    # Offline fake store — no network
+    FAKE = {
+        "SHP-77": {"status": "on_hold", "hold_reason": "address_verify", "can_release": False},
+        "SHP-12": {"status": "in_transit", "eta_days": 2, "can_release": False},
+    }
+    return FAKE.get(shipment_id, {"status": "not_found", "shipment_id": shipment_id})
+
+print(get_shipment.name)
+print(get_shipment.description)
+print(get_shipment.args)          # JSON-schema-ish dict for the model
+print(get_shipment.invoke({"shipment_id": "SHP-77"}))</code></pre>
+
+      <div class="callout warn">
+        <strong>Write tools need approval</strong>
+        In the PM lab, goodwill credits and hold releases are write operations. Even when you
+        expose them as LangChain tools, the wrapper must check learner approval + idempotency key
+        before mutating. Do not invent claim/loan/shipment records — use fixtures under
+        <code class="inline">ConceptBuilding/data/</code> or an in-memory dict.
+      </div>
+
+      <div class="exercise" id="ex05">
+        <div class="ex-label">Exercise I1 — Define loan_lookup tool with Pydantic</div>
+        <p>
+          Define <code class="inline">LoanLookupArgs</code> (Pydantic) and
+          <code class="inline">@tool</code> <code class="inline">loan_lookup(loan_id: str)</code>
+          returning a dict from a hard-coded map with at least
+          <code class="inline">LN-10042</code>. Print
+          <code class="inline">loan_lookup.args</code> and invoke once. Confirm the schema
+          description mentions the id format.
+        </p>
+      </div>
+
+      <h3>4. <code class="inline">bind_tools</code> — attach schemas to a chat model</h3>
+      <p>
+        Binding does not execute tools. It tells the provider to advertise those tools so the
+        next <code class="inline">AIMessage</code> may include <code class="inline">tool_calls</code>.
+        You can practice the <em>shape</em> offline by constructing the AIMessage yourself;
+        provider-backed binding needs a real model instance.
+      </p>
+<pre><code># Conceptual — what bind_tools prepares for the provider:
+# model_with_tools = model.bind_tools([get_shipment, loan_lookup])
+# ai = model_with_tools.invoke([HumanMessage(content="Status of SHP-77?")])
+# ai.tool_calls  →  [{"name": "get_shipment", "args": {...}, "id": "..."}]
+
+# Offline stand-in for a model that "chose" a tool:
+fake_ai = AIMessage(
+    content="",
+    tool_calls=[{
+        "id": "call_shp",
+        "name": "get_shipment",
+        "args": {"shipment_id": "SHP-77"},
+    }],
+)
+assert fake_ai.tool_calls[0]["name"] == "get_shipment"</code></pre>
+
+      <h3>5. Tool-calling loop sketch (no LangGraph yet)</h3>
+      <p>
+        This is the algorithm LangGraph ReAct implements for you. Writing it by hand once makes
+        checkpoint / interrupt behavior in module 06 obvious.
+      </p>
+<pre><code>from typing import Callable
+
+TOOL_REGISTRY: dict[str, Callable] = {
+    get_shipment.name: get_shipment,
+}
+
+def run_one_tool_turn(ai: AIMessage) -&gt; list[ToolMessage]:
+    """Execute every tool_call on an AIMessage; return ToolMessages."""
+    out: list[ToolMessage] = []
+    for call in ai.tool_calls or []:
+        fn = TOOL_REGISTRY[call["name"]]
+        result = fn.invoke(call["args"])
+        out.append(
+            ToolMessage(
+                content=str(result),
+                tool_call_id=call["id"],
+                name=call["name"],
+            )
+        )
+    return out
+
+# One ReAct step offline:
+history = [
+    SystemMessage(content="Use tools before answering."),
+    HumanMessage(content="Is SHP-77 releasable?"),
+    fake_ai,
+]
+history.extend(run_one_tool_turn(fake_ai))
+# Next: model would see ToolMessage(s) and produce a final AIMessage
+print([type(m).__name__ for m in history])</code></pre>
+
+      <div class="exercise" id="ex06">
+        <div class="ex-label">Exercise I2 — Multi-tool turn via run_one_tool_turn</div>
+        <p>
+          Extend <code class="inline">TOOL_REGISTRY</code> with your
+          <code class="inline">loan_lookup</code>. Fabricate an
+          <code class="inline">AIMessage</code> that calls <em>both</em> tools in one turn.
+          Run <code class="inline">run_one_tool_turn</code> and assert you get two
+          <code class="inline">ToolMessage</code>s with correct ids and names.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex07">
+        <div class="ex-label">Exercise I3 — Write tool release_hold with approval</div>
+        <p>
+          Add a write-shaped tool <code class="inline">release_hold(shipment_id, idempotency_key, approved: bool)</code>
+          that returns <code class="inline">{"ok": False, "reason": "approval_required"}</code>
+          when <code class="inline">approved</code> is false, otherwise a success dict.
+          Document in the docstring that this is a write. Call it both ways offline — no LLM.
+        </p>
+      </div>
+
+      <h3>6. Dual path — ChatOpenAI → OpenRouter, ChatAnthropic → Claude</h3>
+      <p>
+        Construction only (no invoke) is still valuable: you verify env wiring from module 02/04.
+        Provider invocation is an API stretch.
+      </p>
+<pre><code>import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# From a notebook whose cwd is Week2/ConceptBuilding:
+load_dotenv(Path("..").resolve() / ".env")
+
+def build_chat_model():
+    """Standalone dual-provider routing example for the Day 1 concepts."""
+    provider = os.getenv("LLM_PROVIDER", "anthropic").lower()
+
+    if provider == "openrouter":
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            base_url=os.getenv(
+                "OPENROUTER_BASE_URL",
+                "https://openrouter.ai/api/v1",
+            ),
+            model=os.getenv("OPENROUTER_MODEL", "anthropic/claude-sonnet-4"),
+            temperature=0,
+            max_tokens=int(os.getenv("AGENT_MAX_TOKENS", "1024")),
+        )
+
+    from langchain_anthropic import ChatAnthropic
+    return ChatAnthropic(
+        api_key=os.getenv("ANTHROPIC_API_KEY"),
+        model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
+        temperature=0,
+        max_tokens=int(os.getenv("AGENT_MAX_TOKENS", "1024")),
+    )
+
+# Offline check — construct only:
+model = build_chat_model()
+print(type(model).__name__)
+# OpenRouter cohort should print: ChatOpenAI
+# Anthropic cohort should print: ChatAnthropic</code></pre>
+
+      <div class="callout">
+        <strong>Why ChatOpenAI for OpenRouter?</strong>
+        OpenRouter speaks the OpenAI Chat Completions wire format. Pointing
+        <code class="inline">base_url</code> at <code class="inline">https://openrouter.ai/api/v1</code>
+        and passing <code class="inline">OPENROUTER_API_KEY</code> is the supported Week 2 pattern —
+        not a separate <code class="inline">langchain_openrouter</code> package. Model slugs look like
+        <code class="inline">anthropic/claude-sonnet-4</code> (provider/model).
+      </div>
+
+<pre><code># Binding tools on either provider (same API):
+model_with_tools = model.bind_tools([get_shipment, loan_lookup])
+# Later (API stretch): model_with_tools.invoke([HumanMessage(...)])</code></pre>
+
+      <div class="exercise" id="ex08">
+        <div class="ex-label">Exercise I4 — build_chat_model for both providers</div>
+        <p>
+          Implement <code class="inline">build_chat_model()</code> as above. Force
+          <code class="inline">os.environ["LLM_PROVIDER"] = "openrouter"</code> (and a dummy key if
+          unset) then assert <code class="inline">type(model).__name__ == "ChatOpenAI"</code>.
+          Repeat for <code class="inline">"anthropic"</code> → <code class="inline">ChatAnthropic</code>.
+          Do <em>not</em> call <code class="inline">invoke</code>.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex09">
+        <div class="ex-label">Exercise I5 — Provider-backed bind_tools invoke (API stretch)</div>
+        <p>
+          With a real key and budget approval: <code class="inline">bind_tools([get_shipment])</code>,
+          invoke with <code class="inline">HumanMessage("Status of SHP-77? Use the tool.")</code>,
+          print <code class="inline">ai.tool_calls</code>. If the model returns tool calls, run your
+          offline <code class="inline">run_one_tool_turn</code>, append ToolMessages, invoke once
+          more for the final text. Cap <code class="inline">max_tokens</code> low (e.g. 256).
+        </p>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════ ADVANCED -->
+    <section class="section" id="advanced">
+      <h2>
+        <span class="level advanced">Advanced</span>
+        Streaming, usage metadata, mini ReAct
+      </h2>
+
+      <h3>7. Streaming token chunks</h3>
+      <p>
+        Streaming is a chat-model concern; LangGraph can stream events on top. Practice the
+        model API so UI / CLI progress bars make sense later.
+      </p>
+<pre><code># API stretch — pattern only
+# for chunk in model.stream([HumanMessage(content="One sentence on FNOL.")]):
+#     # chunk is an AIMessageChunk; .content is often a small string delta
+#     print(chunk.content, end="", flush=True)
+
+# Offline stand-in: fake chunks you can unit-test without a provider
+chunks = ["Active ", "policy. ", "Route ", "to ", "intake."]
+assembled = "".join(chunks)
+assert assembled.startswith("Active")</code></pre>
+
+      <div class="exercise" id="ex10">
+        <div class="ex-label">Exercise A1 — Assemble streamed chunk deltas</div>
+        <p>
+          Write <code class="inline">assemble_chunks(chunks: list[str]) -&gt; str</code> and a tiny
+          test that joining streamed deltas equals a golden string. Then note in a comment where
+          you would replace the list with <code class="inline">model.stream(...)</code>.
+        </p>
+      </div>
+
+      <h3>8. Usage metadata — tokens for budgets</h3>
+      <p>
+        OpenRouter / Anthropic paths in the lab read
+        <code class="inline">message.usage_metadata</code> after each AI turn to enforce
+        <code class="inline">AGENT_MAX_TOKENS</code> and spend knobs from module 02.
+      </p>
+<pre><code>def token_usage(messages) -&gt; tuple[int, int]:
+    """Sum input/output tokens from AIMessage.usage_metadata (lab pattern)."""
+    inp = out = 0
+    for message in messages:
+        usage = getattr(message, "usage_metadata", None) or {}
+        inp += int(usage.get("input_tokens") or 0)
+        out += int(usage.get("output_tokens") or 0)
+    return inp, out
+
+# Offline fake AIMessage with usage (no provider call):
+ai_with_usage = AIMessage(
+    content="Done.",
+    usage_metadata={"input_tokens": 120, "output_tokens": 40, "total_tokens": 160},
+)
+assert token_usage([ai_with_usage]) == (120, 40)</code></pre>
+
+      <div class="exercise" id="ex11">
+        <div class="ex-label">Exercise A2 — Token budget would_exceed helper</div>
+        <p>
+          Simulate three AI turns with different <code class="inline">usage_metadata</code>.
+          Implement <code class="inline">would_exceed(messages, max_total: int) -&gt; bool</code>
+          using your <code class="inline">token_usage</code> helper. Assert True/False cases.
+        </p>
+      </div>
+
+      <h3>9. Mini ReAct step — fake tools offline, optional provider-backed finish</h3>
+      <p>
+        You now have every piece LangGraph’s ReAct agent uses internally for one tool hop.
+        Assemble a function you could later drop behind a graph node.
+      </p>
+<pre><code>def mini_react_offline(
+    question: str,
+    tool_choice: dict,
+    tools: dict[str, Callable],
+) -&gt; list:
+    """
+    One ReAct hop without a model:
+      Human → AI(tool_calls) → ToolMessage(s) → final AI (templated summary).
+    tool_choice example:
+      {"id": "c1", "name": "get_shipment", "args": {"shipment_id": "SHP-77"}}
+    """
+    ai = AIMessage(content="", tool_calls=[tool_choice])
+    registry = tools
+    tool_msgs = []
+    for call in ai.tool_calls:
+        result = registry[call["name"]].invoke(call["args"])
+        tool_msgs.append(
+            ToolMessage(content=str(result), tool_call_id=call["id"], name=call["name"])
+        )
+    summary = AIMessage(
+        content=f"Tool {tool_choice['name']} returned: {tool_msgs[0].content}"
+    )
+    return [
+        SystemMessage(content="Prefer tools over guesses."),
+        HumanMessage(content=question),
+        ai,
+        *tool_msgs,
+        summary,
+    ]
+
+trace = mini_react_offline(
+    "Is SHP-77 on hold?",
+    {"id": "c1", "name": "get_shipment", "args": {"shipment_id": "SHP-77"}},
+    {get_shipment.name: get_shipment},
+)
+assert [type(m).__name__ for m in trace] == [
+    "SystemMessage", "HumanMessage", "AIMessage", "ToolMessage", "AIMessage"
+]
+print(trace[-1].content)</code></pre>
+
+      <div class="exercise" id="ex12">
+        <div class="ex-label">Exercise A3 — Parallel tool_choice mini ReAct</div>
+        <p>
+          Generalize <code class="inline">mini_react_offline</code> to accept a
+          <em>list</em> of tool_choice dicts (parallel calls). Return one ToolMessage per call.
+          Add an assertion that final message content mentions every tool name used.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex13">
+        <div class="ex-label">Exercise A4 — Provider-backed mini ReAct with token budget</div>
+        <p>
+          Replace the fabricated <code class="inline">AIMessage(tool_calls=...)</code> with a model-returned
+          <code class="inline">model.bind_tools([...]).invoke(...)</code>. Keep tool execution and
+          the second model call for the summary. Log
+          <code class="inline">token_usage</code> after each AIMessage. Stop if total tokens would
+          exceed your <code class="inline">AGENT_MAX_TOKENS</code> budget. Mark the notebook cell
+          clearly as stretch so instructors can skip it in no-key rooms.
+        </p>
+      </div>
+
+      <h3>10. How this plugs into LangGraph (preview only)</h3>
+<pre><code># Preview — full treatment in module 06
+# from langgraph.prebuilt import create_react_agent
+# agent = create_react_agent(model, [get_shipment, loan_lookup])
+# result = agent.invoke({"messages": [HumanMessage(content="...")]})
+# result["messages"]  # same BaseMessage types you practiced here</code></pre>
+      <div class="callout">
+        <strong>Takeaway for OpenRouter cohort</strong>
+        Your production-ish path is: build tools → build
+        <code class="inline">ChatOpenAI(base_url=OpenRouter)</code> → hand both to LangGraph.
+        langchain-core is not optional glue; it is the typed contract between the model provider
+        and the graph.
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════ CHEATSHEET -->
+    <section class="section" id="cheatsheet">
+      <h2>Cheatsheet &amp; pitfalls</h2>
+      <table>
+        <thead>
+          <tr><th>Want…</th><th>Use…</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Conversation roles</td>
+            <td><code class="inline">SystemMessage</code> / <code class="inline">HumanMessage</code> /
+              <code class="inline">AIMessage</code> / <code class="inline">ToolMessage</code></td>
+          </tr>
+          <tr>
+            <td>Prompt with history slot</td>
+            <td><code class="inline">ChatPromptTemplate</code> +
+              <code class="inline">MessagesPlaceholder</code></td>
+          </tr>
+          <tr>
+            <td>Tool schema for the model</td>
+            <td><code class="inline">@tool</code> + Pydantic <code class="inline">args_schema</code></td>
+          </tr>
+          <tr>
+            <td>Advertise tools to the LLM</td>
+            <td><code class="inline">model.bind_tools([t1, t2])</code></td>
+          </tr>
+          <tr>
+            <td>OpenRouter chat model</td>
+            <td><code class="inline">ChatOpenAI(api_key=..., base_url=..., model=...)</code></td>
+          </tr>
+          <tr>
+            <td>Direct Anthropic chat model</td>
+            <td><code class="inline">ChatAnthropic(api_key=..., model=...)</code></td>
+          </tr>
+          <tr>
+            <td>Budget / token totals</td>
+            <td><code class="inline">AIMessage.usage_metadata</code></td>
+          </tr>
+          <tr>
+            <td>Full agent loop</td>
+            <td>Module 06 — LangGraph <code class="inline">create_react_agent</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Pitfalls</h3>
+      <ul>
+        <li>
+          <strong>Mismatched <code class="inline">tool_call_id</code></strong> — providers reject
+          or ignore ToolMessages that do not reference the AI’s call id.
+        </li>
+        <li>
+          <strong>Calling tools inside the model class</strong> — binding ≠ execution. Your code
+          (or LangGraph) must run the function and append ToolMessages.
+        </li>
+        <li>
+          <strong>Wrong package for OpenRouter</strong> — use
+          <code class="inline">langchain-openai</code>’s <code class="inline">ChatOpenAI</code>
+          with OpenRouter <code class="inline">base_url</code>, not a missing third-party wrapper.
+        </li>
+        <li>
+          <strong>Inventing domain records</strong> — always tool against fixtures or explicit fakes;
+          never fabricate policy/claim/loan/shipment facts in prose.
+        </li>
+        <li>
+          <strong>Write tools without approval</strong> — hold release / goodwill credit must gate
+          on learner approval and an idempotency key.
+        </li>
+      </ul>
+    </section>
+
+    <!-- ═══════════════════════════════════════════ CHECKLIST -->
+    <section class="section" id="checklist">
+      <h2>Exit checklist</h2>
+      <p>You are ready for module 06 when you can do all of the following <em>offline</em>:</p>
+      <ul>
+        <li>Assemble a Human → AI(tool_calls) → Tool → AI message list by hand.</li>
+        <li>Define a Pydantic-backed <code class="inline">@tool</code> and invoke it without an LLM.</li>
+        <li>Sketch a multi-tool turn executor that returns matching ToolMessages.</li>
+        <li>Construct <code class="inline">ChatOpenAI</code> (OpenRouter) and
+          <code class="inline">ChatAnthropic</code> from <code class="inline">LLM_PROVIDER</code>
+          without calling the network.</li>
+        <li>Sum fake <code class="inline">usage_metadata</code> for a budget check.</li>
+        <li>Explain in one sentence: langchain = model/tool layer; LangGraph = loop/state.</li>
+      </ul>
+      <div class="callout warn">
+        <strong>API stretches (optional)</strong>
+        Exercises I5 and A4 only — require keys, burn tokens, mark clearly in notebooks.
+      </div>
+    </section>
+
+    <nav class="nav-footer">
+      <a href="04_provider_routing.html">← 04 Provider routing</a>
+      <a href="../index.html">Index</a>
+      <a href="06_langgraph_checkpoint_hitl.html">06 LangGraph checkpoint &amp; HITL →</a>
+    </nav>
+  </div>
+</body>
+</html>

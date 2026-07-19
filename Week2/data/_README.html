@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Week 2 shared datasets</title>
+  <link rel="stylesheet" href="../css/lab-readme.css">
+</head>
+<body>
+  <header class="page-header">
+    <h1>Week 2 shared datasets</h1>
+    <p class="meta">Authoritative shared fixtures for the ten session-first labs. Shipped files are read-only inputs; generated derivatives are identified below.</p>
+  </header>
+
+  <main class="content">
+    <h2>Files</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Path</th>
+          <th>Shipped in git?</th>
+          <th>Used in</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="logistics/shipment_events.jsonl"><code>logistics/shipment_events.jsonl</code></a></td>
+          <td>Yes</td>
+          <td>W2D1 AM topic 01, W2D1 PM topic 02</td>
+        </tr>
+        <tr>
+          <td><a href="insurance/fnol_emails.csv"><code>insurance/fnol_emails.csv</code></a></td>
+          <td>Yes</td>
+          <td>W2D1 AM typed tools, W2D1 PM triage</td>
+        </tr>
+        <tr>
+          <td><a href="insurance/seed_claims_db.py"><code>insurance/claims.db</code> (seed script)</a></td>
+          <td>No - you generate</td>
+          <td>W2D1 AM typed tools, W2D1 PM tools</td>
+        </tr>
+        <tr>
+          <td><a href="banking/generate_loans_parquet.py"><code>banking/loans_5k.parquet</code> (generator)</a></td>
+          <td>No - you generate</td>
+          <td>W2D1 AM agent vs pipeline, W2D1 PM banking</td>
+        </tr>
+        <tr>
+          <td><a href="banking/customer_threads.json"><code>banking/customer_threads.json</code></a></td>
+          <td>Yes</td>
+          <td>W2D1 PM banking <code>session-demo</code></td>
+        </tr>
+        <tr>
+          <td><a href="insurance/workflow_cases_15.json"><code>insurance/workflow_cases_15.json</code></a></td>
+          <td>Yes</td>
+          <td>W2D2 AM CrewAI primer, scaffold, SDK isolation/hooks, and checkpointed HITL</td>
+        </tr>
+        <tr>
+          <td><a href="insurance/claim_narratives_10.json"><code>insurance/claim_narratives_10.json</code></a></td>
+          <td>Yes</td>
+          <td>W2D2 PM provider-backed multi-agent, gateway, handoff, baseline, resumable workflow, and claim MCP/A2A services</td>
+        </tr>
+        <tr>
+          <td><a href="supply/inventory.json"><code>supply/inventory.json</code></a></td>
+          <td>Yes</td>
+          <td>W2D2 Google ADK primer and PM MCP/A2A inventory servers</td>
+        </tr>
+        <tr>
+          <td><a href="insurance/policies/"><code>insurance/policies/*.md</code></a></td>
+          <td>Yes</td>
+          <td>W2D3 AM/PM policy retrieval corpus</td>
+        </tr>
+        <tr>
+          <td><a href="insurance/policy_chunks.json"><code>insurance/policy_chunks.json</code></a></td>
+          <td>Yes</td>
+          <td>W2D3 shipped canonical chunk input for embeddings, retrieval, citations, lineage, and store ingestion</td>
+        </tr>
+        <tr>
+          <td><a href="insurance/rag_goldens.json"><code>insurance/rag_goldens.json</code></a></td>
+          <td>Yes</td>
+          <td>W2D3 hybrid/rerank eval</td>
+        </tr>
+        <tr>
+          <td><a href="supply/supplier_kg.json"><code>supply/supplier_kg.json</code></a></td>
+          <td>Yes</td>
+          <td>W2D3 GraphRAG concept</td>
+        </tr>
+        <tr>
+          <td><a href="banking/generate_accounts_acl.py"><code>banking/accounts_acl.parquet</code> (generator)</a></td>
+          <td>No - you generate</td>
+          <td>W2D3 ACL retrieval demo</td>
+        </tr>
+        <tr>
+          <td><a href="insurance/customer_sessions/threads.json"><code>insurance/customer_sessions/threads.json</code></a></td>
+          <td>Yes</td>
+          <td>W2D3 PM session memory</td>
+        </tr>
+        <tr>
+          <td><a href="logistics/delay_events.jsonl"><code>logistics/delay_events.jsonl</code></a></td>
+          <td>Yes</td>
+          <td>W2D3 PM webhook agent</td>
+        </tr>
+        <tr>
+          <td><a href="eval/adversarial_prompts.json"><code>eval/adversarial_prompts.json</code></a></td>
+          <td>Yes</td>
+          <td>W2D4 AM prompt-injection and policy controls</td>
+        </tr>
+        <tr>
+          <td><a href="eval/trajectory_goldens.json"><code>eval/trajectory_goldens.json</code></a></td>
+          <td>Yes</td>
+          <td>W2D4 PM trajectory, test-data, and release-gate topics</td>
+        </tr>
+        <tr>
+          <td><a href="governance/use_case_risk_tiers.json"><code>governance/use_case_risk_tiers.json</code></a></td>
+          <td>Yes</td>
+          <td>W2D5 PM governance and regulatory-fit topics</td>
+        </tr>
+        <tr>
+          <td><a href="rag/build_policy_index.py"><code>chroma_persist/</code> (index builder)</a></td>
+          <td>No - you generate</td>
+          <td>Legacy/local Chroma utility; rebuilt Day 3 uses <code>d3amt2c06_chroma_fallback.py</code> for the implemented Chroma alternative</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Preprocessing (run once)</h2>
+    <p>From the <code>Week2</code> root after <code>uv pip install -r requirements.txt</code>:</p>
+<pre><code>uv run python data\insurance\seed_claims_db.py
+uv run python data\banking\generate_loans_parquet.py
+uv run python data\banking\generate_accounts_acl.py</code></pre>
+    <p>
+      Seed scripts:
+      <a href="insurance/seed_claims_db.py"><code>insurance/seed_claims_db.py</code></a>,
+      <a href="banking/generate_loans_parquet.py"><code>banking/generate_loans_parquet.py</code></a>,
+      <a href="banking/generate_accounts_acl.py"><code>banking/generate_accounts_acl.py</code></a>
+    </p>
+    <p><code>claims.db</code> is required before the first Day 1 LangGraph tool chain. Day 2, evaluation, governance, and <code>insurance/policy_chunks.json</code> fixtures are shipped and need no seed step. The insurance policy corpus contains exactly six Markdown files.</p>
+
+    <h3>Day 3 canonical data and generated stores</h3>
+    <p>
+      Day 3 reads the six shipped policy Markdown files, shipped
+      <code>insurance/policy_chunks.json</code>, <code>insurance/rag_goldens.json</code>,
+      <code>supply/supplier_kg.json</code>, customer threads, and logistics delay events.
+      <strong>The chunk JSON is source-controlled input, not a generated vector index.</strong>
+      Pinecone indexes/namespaces, PostgreSQL/pgvector tables and indexes, Chroma persistence,
+      SQLite checkpoints/event receipts, and DiskCache directories are generated runtime state.
+    </p>
+    <p>
+      Pinecone is the primary implemented and runtime-tested classroom vector path. PostgreSQL with
+      pgvector and Chroma are fully implemented alternatives whose runtime verification is
+      intentionally deferred. Follow
+      <a href="../W2D3/W2D3AM/_VECTOR_STORES_SETUP.html"><code>W2D3AM/_VECTOR_STORES_SETUP.html</code></a>;
+      detailed pgvector provisioning and validation maps to
+      <a href="../W2D3/W2D3AM/d3amt2c03_pgvector_store.py"><code>d3amt2c03_pgvector_store.py</code></a>.
+    </p>
+    <div class="callout">
+      <strong>Home policy identity:</strong> <code>POL-HOME-010</code> is the parent homeowners
+      policy represented by the water and flood-rider source files. <code>POL-HOME-FLOOD</code>
+      is the rider expectation used by relevant retrieval/evaluation checks; do not rewrite the
+      parent policy ID as the rider ID.
+    </div>
+    <p>
+      The rebuilt 34-script path requires Anthropic API, SentenceTransformers, Pinecone,
+      LangGraph, NetworkX, CrossEncoder reranking, Pydantic, SQLite checkpoints/events,
+      FastAPI webhook handling, DiskCache, and typed citations. LlamaIndex is not used by these
+      teaching scripts; they use native clients and LangGraph.
+    </p>
+
+    <h3>Day 1 generated evidence</h3>
+    <p>Day 1 never mutates authoritative CSV, SQLite, or JSONL fixtures. Configured Day 1 runs write reconstructable evidence under <code>W2D1/outputs/day1/</code>, including <code>am_handoff.json</code>, <code>triage_decision.json</code>, <code>agent_trace.jsonl</code>, <code>sdk_session.json</code>, <code>usage_summary.json</code>, and <code>hold_release_ledger.jsonl</code>. The hold-release ledger records learner-approved commands and provides process-restart idempotency; it is generated output, not shipment source data.</p>
+
+    <h3>Day 2 canonical data and providers</h3>
+    <p>
+      Day 2 AM reads <code>insurance/workflow_cases_15.json</code> for all 15 underwriting cases.
+      Day 2 PM reads <code>insurance/claim_narratives_10.json</code> for claim-agent work and
+      <code>supply/inventory.json</code> for MCP/A2A protocol work. The CrewAI primer also reads
+      <code>insurance/fnol_emails.csv</code> and generated <code>insurance/claims.db</code>;
+      the Google ADK primer reads inventory plus both logistics JSONL files; the Microsoft
+      Agent Framework primer reads <code>banking/customer_threads.json</code> plus the two generated
+      banking Parquet files.
+    </p>
+    <ul>
+      <li><strong>Anthropic:</strong> required for the CrewAI primer and the API-backed Day 2 Anthropic, LangGraph, and Claude Agent SDK chains.</li>
+      <li><strong>Gemini API:</strong> required by <a href="../W2D2/W2D2AM/_GOOGLE_ADK_PRIMER.ipynb">the Google ADK primer</a> through <code>GOOGLE_API_KEY</code> and <code>GOOGLE_ADK_MODEL</code>.</li>
+      <li><strong>Microsoft Foundry:</strong> required by <a href="../W2D2/W2D2AM/_MICROSOFT_AGENT_FRAMEWORK_PRIMER.ipynb">the Agent Framework primer</a> through Azure CLI authentication, <code>FOUNDRY_PROJECT_ENDPOINT</code>, and <code>FOUNDRY_MODEL</code>.</li>
+    </ul>
+    <p>All domain reads must retain exact source IDs. Unknown records, denied access, provider failures, and unavailable protocol endpoints are explicit outcomes; no primer or script may invent a fallback record.</p>
+
+    <h3>Day 2 generated evidence</h3>
+    <table>
+      <thead>
+        <tr><th>Generated path</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>W2D2/W2D2AM/outputs/topic4_hook_audit.jsonl</code></td><td>Append-only Agent SDK pre/post/failure/stop hook evidence</td></tr>
+        <tr><td><code>W2D2/W2D2AM/outputs/topic6_checkpoints.sqlite</code></td><td>Checkpoint-only state</td></tr>
+        <tr><td><code>W2D2/W2D2AM/outputs/topic6_hitl.sqlite</code></td><td>Paused/resumed human decision state</td></tr>
+        <tr><td><code>W2D2/W2D2AM/outputs/topic6_idempotent_hitl.sqlite</code></td><td>Checkpoint state for the approval-gated action chain</td></tr>
+        <tr><td><code>W2D2/W2D2AM/outputs/topic6_action_ledger.sqlite</code></td><td>Idempotency receipts; duplicate keys cannot execute a second action</td></tr>
+        <tr><td><code>W2D2/W2D2PM/outputs/topic6.sqlite</code></td><td>Checkpointed two-agent handoff state</td></tr>
+        <tr><td><code>W2D2/W2D2PM/outputs/topic6_protocol.sqlite</code></td><td>MCP/A2A integration checkpoint and handoff-idempotency records</td></tr>
+        <tr><td>Learner-selected <code>--trace-out</code> path</td><td>Optional Topic 5 PM replay trace with hashes, provenance, usage, and private-field exclusion</td></tr>
+      </tbody>
+    </table>
+    <p>These files are generated evidence, not canonical datasets. Use the same thread ID to resume a paused run and a new thread ID/idempotency key for a new demonstration.</p>
+
+    <h3>Day 2 MCP and A2A localhost setup</h3>
+    <p>From the <code>Week2</code> root, keep the selected server running in one terminal and use a second terminal for its client:</p>
+<pre><code>uv run python W2D2\W2D2PM\d2pmt2c01_mcp_server.py --self-test
+uv run python W2D2\W2D2PM\d2pmt2c01_mcp_server.py
+uv run python W2D2\W2D2PM\d2pmt2c02_mcp_client.py --sku SKU-1002
+
+uv run python W2D2\W2D2PM\d2pmt3c01_agent_card_validate.py
+uv run python W2D2\W2D2PM\d2pmt3c03_inventory_a2a_server.py
+uv run python W2D2\W2D2PM\d2pmt3c02_a2a_task.py --sku SKU-1002
+
+uv run python W2D2\W2D2PM\d2pmt6c03_claim_mcp_server.py
+uv run python W2D2\W2D2PM\d2pmt6c03_claim_a2a_server.py
+uv run python W2D2\W2D2PM\d2pmt6c03_protocol_workflow.py --thread-id protocol-demo</code></pre>
+    <p>
+      MCP uses official Streamable HTTP at <code>http://127.0.0.1:8765/mcp</code> and exposes
+      <code>get_stock</code>, <code>list_low_stock</code>, and
+      <code>inventory://canonical/snapshot</code>; it exposes no write tool. A2A serves the retained
+      <a href="../W2D2/W2D2PM/agent_card.json"><code>agent_card.json</code></a> and JSON-RPC endpoint
+      on <code>http://127.0.0.1:9999</code>, returning working/completed/failed task states and a
+      canonical inventory artifact.
+    </p>
+    <p>
+      Topic 6 c03 uses supplied claim-specific services backed by
+      <code>insurance/claim_narratives_10.json</code>: MCP Streamable HTTP at
+      <code>http://127.0.0.1:8000/mcp</code> exposes the read-only <code>get_claim</code>
+      tool, while A2A at <code>http://127.0.0.1:9999</code> advertises
+      <code>claim_operator_review</code>. The A2A input requires the exact canonical claim
+      and narrative IDs, <code>learner_approved: true</code>, and an 8-128 character
+      idempotency key. Stop the inventory A2A server before starting the claim A2A server
+      because both default to port 9999. The workflow has no local fallback when either
+      protocol endpoint is unavailable.
+    </p>
+
+    <h3>Verify</h3>
+<pre><code>dir data\insurance\claims.db
+dir data\banking\loans_5k.parquet
+dir data\insurance\workflow_cases_15.json
+dir data\insurance\claim_narratives_10.json
+dir data\supply\inventory.json
+dir data\insurance\policy_chunks.json
+dir data\banking\accounts_acl.parquet</code></pre>
+
+    <h2>Session-first learner flows</h2>
+    <ul>
+      <li>Day 1: <a href="../W2D1/W2D1AM/_README.html">AM guide</a> · <a href="../W2D1/W2D1PM/_README.html">PM guide</a></li>
+      <li>Day 2: <a href="../W2D2/W2D2AM/_README.html">AM guide</a> · <a href="../W2D2/W2D2PM/_README.html">PM guide</a></li>
+      <li>Day 3: <a href="../W2D3/W2D3AM/_VECTOR_STORES_SETUP.html">AM vector-store setup</a> · <a href="../W2D3/W2D3AM/_CONCEPTS.ipynb">AM notebook</a> · <a href="../W2D3/W2D3PM/_CONCEPTS.ipynb">PM notebook</a></li>
+      <li>Day 4: <a href="../W2D4/W2D4AM/_README.html">AM guide</a> · <a href="../W2D4/W2D4PM/_README.html">PM guide</a></li>
+      <li>Day 5: <a href="../W2D5/W2D5AM/_README.html">AM guide</a> · <a href="../W2D5/W2D5PM/_README.html">PM guide</a></li>
+    </ul>
+  </main>
+  <script src="../css/lab-readme.js"></script>
+</body>
+</html>

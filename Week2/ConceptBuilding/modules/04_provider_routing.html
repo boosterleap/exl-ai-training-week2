@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>04 · Provider routing — Anthropic vs OpenRouter</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">Mastery index</a>
+      <a href="03_pydantic_contracts.html">Prev: 03 Pydantic</a>
+      <a href="05_langchain_core_providers.html">Next: 05 LangChain core</a>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">EXL CampusHire · Week 2 · Module 04 · June 2026</div>
+      <h1>Provider routing in one codebase</h1>
+      <p class="lead">
+        Week 2 does <strong>not</strong> ship separate <code class="inline">_openrouter</code> folders.
+        Both cohorts open the same Day 1 PM lab. A small factory —
+        <code class="inline">load_settings()</code> then a provider branch — picks Anthropic
+        (Claude Agent SDK) or OpenRouter (LangGraph + OpenAI-compatible chat). Tools, schemas,
+        CLI, sessions, and permission gates stay identical.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">One folder · two runtimes</span>
+        <span class="chip">Factory: load_settings → branch</span>
+        <span class="chip">Dry-run before paid API</span>
+        <span class="chip">Maps to W2D1PM topic 6</span>
+      </div>
+    </header>
+
+    <nav class="toc">
+      <h2>On this page</h2>
+      <ol>
+        <li><a href="#why">Why a single codebase</a></li>
+        <li><a href="#day1pm">Day 1 PM dual-provider map</a></li>
+        <li><a href="#models">Model ID naming (June 2026)</a></li>
+        <li><a href="#beginner">Beginner — settings and branching</a></li>
+        <li><a href="#intermediate">Intermediate — factory + mock agent</a></li>
+        <li><a href="#advanced">Advanced — dry-run, parity, CLI shape</a></li>
+        <li><a href="#checklist">Classroom checklist</a></li>
+      </ol>
+    </nav>
+
+    <!-- ═══════════ WHY ═══════════ -->
+    <section class="section" id="why">
+      <h2>Why a single codebase</h2>
+      <p>
+        Week 1 often duplicated notebooks with provider suffixes. That pattern breaks down once
+        the lab is a multi-file agent: schemas, tools, CLI, sessions, cost logs, and permission
+        gates would drift between copies. Week 2 keeps <strong>one scaffold per day</strong>.
+        Cohort assignment is an env flag only.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Approach</th><th>What learners open</th><th>Failure mode</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Dual folders (<code class="inline">W2D1PM/</code> + <code class="inline">W2D1PM_openrouter/</code>)</td>
+            <td>Wrong tree if mis-assigned</td>
+            <td>Schema/tool patches land in one copy only</td>
+          </tr>
+          <tr>
+            <td>Single folder + <code class="inline">LLM_PROVIDER</code></td>
+            <td>Same <code class="inline">d1pmt6c02_guarded_operations_assistant.py</code> for everyone</td>
+            <td>Incorrectly configured <code class="inline">.env</code> — easy to fix without forking code</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Instructor rule</strong>
+        Assign provider before Day 1 PM. Learners never hunt for an
+        <code class="inline">_openrouter</code> tree. Routing lives in
+        the provider factory, not in folder layout.
+      </div>
+      <pre><code>Week2/
+  .env                 &lt;-- LLM_PROVIDER=anthropic | openrouter
+  W2D1/W2D1PM/
+    d1pmt3c02_validate_triage_output.py       shared TriageDecision contract
+    d1pmt2c02_custom_shipment_tool.py         typed domain tool
+    d1pmt6c01_cost_budget.py                  provider budget model
+    d1pmt6c02_guarded_operations_assistant.py guarded offline entry point
+  W2D1/W2D1PM/_CONCEPTS.ipynb
+    section 6: provider routing and budgets</code></pre>
+    </section>
+
+    <!-- ═══════════ DAY 1 PM ═══════════ -->
+    <section class="section" id="day1pm">
+      <h2>Day 1 PM dual-provider map</h2>
+      <p>
+        The Agentic Operations Assistant is the first place learners see the factory in a real
+        lab. AM may still discuss Claude Agent SDK concepts on slides; the PM runtime path
+        depends on the cohort flag.
+      </p>
+      <pre><code>d1pmt6c02_guarded_operations_assistant.py
+  |- --dry-run  → tools-only TriageDecision (no API spend)
+  `- provider   → providers.run_provider_agent(...)
+                    |- anthropic  → ClaudeSDKClient + in-process MCP tools
+                    `- openrouter → LangGraph ReAct + LangChain tools
+                  → same TriageDecision JSON + CostLog shape</code></pre>
+      <table>
+        <thead>
+          <tr><th><code class="inline">LLM_PROVIDER</code></th><th>Runtime</th><th>Keys / model env</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">anthropic</code></td>
+            <td>Claude Agent SDK</td>
+            <td><code class="inline">ANTHROPIC_API_KEY</code>, <code class="inline">ANTHROPIC_MODEL</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">openrouter</code></td>
+            <td>LangGraph + OpenAI-compatible client</td>
+            <td><code class="inline">OPENROUTER_API_KEY</code>, <code class="inline">OPENROUTER_BASE_URL</code>, <code class="inline">OPENROUTER_MODEL</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout warn">
+        <strong>Shared contract</strong>
+        Both paths must return a valid <code class="inline">TriageDecision</code>, honor write
+        permission gating, and emit a cost log. If only one provider can do that, the factory
+        is incomplete — fix the runtime, do not fork the CLI.
+      </div>
+    </section>
+
+    <!-- ═══════════ MODELS ═══════════ -->
+    <section class="section" id="models">
+      <h2>Model ID naming (June 2026)</h2>
+      <p>
+        Anthropic’s native API and OpenRouter’s catalog use <strong>different string formats</strong>
+        for related Claude models. Mixing them is a common Day 1 PM failure.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Provider</th><th>Env var</th><th>Default lab model</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Anthropic SDK</td>
+            <td><code class="inline">ANTHROPIC_MODEL</code></td>
+            <td><code class="inline">claude-sonnet-4-6</code></td>
+            <td>Native Anthropic model id (June 2026 lab default)</td>
+          </tr>
+          <tr>
+            <td>OpenRouter</td>
+            <td><code class="inline">OPENROUTER_MODEL</code></td>
+            <td><code class="inline">anthropic/claude-sonnet-4</code></td>
+            <td>Vendor-prefixed OpenRouter slug; not the native id</td>
+          </tr>
+        </tbody>
+      </table>
+      <pre><code># Anthropic cohort (.env)
+LLM_PROVIDER=anthropic
+ANTHROPIC_MODEL=claude-sonnet-4-6
+
+# OpenRouter cohort (.env)
+LLM_PROVIDER=openrouter
+OPENROUTER_MODEL=anthropic/claude-sonnet-4
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1</code></pre>
+      <div class="callout">
+        <strong>Rule of thumb</strong>
+        Never hard-code one model string for both branches. Resolve the model
+        <em>after</em> you know <code class="inline">provider</code>, exactly like
+        <code class="inline">load_settings()</code> in Day 1 PM.
+      </div>
+    </section>
+
+    <!-- ═══════════ BEGINNER ═══════════ -->
+    <section class="section" id="beginner">
+      <h2><span class="level beginner">Beginner</span> Settings and branching</h2>
+      <p>
+        Build intuition for “config first, runtime second.” All exercises below are offline —
+        no API keys required. Copy into a notebook with working directory under
+        <code class="inline">Week2/ConceptBuilding</code> (or adjust paths).
+      </p>
+
+      <h3>Mental model</h3>
+      <pre><code>env flag  →  settings dict  →  if provider == "openrouter" else anthropic
+                 ↑
+         one function: load_settings()</code></pre>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B1 — Read the provider flag</div>
+        <p>Simulate env lookup without a real <code class="inline">.env</code>. Default to Anthropic.</p>
+        <pre><code>import os
+
+def read_provider(environ: dict[str, str] | None = None) -> str:
+    env = environ if environ is not None else os.environ
+    return env.get("LLM_PROVIDER", "anthropic").lower()
+
+assert read_provider({}) == "anthropic"
+assert read_provider({"LLM_PROVIDER": "OpenRouter"}) == "openrouter"
+print("B1 OK", read_provider({"LLM_PROVIDER": "anthropic"}))</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B2 — Reject unknown providers early</div>
+        <p>Fail fast with a clear error instead of silently taking the Anthropic path.</p>
+        <pre><code>ALLOWED = {"anthropic", "openrouter"}
+
+def require_provider(raw: str) -> str:
+    provider = raw.strip().lower()
+    if provider not in ALLOWED:
+        raise ValueError(f"LLM_PROVIDER must be one of {sorted(ALLOWED)}, got {raw!r}")
+    return provider
+
+assert require_provider("anthropic") == "anthropic"
+try:
+    require_provider("bedrock")
+except ValueError as exc:
+    print("B2 OK:", exc)</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B3 — Pick the model string by provider</div>
+        <p>Mirror Day 1 PM defaults: native id vs OpenRouter slug.</p>
+        <pre><code>def pick_model(provider: str, environ: dict[str, str]) -> str:
+    if provider == "openrouter":
+        return environ.get("OPENROUTER_MODEL", "anthropic/claude-sonnet-4")
+    return environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+
+assert pick_model("anthropic", {}) == "claude-sonnet-4-6"
+assert pick_model("openrouter", {}) == "anthropic/claude-sonnet-4"
+assert pick_model("anthropic", {"ANTHROPIC_MODEL": "claude-opus-4-8"}) == "claude-opus-4-8"
+print("B3 OK")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B4 — Spot the naming bug</div>
+        <p>Which assignment is wrong for an OpenRouter cohort? Explain in a comment, then assert.</p>
+        <pre><code>cases = [
+    ("anthropic", "claude-sonnet-4-6", True),
+    ("openrouter", "anthropic/claude-sonnet-4", True),
+    ("openrouter", "claude-sonnet-4-6", False),  # native id on OpenRouter path
+    ("anthropic", "anthropic/claude-sonnet-4", False),  # slug on Anthropic path
+]
+
+def looks_plausible(provider: str, model: str) -> bool:
+    if provider == "openrouter":
+        return "/" in model  # vendor/model slug
+    return "/" not in model
+
+for provider, model, expected in cases:
+    assert looks_plausible(provider, model) is expected, (provider, model)
+print("B4 OK — never cross-wire model ids")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B5 — Budget knobs are shared</div>
+        <p>Steps / tokens / spend live in the same settings dict for both cohorts.</p>
+        <pre><code>def load_budget_knobs(environ: dict[str, str]) -> dict:
+    return {
+        "max_steps": int(environ.get("AGENT_MAX_STEPS", "10")),
+        "max_tokens": int(environ.get("AGENT_MAX_TOKENS", "8000")),
+        "max_budget_usd": float(environ.get("AGENT_MAX_BUDGET_USD", "0.50")),
+    }
+
+knobs = load_budget_knobs({"AGENT_MAX_STEPS": "6"})
+assert knobs["max_steps"] == 6
+assert knobs["max_budget_usd"] == 0.5
+print("B5 OK", knobs)</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B6 — Hard stop vs soft semantics (table check)</div>
+        <p>Fill the missing cells from memory, then compare to this reference.</p>
+        <pre><code>semantics = {
+    "AGENT_MAX_STEPS": {
+        "anthropic": "hard stop (max_turns)",
+        "openrouter": "hard stop (recursion_limit)",
+    },
+    "AGENT_MAX_BUDGET_USD": {
+        "anthropic": "hard run cap (SDK)",
+        "openrouter": "recorded / policy — not the same SDK hard cap",
+    },
+    "AGENT_MAX_TOKENS": {
+        "anthropic": "post-run usage threshold",
+        "openrouter": "per-call output cap",
+    },
+}
+for key, row in semantics.items():
+    print(key)
+    for provider, meaning in row.items():
+        print(f"  {provider}: {meaning}")
+print("B6 OK — same knobs, provider-specific semantics")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B7 — Same CLI argv for both cohorts</div>
+        <p>Prove the command surface does not mention the provider.</p>
+        <pre><code>REQUIRED_CMD = [
+    "uv", "run", "python",
+    "W2D1/W2D1PM/d1pmt6c02_guarded_operations_assistant.py",
+]
+
+assert "openrouter" not in " ".join(REQUIRED_CMD).lower()
+assert "anthropic" not in " ".join(REQUIRED_CMD).lower()
+assert "d1t6c02" in " ".join(REQUIRED_CMD)
+print("B7 OK")
+print(" ", " ".join(REQUIRED_CMD))</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B8 — Shared artifact names</div>
+        <p>Result and cost files should not encode the provider in the filename.</p>
+        <pre><code>def result_paths(run_name: str) -> tuple[str, str]:
+    # mirrors agent_flow.save_result naming intent
+    return f"{run_name}.json", f"cost_{run_name}.json"
+
+r, c = result_paths("triage_CLN-001")
+assert "openrouter" not in r and "anthropic" not in r
+assert c.startswith("cost_")
+print("B8 OK", r, c)</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B9 — Draw the dependency arrow</div>
+        <p>Order these layers top → bottom: CLI, schemas, provider factory, domain tools.</p>
+        <pre><code>layers = ["d1pmt6c02_guarded_operations_assistant.py", "provider factory", "typed tools + contracts"]
+# learners: typed tools/contracts are leaves; the factory adapts them; the assistant is the entry
+assert layers[0].startswith("d1t6c02")
+assert "factory" in layers[1]
+assert "contracts" in layers[2]
+print("B9 OK")
+for i, layer in enumerate(layers, 1):
+    print(f"  {i}. {layer}")</code></pre>
+      </div>
+
+      <div class="callout">
+        <strong>Beginner checkpoint</strong>
+        You can explain why Week 2 forbids <code class="inline">_openrouter</code> folders,
+        pick the correct model string per provider, and name the shared CLI commands.
+      </div>
+    </section>
+
+    <!-- ═══════════ INTERMEDIATE ═══════════ -->
+    <section class="section" id="intermediate">
+      <h2><span class="level intermediate">Intermediate</span> Factory + mock <code class="inline">run_provider_agent</code></h2>
+      <p>
+        Build a tiny router that mirrors Day 1 PM:
+        <code class="inline">load_settings()</code> → branch inside
+        <code class="inline">run_provider_agent</code>. Use mocks only — no provider SDK calls or LangGraph execution.
+      </p>
+
+      <h3>Target shape (standalone provider-routing example)</h3>
+      <pre><code>def load_settings() -&gt; dict: ...
+async def run_provider_agent(...) -&gt; dict:
+    settings = load_settings()
+    if settings["provider"] == "openrouter":
+        return run_openrouter(...)
+    return await run_anthropic(...)</code></pre>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I1 — Implement <code class="inline">load_settings</code> from a dict</div>
+        <p>Inject environ so tests stay deterministic.</p>
+        <pre><code>from typing import Any
+
+def load_settings(environ: dict[str, str]) -> dict[str, Any]:
+    provider = environ.get("LLM_PROVIDER", "anthropic").lower()
+    if provider not in {"anthropic", "openrouter"}:
+        raise ValueError(f"unsupported LLM_PROVIDER: {provider}")
+    model = (
+        environ.get("OPENROUTER_MODEL", "anthropic/claude-sonnet-4")
+        if provider == "openrouter"
+        else environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+    )
+    return {
+        "provider": provider,
+        "model": model,
+        "max_steps": int(environ.get("AGENT_MAX_STEPS", "10")),
+        "max_tokens": int(environ.get("AGENT_MAX_TOKENS", "8000")),
+        "max_budget_usd": float(environ.get("AGENT_MAX_BUDGET_USD", "0.50")),
+        "base_url": environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+        if provider == "openrouter"
+        else None,
+    }
+
+s = load_settings({"LLM_PROVIDER": "openrouter"})
+assert s["model"] == "anthropic/claude-sonnet-4"
+assert s["base_url"].endswith("/api/v1")
+print("I1 OK", s["provider"], s["model"])</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I2 — Mock Anthropic runtime</div>
+        <p>Return a provider-tagged payload without calling the SDK.</p>
+        <pre><code>def run_anthropic_mock(prompt: str, settings: dict) -> dict:
+    return {
+        "provider": "anthropic",
+        "model": settings["model"],
+        "runtime": "claude_agent_sdk",
+        "answer_text": f"[anthropic mock] {prompt[:40]}",
+        "tools_adapter": "mcp_in_process",
+        "cost": {"steps_used": 1, "stopped_reason": "mock"},
+    }
+
+out = run_anthropic_mock("triage CLN-001", load_settings({}))
+assert out["runtime"] == "claude_agent_sdk"
+assert out["model"] == "claude-sonnet-4-6"
+print("I2 OK", out["provider"])</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I3 — Mock OpenRouter runtime</div>
+        <p>Same return keys as Anthropic mock; different runtime tag.</p>
+        <pre><code>def run_openrouter_mock(prompt: str, settings: dict) -> dict:
+    return {
+        "provider": "openrouter",
+        "model": settings["model"],
+        "runtime": "langgraph_openai_compatible",
+        "answer_text": f"[openrouter mock] {prompt[:40]}",
+        "tools_adapter": "langchain_tools",
+        "base_url": settings["base_url"],
+        "cost": {"steps_used": 1, "stopped_reason": "mock"},
+    }
+
+out = run_openrouter_mock("triage CLN-001", load_settings({"LLM_PROVIDER": "openrouter"}))
+assert out["tools_adapter"] == "langchain_tools"
+assert "anthropic/" in out["model"]
+print("I3 OK", out["runtime"])</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I4 — Wire <code class="inline">run_provider_agent</code></div>
+        <p>The factory branch is the whole point of this module.</p>
+        <pre><code>def run_provider_agent(prompt: str, environ: dict[str, str]) -> dict:
+    settings = load_settings(environ)
+    if settings["provider"] == "openrouter":
+        return run_openrouter_mock(prompt, settings)
+    return run_anthropic_mock(prompt, settings)
+
+a = run_provider_agent("hello", {"LLM_PROVIDER": "anthropic"})
+o = run_provider_agent("hello", {"LLM_PROVIDER": "openrouter"})
+assert a["provider"] != o["provider"]
+assert a["answer_text"].startswith("[anthropic")
+assert o["answer_text"].startswith("[openrouter")
+print("I4 OK — one entry point, two runtimes")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I5 — Override max_steps at call time</div>
+        <p>Day 1 PM lets the CLI pass <code class="inline">max_steps</code> without editing <code class="inline">.env</code>.</p>
+        <pre><code>def run_provider_agent_with_override(
+    prompt: str,
+    environ: dict[str, str],
+    max_steps: int | None = None,
+) -> dict:
+    settings = load_settings(environ)
+    if max_steps is not None:
+        settings = {**settings, "max_steps": max_steps}
+    result = run_provider_agent(prompt, environ)
+    result = {**result, "max_steps": settings["max_steps"]}
+    return result
+
+r = run_provider_agent_with_override("x", {}, max_steps=3)
+assert r["max_steps"] == 3
+print("I5 OK")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I6 — Shared tool names across adapters</div>
+        <p>MCP names and LangChain tool names differ in prefix, not in domain meaning.</p>
+        <pre><code>READ_TOOL_NAMES = ["load_fnol_email", "claim_status", "policy_lookup"]
+
+def mcp_tool_ids(names: list[str]) -> list[str]:
+    return [f"mcp__ops__{n}" for n in names]
+
+def langchain_tool_ids(names: list[str]) -> list[str]:
+    return list(names)  # bare domain names in LangChain adapter
+
+mcp = mcp_tool_ids(READ_TOOL_NAMES)
+lc = langchain_tool_ids(READ_TOOL_NAMES)
+assert [t.split("__")[-1] for t in mcp] == lc
+print("I6 OK — same domain verbs, different wiring")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I7 — Structured output contract is provider-agnostic</div>
+        <p>Reuse a tiny decision dict (stand-in for Pydantic <code class="inline">TriageDecision</code>).</p>
+        <pre><code>REQUIRED = {
+    "lane", "case_id", "urgency", "route_queue",
+    "summary", "rationale", "tools_used", "confidence", "needs_human_approval",
+}
+
+def validate_decision(payload: dict) -> dict:
+    missing = REQUIRED - payload.keys()
+    if missing:
+        raise ValueError(f"missing fields: {sorted(missing)}")
+    return payload
+
+decision = validate_decision({
+    "lane": "insurance",
+    "case_id": "CLM-000001",
+    "urgency": "medium",
+    "route_queue": "fnol_intake",
+    "summary": "Route to FNOL intake.",
+    "rationale": "Claim open; policy found.",
+    "tools_used": ["load_fnol_email", "claim_status", "policy_lookup"],
+    "confidence": 0.9,
+    "needs_human_approval": False,
+})
+
+def attach_decision(result: dict, decision: dict) -> dict:
+    return {**result, "decision": decision}
+
+for env in ({}, {"LLM_PROVIDER": "openrouter"}):
+    out = attach_decision(run_provider_agent("triage", env), decision)
+    assert set(out["decision"]) == REQUIRED
+print("I7 OK — both providers carry the same decision shape")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I8 — Key presence check without printing secrets</div>
+        <p>Validate that the right key env var exists; never echo the value.</p>
+        <pre><code>def missing_key_vars(environ: dict[str, str]) -> list[str]:
+    settings = load_settings(environ)
+    if settings["provider"] == "openrouter":
+        needed = ["OPENROUTER_API_KEY"]
+    else:
+        needed = ["ANTHROPIC_API_KEY"]
+    return [k for k in needed if not environ.get(k)]
+
+assert missing_key_vars({"LLM_PROVIDER": "anthropic"}) == ["ANTHROPIC_API_KEY"]
+assert missing_key_vars({
+    "LLM_PROVIDER": "openrouter",
+    "OPENROUTER_API_KEY": "sk-or-xxx",
+}) == []
+print("I8 OK — report names only, never values")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I9 — Session metadata stays provider-tagged</div>
+        <p>Resume needs to know which runtime wrote the session file.</p>
+        <pre><code>def session_record(result: dict, session_id: str) -> dict:
+    return {
+        "session_id": session_id,
+        "provider": result["provider"],
+        "provider_session_id": f"{result['provider']}-sess-001",
+        "model": result["model"],
+    }
+
+rec_a = session_record(run_provider_agent("hi", {}), "banking-demo")
+rec_o = session_record(run_provider_agent("hi", {"LLM_PROVIDER": "openrouter"}), "banking-demo")
+assert rec_a["provider"] == "anthropic"
+assert rec_o["provider"] == "openrouter"
+assert rec_a["session_id"] == rec_o["session_id"]
+print("I9 OK — learner session id shared; provider session id differs")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I10 — Table-drive both cohorts</div>
+        <p>One test table, two env fixtures — the classroom parity check.</p>
+        <pre><code>table = [
+    {"LLM_PROVIDER": "anthropic"},
+    {"LLM_PROVIDER": "openrouter", "OPENROUTER_MODEL": "anthropic/claude-sonnet-4"},
+]
+prompt = "Summarize claim urgency for CLN-001"
+for env in table:
+    out = run_provider_agent(prompt, env)
+    assert "provider" in out and "model" in out and "cost" in out
+    assert out["provider"] == env["LLM_PROVIDER"]
+    print("parity", out["provider"], out["model"], out["runtime"])
+print("I10 OK")</code></pre>
+      </div>
+
+      <div class="callout">
+        <strong>Intermediate checkpoint</strong>
+        You can implement a miniature <code class="inline">load_settings</code> +
+        <code class="inline">run_provider_agent</code> that switches runtimes without
+        changing the caller, tools list, or decision schema.
+      </div>
+    </section>
+
+    <!-- ═══════════ ADVANCED ═══════════ -->
+    <section class="section" id="advanced">
+      <h2><span class="level advanced">Advanced</span> Dry-run, parity, CLI shape</h2>
+      <p>
+        Day 1 PM insists on an offline path before any paid call. Then both providers must
+        satisfy the same operator-facing contract. These exercises push toward the real
+        <code class="inline">d1pmt6c02_guarded_operations_assistant.py</code> design.
+      </p>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A1 — Dry-run never reads API keys</div>
+        <p>Even with empty keys, dry-run must succeed.</p>
+        <pre><code>def dry_run_insurance(email_id: str, environ: dict[str, str]) -> dict:
+    # tools-only stand-in — no network
+    settings = load_settings(environ)
+    decision = {
+        "lane": "insurance",
+        "case_id": "CLM-000001",
+        "urgency": "high",
+        "route_queue": "fnol_intake",
+        "summary": f"{email_id} routed to fnol_intake.",
+        "rationale": "Offline tool chain only.",
+        "tools_used": ["load_fnol_email", "claim_status", "policy_lookup"],
+        "confidence": 0.9,
+        "needs_human_approval": False,
+    }
+    return {
+        "provider": "dry-run",
+        "model": "none",
+        "lane": "insurance",
+        "decision": decision,
+        "cost": {
+            "steps_used": 3,
+            "max_steps": settings["max_steps"],
+            "stopped_reason": "dry_run",
+        },
+    }
+
+out = dry_run_insurance("CLN-001", {"LLM_PROVIDER": "openrouter"})  # keys absent
+assert out["provider"] == "dry-run"
+assert out["model"] == "none"
+assert missing_key_vars({"LLM_PROVIDER": "openrouter"}) == ["OPENROUTER_API_KEY"]
+print("A1 OK — dry-run bypasses paid path")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A2 — CLI dispatcher: dry-run vs provider mode</div>
+        <p>One function chooses the path from a flag, not from the provider.</p>
+        <pre><code>def dispatch(email_id: str, environ: dict[str, str], dry_run: bool) -> dict:
+    if dry_run:
+        return dry_run_insurance(email_id, environ)
+    if missing_key_vars(environ):
+        raise RuntimeError(f"missing keys: {missing_key_vars(environ)}")
+    return attach_decision(
+        run_provider_agent(f"triage {email_id}", environ),
+        dry_run_insurance(email_id, environ)["decision"],
+    )
+
+d = dispatch("CLN-001", {}, dry_run=True)
+assert d["provider"] == "dry-run"
+provider_result = dispatch("CLN-001", {"LLM_PROVIDER": "anthropic", "ANTHROPIC_API_KEY": "sk-ant-x"}, dry_run=False)
+assert provider_result["provider"] == "anthropic"
+print("A2 OK")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A3 — Write permission gate is shared</div>
+        <p>Domain write tools stay blocked unless the CLI passes approval — both providers.</p>
+        <pre><code>WRITE_TOOL_NAMES = {"apply_goodwill_credit", "release_shipment_hold"}
+
+def permission_allows(tool_name: str, approve_writes: bool) -> bool:
+    short = tool_name.rsplit("__", 1)[-1]
+    if short in WRITE_TOOL_NAMES and not approve_writes:
+        return False
+    return True
+
+assert permission_allows("mcp__ops__claim_status", False) is True
+assert permission_allows("mcp__ops__release_shipment_hold", False) is False
+assert permission_allows("release_shipment_hold", True) is True  # LangChain bare name
+print("A3 OK — gate uses short name for both adapters")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A4 — Cost log shape independent of runtime</div>
+        <p>Normalize telemetry so assessment rubrics stay one checklist.</p>
+        <pre><code>def build_cost_view(result: dict, settings: dict) -> dict:
+    cost = result.get("cost", {})
+    return {
+        "provider": result["provider"],
+        "model": result["model"],
+        "steps_used": cost.get("steps_used", 0),
+        "max_steps": cost.get("max_steps", settings["max_steps"]),
+        "max_tokens": settings["max_tokens"],
+        "max_budget_usd": settings["max_budget_usd"],
+        "stopped_reason": cost.get("stopped_reason", "unknown"),
+    }
+
+for env in ({"ANTHROPIC_API_KEY": "x"}, {"LLM_PROVIDER": "openrouter", "OPENROUTER_API_KEY": "y"}):
+    settings = load_settings(env)
+    result = dispatch("CLN-001", env, dry_run=False)
+    view = build_cost_view(result, settings)
+    assert {"provider", "model", "steps_used", "stopped_reason"} &lt;= view.keys()
+    print("cost", view["provider"], view["stopped_reason"])
+print("A4 OK")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A5 — Refuse to invent records in the dry-run</div>
+        <p>Align with the Agentic Operations Assistant rule: tools are source of truth.</p>
+        <pre><code>FAKE_EMAILS = {
+    "CLN-001": {"claim_number_ground_truth": "CLM-000001", "found": True},
+}
+
+def load_fnol_email(email_id: str) -> dict:
+    row = FAKE_EMAILS.get(email_id)
+    if not row:
+        return {"found": False, "email_id": email_id}
+    return {"email_id": email_id, **row}
+
+def dry_run_strict(email_id: str, environ: dict[str, str]) -> dict:
+    email = load_fnol_email(email_id)
+    if email.get("found") is False:
+        raise ValueError(f"Email not found: {email_id}")
+    return dry_run_insurance(email_id, environ)
+
+assert dry_run_strict("CLN-001", {})["decision"]["case_id"]
+try:
+    dry_run_strict("CLN-999", {})
+except ValueError as exc:
+    print("A5 OK:", exc)</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A6 — Feature parity matrix</div>
+        <p>List what must be equal across providers vs what is allowed to differ.</p>
+        <pre><code>parity = {
+    "must_match": [
+        "CLI subcommands and flags",
+        "TriageDecision schema",
+        "domain tool verbs",
+        "write approval flag semantics",
+        "result + cost filename pattern",
+    ],
+    "may_differ": [
+        "SDK vs LangGraph runtime",
+        "MCP tool id prefix vs LangChain name",
+        "model id string format",
+        "token/budget enforcement mechanism",
+        "provider_session_id format",
+    ],
+}
+assert "TriageDecision schema" in parity["must_match"]
+assert "model id string format" in parity["may_differ"]
+print("A6 OK")
+for label, items in parity.items():
+    print(label)
+    for item in items:
+        print(" -", item)</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A7 — Config object for classroom demos</div>
+        <p>Return a printable config (safe) before any run — useful in PM topic 6.</p>
+        <pre><code>def describe_config(environ: dict[str, str]) -> dict:
+    settings = load_settings(environ)
+    missing = missing_key_vars(environ)
+    return {
+        "provider": settings["provider"],
+        "model": settings["model"],
+        "base_url": settings.get("base_url"),
+        "max_steps": settings["max_steps"],
+        "max_tokens": settings["max_tokens"],
+        "max_budget_usd": settings["max_budget_usd"],
+        "keys_configured": not missing,
+        "missing_env": missing,
+        "ready_for_provider_call": not missing,
+        "ready_for_dry_run": True,
+    }
+
+print(describe_config({"LLM_PROVIDER": "anthropic"}))
+print(describe_config({
+    "LLM_PROVIDER": "openrouter",
+    "OPENROUTER_API_KEY": "sk-or-demo",
+}))
+print("A7 OK")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A8 — Tiny router module sketch</div>
+        <p>Assemble the pieces into one cohesive mock module you could paste into a notebook.</p>
+        <pre><code>"""tiny_router.py — standalone classroom provider-routing miniature"""
+
+from typing import Any
+
+def load_settings(environ: dict[str, str]) -&gt; dict[str, Any]:
+    provider = environ.get("LLM_PROVIDER", "anthropic").lower()
+    if provider not in {"anthropic", "openrouter"}:
+        raise ValueError(provider)
+    return {
+        "provider": provider,
+        "model": (
+            environ.get("OPENROUTER_MODEL", "anthropic/claude-sonnet-4")
+            if provider == "openrouter"
+            else environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+        ),
+        "max_steps": int(environ.get("AGENT_MAX_STEPS", "10")),
+        "max_tokens": int(environ.get("AGENT_MAX_TOKENS", "8000")),
+        "max_budget_usd": float(environ.get("AGENT_MAX_BUDGET_USD", "0.50")),
+        "base_url": (
+            environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+            if provider == "openrouter"
+            else None
+        ),
+    }
+
+def run_provider_agent(prompt: str, environ: dict[str, str]) -&gt; dict[str, Any]:
+    settings = load_settings(environ)
+    runtime = (
+        "langgraph_openai_compatible"
+        if settings["provider"] == "openrouter"
+        else "claude_agent_sdk"
+    )
+    return {
+        "provider": settings["provider"],
+        "model": settings["model"],
+        "runtime": runtime,
+        "answer_text": f"[{settings['provider']}] {prompt}",
+        "cost": {"steps_used": 1, "stopped_reason": "mock"},
+    }
+
+assert run_provider_agent("ping", {})["model"] == "claude-sonnet-4-6"
+assert run_provider_agent("ping", {"LLM_PROVIDER": "openrouter"})["model"] == "anthropic/claude-sonnet-4"
+print("A8 OK — tiny router complete")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A9 — Map notebook → lab files</div>
+        <p>Connect mastery track concepts to the Day 1 PM teaching path.</p>
+        <pre><code>mapping = [
+    ("PM topic 6", "read environment + load_settings mental model + dry-run"),
+    ("d1pmt3c02_validate_triage_output.py", "shared TriageDecision contract"),
+    ("d1pmt2c02_custom_shipment_tool.py", "typed domain tool"),
+    ("provider factory", "branch anthropic | openrouter"),
+    ("d1pmt6c02_guarded_operations_assistant.py", "guarded offline assistant"),
+]
+for step, meaning in mapping:
+    print(f"{step:18} → {meaning}")
+assert mapping[3][0] == "provider factory"
+print("A9 OK — dual provider is a factory, not a second lab")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A10 — Stretch: provider API smoke (optional, paid)</div>
+        <p>
+          Only after dry-run works and keys are set. Run from the <code class="inline">Week2</code>
+          root. Do not paste key values into the notebook.
+        </p>
+        <div class="os-pair">
+          <div class="os-label windows">Windows PowerShell</div>
+          <pre class="os-windows"><code># cwd: Week2 root
+# Required offline integration
+uv run python W2D1\W2D1PM\d1pmt6c02_guarded_operations_assistant.py
+
+# Optional provider API steps: W2D1\W2D1PM\_README.html</code></pre>
+          <div class="os-label ubuntu">Ubuntu / bash</div>
+          <pre class="os-ubuntu"><code># cwd: Week2 root
+# Required offline integration
+uv run python W2D1/W2D1PM/d1pmt6c02_guarded_operations_assistant.py
+
+# Optional provider API steps: W2D1/W2D1PM/_README.html</code></pre>
+        </div>
+        <div class="callout warn">
+          <strong>Stretch only</strong>
+          Classroom default stays on dry-run + mocks. Provider API calls need trainer approval and
+          cohort spend limits from Module 02.
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>Advanced checkpoint</strong>
+        You can explain the Day 1 PM flow, implement a mock factory, enforce dry-run-before-provider-call,
+        and list what must stay identical across Anthropic and OpenRouter cohorts.
+      </div>
+    </section>
+
+    <!-- ═══════════ CHECKLIST ═══════════ -->
+    <section class="section" id="checklist">
+      <h2>Classroom checklist</h2>
+      <table>
+        <thead>
+          <tr><th>Check</th><th>Pass criteria</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>No dual folders</td>
+            <td>Learners only open <code class="inline">W2D1/W2D1PM/</code></td>
+          </tr>
+          <tr>
+            <td>Factory understood</td>
+            <td>Can sketch <code class="inline">load_settings</code> → provider branch</td>
+          </tr>
+          <tr>
+            <td>Model ids</td>
+            <td><code class="inline">claude-sonnet-4-6</code> vs <code class="inline">anthropic/claude-sonnet-4</code></td>
+          </tr>
+          <tr>
+            <td>Shared surface</td>
+            <td>Same CLI, schemas, tools, permission flag</td>
+          </tr>
+          <tr>
+            <td>Offline first</td>
+            <td><code class="inline">--dry-run</code> returns valid decision before a provider call</td>
+          </tr>
+          <tr>
+            <td>Ready for Module 05</td>
+            <td>OpenRouter path uses LangChain chat models under LangGraph</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Next: Module 05 digs into the LangChain message / tool layer that the OpenRouter
+        branch uses under LangGraph. Anthropic cohort still benefits — the same message
+        vocabulary appears when comparing traces.
+      </p>
+    </section>
+
+    <nav class="nav-footer">
+      <a href="03_pydantic_contracts.html">← Prev: 03 Pydantic contracts</a>
+      <a href="../index.html">Index</a>
+      <a href="05_langchain_core_providers.html">Next: 05 LangChain core →</a>
+    </nav>
+  </div>
+</body>
+</html>

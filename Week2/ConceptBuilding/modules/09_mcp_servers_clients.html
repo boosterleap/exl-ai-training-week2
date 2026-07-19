@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>09 — MCP servers &amp; clients · Week 2 Mastery</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">← Index</a>
+      <span>
+        <a href="08_claude_agent_sdk.html">← 08 Claude Agent SDK</a>
+        <a href="10_a2a_agent_cards.html">10 A2A Agent Cards →</a>
+      </span>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">Module 09 · Week 2 Day 2 · June 2026 APIs</div>
+      <h1>MCP — hosts, clients, servers</h1>
+      <p class="lead">
+        Model Context Protocol is the standard wire for agent → tool. This module covers the
+        three-role architecture, in-process vs Streamable HTTP transports, Claude Agent SDK tool
+        naming (<code class="inline">mcp__&lt;server&gt;__&lt;tool&gt;</code>), and the Day 2
+        inventory server pattern from
+        <code class="inline">Week2/W2D2/W2D2PM/d2pmt2c01_mcp_server.py</code>.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">Package: mcp · FastMCP</span>
+        <span class="chip">Transport: stdio / in-process / streamable-http</span>
+        <span class="chip">Lab: inventory.json + localhost:8765</span>
+        <span class="chip">Offline exercises OK</span>
+      </div>
+    </header>
+
+    <nav class="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#why">Why MCP exists</a></li>
+        <li><a href="#roles">Host · client · server</a></li>
+        <li><a href="#beginner">Beginner — vocabulary &amp; inventory JSON</a></li>
+        <li><a href="#transports">Transports — in-process vs Streamable HTTP</a></li>
+        <li><a href="#naming">Tool naming <code class="inline">mcp__server__tool</code></a></li>
+        <li><a href="#intermediate">Intermediate — FastMCP inventory pattern</a></li>
+        <li><a href="#client">Client call sketches (June 2026)</a></li>
+        <li><a href="#advanced">Advanced — auth, SSO, gateways &amp; fakes</a></li>
+        <li><a href="#reference">Quick reference</a></li>
+        <li><a href="#checklist">Ship checklist</a></li>
+      </ol>
+    </nav>
+
+    <!-- ========== WHY ========== -->
+    <section class="section" id="why">
+      <h2>Why MCP exists</h2>
+      <p>
+        Without a shared protocol, every AI host re-implements every tool integration.
+        That is an <strong>N × M</strong> problem (N hosts × M systems). MCP collapses it to
+        one contract: JSON-RPC messages for <em>list tools / call tool / read resources / get prompts</em>.
+      </p>
+      <pre>User
+  │
+  ▼
+AI Host (Cursor, Claude Desktop, your agent CLI)
+  │  MCP client session
+  │  JSON-RPC over stdio or Streamable HTTP
+  ▼
+MCP Server (inventory, ops, filesystem, …)
+  ├── Tools      (do work)
+  ├── Resources  (read-only data)
+  └── Prompts    (reusable templates)</pre>
+      <div class="callout">
+        <strong>Day 2 lab mapping</strong>
+        Learners run a local inventory MCP server; enterprise CRM/ERP connectors stay concept-only
+        (Salesforce Agentforce, ServiceNow, SAP). See instructor guide Day 2 PM topics 02–04.
+      </div>
+    </section>
+
+    <!-- ========== ROLES ========== -->
+    <section class="section" id="roles">
+      <h2>Host · client · server</h2>
+      <table>
+        <thead>
+          <tr><th>Role</th><th>What it is</th><th>Week 2 example</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Host</strong></td>
+            <td>The AI application the user talks to. Owns UX, model calls, permissions, sessions.</td>
+            <td>Claude Agent SDK CLI, LangGraph runner, Cursor</td>
+          </tr>
+          <tr>
+            <td><strong>Client</strong></td>
+            <td>Protocol speaker inside the host. Opens a session, initializes, lists/calls tools.</td>
+            <td><code class="inline">ClientSession</code> + <code class="inline">streamablehttp_client</code></td>
+          </tr>
+          <tr>
+            <td><strong>Server</strong></td>
+            <td>Process that exposes tools/resources/prompts. May be in-process or a separate HTTP process.</td>
+            <td><code class="inline">inventory_server.py</code> on <code class="inline">127.0.0.1:8765</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Colloquially people say “MCP client” for the whole host. In the spec, the
+        <strong>host</strong> embeds one or more <strong>clients</strong>, each talking to a
+        <strong>server</strong>.
+      </p>
+      <div class="callout warn">
+        <strong>MCP ≠ A2A</strong>
+        MCP connects <em>agent → tool/server</em>. A2A connects <em>agent → agent</em> (Agent Cards).
+        Module 10 covers A2A. Together they form the Day 2 integration story.
+      </div>
+    </section>
+
+    <!-- ========== BEGINNER ========== -->
+    <section class="section" id="beginner">
+      <h2>Beginner <span class="level beginner">Beginner</span></h2>
+      <p>
+        Start with data you can touch offline. The Day 2 inventory fixture lives at
+        <code class="inline">ConceptBuilding/data/inventory.json</code> (same shape as
+        <code class="inline">Week2/data/supply/inventory.json</code> used by
+        <code class="inline">inventory_server.py</code>).
+      </p>
+
+      <h3>Embedded fixture (offline)</h3>
+      <p>Copy into a notebook cell as <code class="inline">INVENTORY</code> if you are not loading the file:</p>
+<pre>INVENTORY = {
+  "warehouse": "WH-SG-01",
+  "updated_at": "2026-07-15T10:00:00Z",
+  "items": [
+    {"sku": "SKU-1001", "name": "Packing tape 48mm", "qty_on_hand": 420, "reorder_point": 100, "location": "A-12"},
+    {"sku": "SKU-1002", "name": "Corrugated box medium", "qty_on_hand": 85, "reorder_point": 120, "location": "B-03"},
+    {"sku": "SKU-1003", "name": "Pallet wrap roll", "qty_on_hand": 60, "reorder_point": 40, "location": "B-07"},
+    {"sku": "SKU-2001", "name": "GPS tracker unit", "qty_on_hand": 18, "reorder_point": 25, "location": "C-01"},
+    {"sku": "SKU-2002", "name": "Temperature logger", "qty_on_hand": 32, "reorder_point": 20, "location": "C-02"},
+    {"sku": "SKU-3001", "name": "Safety vest XL", "qty_on_hand": 12, "reorder_point": 30, "location": "D-04"},
+    {"sku": "SKU-3002", "name": "Hard hat white", "qty_on_hand": 45, "reorder_point": 20, "location": "D-05"},
+    {"sku": "SKU-4001", "name": "Diesel additive 5L", "qty_on_hand": 7, "reorder_point": 15, "location": "E-02"},
+  ],
+}</pre>
+
+      <h3>Load from disk (preferred when cwd is <code class="inline">Week2/ConceptBuilding</code>)</h3>
+<pre>import json
+from pathlib import Path
+
+payload = json.loads(Path("data/inventory.json").read_text(encoding="utf-8"))
+print(payload["warehouse"], len(payload["items"]))
+# WH-SG-01 8</pre>
+
+      <div class="exercise" id="ex1">
+        <div class="ex-label">Exercise B1 · Label the roles</div>
+        <p>
+          For each line below, write <code class="inline">host</code>, <code class="inline">client</code>,
+          or <code class="inline">server</code> (one word each). No library required.
+        </p>
+<pre>lines = [
+  "User chats with the logistics CLI",
+  "ClientSession.initialize() runs",
+  "inventory_server.py answers get_stock",
+  "Claude Agent SDK decides which tool to call",
+  "streamablehttp_client opens http://127.0.0.1:8765/mcp",
+]
+# Your answers: ["host", "client", "server", ...]
+answers = []  # fill me
+assert len(answers) == 5
+print(list(zip(lines, answers)))</pre>
+        <p>Expected order: host, client, server, host, client.</p>
+      </div>
+
+      <div class="exercise" id="ex2">
+        <div class="ex-label">Exercise B2 · Parse inventory offline</div>
+        <p>Using <code class="inline">INVENTORY</code> (or the file), print warehouse, item count, and all SKUs.</p>
+<pre>warehouse = INVENTORY["warehouse"]
+skus = [item["sku"] for item in INVENTORY["items"]]
+assert warehouse == "WH-SG-01"
+assert len(skus) == 8
+assert "SKU-4001" in skus
+print(warehouse, skus)</pre>
+      </div>
+
+      <div class="exercise" id="ex3">
+        <div class="ex-label">Exercise B3 · Low-stock rule (same as list_low_stock)</div>
+        <p>
+          An item is low when <code class="inline">qty_on_hand &lt;= reorder_point</code>.
+          This is exactly the filter in <code class="inline">inventory_server.py</code>.
+        </p>
+<pre>low = [
+  item for item in INVENTORY["items"]
+  if item["qty_on_hand"] &lt;= item["reorder_point"]
+]
+assert len(low) == 4  # 1002, 2001, 3001, 4001
+print([(i["sku"], i["qty_on_hand"], i["reorder_point"]) for i in low])</pre>
+      </div>
+
+      <div class="exercise" id="ex4">
+        <div class="ex-label">Exercise B4 · Fake get_stock response</div>
+        <p>
+          Write a pure function that returns the same shape as the MCP tool
+          <code class="inline">get_stock</code> — no network, no <code class="inline">mcp</code> package.
+        </p>
+<pre>def get_stock(sku: str, payload: dict) -&gt; dict:
+  for item in payload["items"]:
+    if item["sku"] == sku:
+      return {"found": True, "warehouse": payload["warehouse"], **item}
+  return {"found": False, "sku": sku}
+
+r = get_stock("SKU-2001", INVENTORY)
+assert r["found"] is True
+assert r["location"] == "C-01"
+assert r["qty_on_hand"] == 18
+missing = get_stock("SKU-9999", INVENTORY)
+assert missing == {"found": False, "sku": "SKU-9999"}
+print(r)</pre>
+      </div>
+    </section>
+
+    <!-- ========== TRANSPORTS ========== -->
+    <section class="section" id="transports">
+      <h2>Transports — in-process vs Streamable HTTP</h2>
+      <table>
+        <thead>
+          <tr><th>Mode</th><th>How it runs</th><th>When Week 2 uses it</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>In-process / SDK MCP</strong></td>
+            <td>Server object lives inside the host process. Tools registered via SDK helpers (e.g. Day 1 <code class="inline">mcp_servers={{"ops": ...}}</code>).</td>
+            <td>Day 1 insurance/banking/logistics tools — no open port.</td>
+          </tr>
+          <tr>
+            <td><strong>stdio</strong></td>
+            <td>Host spawns <code class="inline">server.py</code> as a subprocess; JSON-RPC on stdin/stdout. Default <code class="inline">mcp.run()</code>.</td>
+            <td>Claude Desktop, MCP Inspector (<code class="inline">uv run mcp dev server.py</code>).</td>
+          </tr>
+          <tr>
+            <td><strong>Streamable HTTP</strong></td>
+            <td>Server binds host/port; client hits an HTTP MCP endpoint (lab URL <code class="inline">http://127.0.0.1:8765/mcp</code>).</td>
+            <td>Day 2 <code class="inline">inventory_server.py</code> — shared local endpoint for CLI labs.</td>
+          </tr>
+        </tbody>
+      </table>
+      <pre># inventory_server.py (standalone conceptual sketch)
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("inventory", host="127.0.0.1", port=8765)
+
+@mcp.tool()
+def get_stock(sku: str) -&gt; dict:
+    """Return on-hand quantity and location for one SKU."""
+    ...
+
+@mcp.tool()
+def list_low_stock() -&gt; dict:
+    """Return items at or below the reorder point."""
+    ...
+
+if __name__ == "__main__":
+    mcp.run(transport="streamable-http")</pre>
+      <div class="callout">
+        <strong>Run from Week2 root</strong>
+        Use <code class="inline">uv run python W2D2/W2D2PM/d2pmt2c01_mcp_server.py --self-test</code>,
+        then run <code class="inline">d2pmt2c02_mcp_client.py</code>. The session guide documents
+        the optional persistent server transport.
+      </div>
+    </section>
+
+    <!-- ========== NAMING ========== -->
+    <section class="section" id="naming">
+      <h2>Tool naming: <code class="inline">mcp__&lt;server&gt;__&lt;tool&gt;</code></h2>
+      <p>
+        Claude Agent SDK surfaces MCP tools with a fixed prefix so the model (and your
+        <code class="inline">allowed_tools</code> / permission gates) can address them unambiguously:
+      </p>
+      <pre>mcp__&lt;server_key&gt;__&lt;tool_name&gt;
+
+# Day 1 ops server (in-process)
+mcp__ops__policy_lookup
+mcp__ops__claims_status
+
+# Day 2 inventory server (if wired into an SDK host as key "inventory")
+mcp__inventory__get_stock
+mcp__inventory__list_low_stock</pre>
+      <p>
+        The middle segment is the key you pass in <code class="inline">mcp_servers={{"ops": ...}}</code>
+        or the FastMCP server name as configured by the host — not the Python function’s module path.
+        Permission gates often strip with <code class="inline">tool_name.rsplit("__", 1)[-1]</code>
+        to recover the short tool name.
+      </p>
+    </section>
+
+    <!-- ========== INTERMEDIATE ========== -->
+    <section class="section" id="intermediate">
+      <h2>Intermediate <span class="level intermediate">Intermediate</span></h2>
+      <p>
+        Build the inventory pattern without starting the HTTP server first: mimic list/call
+        envelopes, then sketch the real FastMCP + client code for when the server is up.
+      </p>
+
+      <h3>Fake MCP envelopes (offline)</h3>
+      <p>
+        Real MCP uses JSON-RPC. For classroom drills we fake the <em>payload shapes</em>
+        the host cares about after <code class="inline">list_tools</code> / <code class="inline">call_tool</code>.
+      </p>
+<pre>FAKE_TOOLS = [
+  {"name": "get_stock", "description": "Return on-hand quantity and location for one SKU.",
+   "inputSchema": {"type": "object", "properties": {"sku": {"type": "string"}}, "required": ["sku"]}},
+  {"name": "list_low_stock", "description": "Return items at or below the reorder point.",
+   "inputSchema": {"type": "object", "properties": {}}},
+]
+
+def fake_call_tool(name: str, arguments: dict, payload: dict) -&gt; dict:
+  if name == "get_stock":
+    return get_stock(arguments["sku"], payload)  # from B4
+  if name == "list_low_stock":
+    low = [i for i in payload["items"] if i["qty_on_hand"] &lt;= i["reorder_point"]]
+    return {"warehouse": payload["warehouse"], "count": len(low), "items": low}
+  raise ValueError(f"unknown tool: {name}")</pre>
+
+      <div class="exercise" id="ex5">
+        <div class="ex-label">Exercise I1 · Build allowed_tools names</div>
+        <p>Given a server key and tool names, produce the SDK-style full names.</p>
+<pre>def mcp_tool_names(server_key: str, tool_names: list[str]) -&gt; list[str]:
+  return [f"mcp__{server_key}__{t}" for t in tool_names]
+
+names = mcp_tool_names("inventory", ["get_stock", "list_low_stock"])
+assert names == [
+  "mcp__inventory__get_stock",
+  "mcp__inventory__list_low_stock",
+]
+short = names[0].rsplit("__", 1)[-1]
+assert short == "get_stock"
+print(names)</pre>
+      </div>
+
+      <div class="exercise" id="ex6">
+        <div class="ex-label">Exercise I2 · Fake list_tools + call_tool round-trip</div>
+        <p>Assert catalog size and that calling both tools matches offline expectations.</p>
+<pre>assert {t["name"] for t in FAKE_TOOLS} == {"get_stock", "list_low_stock"}
+
+stock = fake_call_tool("get_stock", {"sku": "SKU-1002"}, INVENTORY)
+assert stock["found"] and stock["qty_on_hand"] == 85
+
+low = fake_call_tool("list_low_stock", {}, INVENTORY)
+assert low["count"] == 4
+assert all(i["qty_on_hand"] &lt;= i["reorder_point"] for i in low["items"])
+print("ok", low["count"], "low-stock items")</pre>
+      </div>
+
+      <div class="exercise" id="ex7">
+        <div class="ex-label">Exercise I3 · Simulate content blocks</div>
+        <p>
+          MCP clients often receive tool results as content blocks with a
+          <code class="inline">.text</code> field holding JSON. Parse like Day 2
+          <code class="inline">W2D2/W2D2PM/d2pmt2c02_mcp_client.py</code>.
+        </p>
+<pre>import json
+from types import SimpleNamespace
+
+def parse_mcp_result(result) -&gt; dict:
+  text_blocks = []
+  for block in result.content:
+    text = getattr(block, "text", None)
+    if text:
+      text_blocks.append(text)
+  raw = text_blocks[0] if text_blocks else "{}"
+  try:
+    payload = json.loads(raw)
+  except json.JSONDecodeError:
+    payload = {"raw": raw}
+  if isinstance(payload, dict):
+    payload["source"] = "mcp_server"
+  return payload
+
+fake_result = SimpleNamespace(
+  content=[SimpleNamespace(text=json.dumps({"found": True, "sku": "SKU-3002", "qty_on_hand": 45}))]
+)
+parsed = parse_mcp_result(fake_result)
+assert parsed["source"] == "mcp_server"
+assert parsed["qty_on_hand"] == 45
+print(parsed)</pre>
+      </div>
+
+      <h3>FastMCP inventory server sketch (June 2026)</h3>
+<pre>"""Conceptual companion to Week2/W2D2/W2D2PM/d2pmt2c01_mcp_server.py"""
+from __future__ import annotations
+import json
+from pathlib import Path
+from mcp.server.fastmcp import FastMCP
+
+WEEK2_ROOT = Path(__file__).resolve().parents[1]
+INVENTORY_PATH = WEEK2_ROOT / "data" / "supply" / "inventory.json"
+
+mcp = FastMCP("inventory", host="127.0.0.1", port=8765)
+
+def load_inventory() -&gt; dict:
+  return json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
+
+@mcp.tool()
+def get_stock(sku: str) -&gt; dict:
+  """Return on-hand quantity and location for one SKU."""
+  payload = load_inventory()
+  for item in payload["items"]:
+    if item["sku"] == sku:
+      return {"found": True, "warehouse": payload["warehouse"], **item}
+  return {"found": False, "sku": sku}
+
+@mcp.tool()
+def list_low_stock() -&gt; dict:
+  """Return items at or below the reorder point."""
+  payload = load_inventory()
+  low = [i for i in payload["items"] if i["qty_on_hand"] &lt;= i["reorder_point"]]
+  return {"warehouse": payload["warehouse"], "count": len(low), "items": low}
+
+if __name__ == "__main__":
+  mcp.run(transport="streamable-http")</pre>
+
+      <div class="exercise" id="ex8">
+        <div class="ex-label">Exercise I4 · Map file concepts to lines</div>
+        <p>
+          Without opening the file, match each concept to the right idea (print a dict of answers).
+        </p>
+<pre>concepts = {
+  "FastMCP name": "?",          # inventory
+  "transport": "?",             # streamable-http
+  "bind": "?",                  # 127.0.0.1:8765
+  "data path segment": "?",     # data/supply/inventory.json
+  "low-stock predicate": "?",   # qty_on_hand &lt;= reorder_point
+}
+# fill then assert:
+concepts = {
+  "FastMCP name": "inventory",
+  "transport": "streamable-http",
+  "bind": "127.0.0.1:8765",
+  "data path segment": "data/supply/inventory.json",
+  "low-stock predicate": "qty_on_hand &lt;= reorder_point",
+}
+assert concepts["FastMCP name"] == "inventory"
+print(concepts)</pre>
+      </div>
+    </section>
+
+    <!-- ========== CLIENT ========== -->
+    <section class="section" id="client">
+      <h2>Client call sketches (June 2026 Python SDK)</h2>
+      <p>
+        Patterns below match the Week 1 MCP quick reference and Day 2
+        <code class="inline">tools._mcp_call_tool</code>. Requires the server running —
+        use offline fakes above when the port is closed.
+      </p>
+
+      <h3>Streamable HTTP client</h3>
+<pre>import asyncio
+import json
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
+
+MCP_URL = "http://127.0.0.1:8765/mcp"
+
+async def call_get_stock(sku: str) -&gt; dict:
+  async with streamablehttp_client(MCP_URL) as streams:
+    read_stream, write_stream, _get_session_id = streams
+    async with ClientSession(read_stream, write_stream) as session:
+      await session.initialize()
+      tools = await session.list_tools()
+      print([t.name for t in tools.tools])
+      result = await session.call_tool("get_stock", {"sku": sku})
+      text = next(b.text for b in result.content if getattr(b, "text", None))
+      return json.loads(text)
+
+# asyncio.run(call_get_stock("SKU-1001"))</pre>
+
+      <h3>In-process / notebook testing on FastMCP</h3>
+<pre># Same process — no HTTP. Useful for unit drills.
+# tools = await mcp.list_tools()
+# result = await mcp.call_tool("get_stock", {"sku": "SKU-1001"})</pre>
+
+      <h3>stdio client (desktop / Inspector style)</h3>
+<pre>from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+params = StdioServerParameters(command="python", args=["mcp_servers/inventory_server.py"])
+# async with stdio_client(params) as (read, write):
+#   async with ClientSession(read, write) as session:
+#     await session.initialize()
+#     ...</pre>
+      <div class="callout warn">
+        <strong>Note on stdio vs streamable-http in one file</strong>
+        The lab inventory server’s <code class="inline">__main__</code> forces
+        <code class="inline">transport="streamable-http"</code>. For stdio demos, use a separate
+        script that calls bare <code class="inline">mcp.run()</code>, or point Inspector at a stdio server.
+      </div>
+    </section>
+
+    <!-- ========== ADVANCED ========== -->
+    <section class="section" id="advanced">
+      <h2>Advanced <span class="level advanced">Advanced</span></h2>
+
+      <h3>Auth · SSO · API gateways (concept)</h3>
+      <p>
+        The classroom inventory server has <strong>no auth</strong> — it binds localhost only.
+        Enterprise MCP deployments typically put a front door in front of servers:
+      </p>
+      <table>
+        <thead>
+          <tr><th>Layer</th><th>Role</th><th>Learner takeaway</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>SSO / IdP</strong></td>
+            <td>Who is calling (employee, service principal).</td>
+            <td>Host presents tokens; servers trust the gateway’s identity claims.</td>
+          </tr>
+          <tr>
+            <td><strong>API gateway</strong></td>
+            <td>TLS termination, rate limits, routing to MCP endpoints, audit logs.</td>
+            <td>Clients talk to the gateway URL, not raw warehouse systems.</td>
+          </tr>
+          <tr>
+            <td><strong>Scoped credentials</strong></td>
+            <td>Per-tool or per-resource permissions (read stock vs release hold).</td>
+            <td>Same idea as Day 1 write-tool approval — policy outside the model.</td>
+          </tr>
+          <tr>
+            <td><strong>Registry / catalog</strong></td>
+            <td>Discover approved servers (ecosystem scale: thousands of servers / many SDKs).</td>
+            <td>Lab skips registry; production does not hard-code every URL in agents.</td>
+          </tr>
+        </tbody>
+      </table>
+<pre>mcp_deployment_notes = {
+  "in_process": "Day 1 custom tools inside the agent process",
+  "network_streamable_http": "Day 2 inventory_server.py on 127.0.0.1",
+  "enterprise_front_door": ["SSO", "API gateway", "scoped credentials"],
+}</pre>
+
+      <div class="exercise" id="ex9">
+        <div class="ex-label">Exercise A1 · Choose the front door</div>
+        <p>Fill the mapping; assert keys. Offline only.</p>
+<pre>scenario_to_control = {
+  "local lab inventory on 8765": "localhost bind + no auth",
+  "employee must use corporate IdP": "SSO",
+  "central rate limit + TLS for many MCP apps": "API gateway",
+  "agent may read stock but not mutate ERP": "scoped credentials",
+}
+assert "SSO" in scenario_to_control.values()
+assert scenario_to_control["local lab inventory on 8765"].startswith("localhost")
+print(scenario_to_control)</pre>
+      </div>
+
+      <div class="exercise" id="ex10">
+        <div class="ex-label">Exercise A2 · Dry-run vs MCP source tag</div>
+        <p>
+          Day 2 helpers tag <code class="inline">source: local_file</code> vs
+          <code class="inline">source: mcp_server</code>. Implement a tiny router offline.
+        </p>
+<pre>def get_stock_routed(sku: str, use_mcp: bool, payload: dict) -&gt; dict:
+  base = get_stock(sku, payload)
+  if use_mcp:
+    # pretend network succeeded — same data, different provenance
+    return {**base, "source": "mcp_server"}
+  return {**base, "source": "local_file"}
+
+a = get_stock_routed("SKU-4001", False, INVENTORY)
+b = get_stock_routed("SKU-4001", True, INVENTORY)
+assert a["source"] == "local_file" and b["source"] == "mcp_server"
+assert a["qty_on_hand"] == b["qty_on_hand"] == 7
+print(a["source"], b["source"])</pre>
+      </div>
+
+      <div class="exercise" id="ex11">
+        <div class="ex-label">Exercise A3 · Probe semantics without a live server</div>
+        <p>
+          Soft-fail probes must never crash the CLI. Fake an unreachable probe and a reachable one.
+        </p>
+<pre>def soft_probe(reachable: bool, status_code: int | None = None, error: str | None = None) -&gt; dict:
+  if reachable:
+    return {"reachable": True, "status_code": status_code or 200}
+  return {"reachable": False, "error": error or "connection refused"}
+
+down = soft_probe(False)
+up = soft_probe(True, 200)
+assert down["reachable"] is False and "error" in down
+assert up == {"reachable": True, "status_code": 200}
+
+def require_mcp_or_raise(probe: dict) -&gt; None:
+  if not probe.get("reachable"):
+    raise RuntimeError("Inventory MCP server is not reachable on port 8765.")
+
+try:
+  require_mcp_or_raise(down)
+  raised = False
+except RuntimeError:
+  raised = True
+assert raised
+require_mcp_or_raise(up)
+print("probe guards ok")</pre>
+      </div>
+
+      <div class="exercise" id="ex12">
+        <div class="ex-label">Exercise A4 · Operator summary from fake MCP payloads</div>
+        <p>Produce a one-line operator-facing summary from a fake <code class="inline">list_low_stock</code> result.</p>
+<pre>def summarize_low_stock(result: dict) -&gt; str:
+  skus = ", ".join(i["sku"] for i in result["items"])
+  return f"{result['warehouse']}: {result['count']} below reorder ({skus})"
+
+summary = summarize_low_stock(fake_call_tool("list_low_stock", {}, INVENTORY))
+assert summary.startswith("WH-SG-01: 4 below reorder")
+assert "SKU-4001" in summary
+print(summary)</pre>
+      </div>
+    </section>
+
+    <!-- ========== REFERENCE ========== -->
+    <section class="section" id="reference">
+      <h2>Quick reference — June 2026 MCP Python</h2>
+      <table>
+        <thead><tr><th>Import / API</th><th>One-liner</th></tr></thead>
+        <tbody>
+          <tr><td><code class="inline">from mcp.server.fastmcp import FastMCP</code></td><td>High-level server builder</td></tr>
+          <tr><td><code class="inline">FastMCP("inventory", host=..., port=...)</code></td><td>Named server with HTTP bind</td></tr>
+          <tr><td><code class="inline">@mcp.tool()</code></td><td>Register tool; schema from type hints + docstring</td></tr>
+          <tr><td><code class="inline">mcp.run()</code></td><td>stdio transport (Desktop / Inspector)</td></tr>
+          <tr><td><code class="inline">mcp.run(transport="streamable-http")</code></td><td>Streamable HTTP (Day 2 inventory)</td></tr>
+          <tr><td><code class="inline">from mcp import ClientSession</code></td><td>Client session over a transport</td></tr>
+          <tr><td><code class="inline">streamablehttp_client(url)</code></td><td>Connect to <code class="inline">http://127.0.0.1:8765/mcp</code></td></tr>
+          <tr><td><code class="inline">await session.initialize()</code></td><td>Handshake before list/call</td></tr>
+          <tr><td><code class="inline">await session.call_tool(name, args)</code></td><td>Invoke tool by short name</td></tr>
+          <tr><td><code class="inline">mcp__server__tool</code></td><td>SDK host-facing tool id</td></tr>
+          <tr><td><code class="inline">uv run mcp dev server.py</code></td><td>Inspector against a top-level <code class="inline">mcp</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ========== CHECKLIST ========== -->
+    <section class="section" id="checklist">
+      <h2>Ship checklist (Day 2)</h2>
+      <ol>
+        <li>Explain host / client / server in one sentence each.</li>
+        <li>Contrast in-process (Day 1) vs Streamable HTTP (Day 2 inventory).</li>
+        <li>Parse <code class="inline">data/inventory.json</code> and list low-stock SKUs offline.</li>
+        <li>Name tools as <code class="inline">mcp__inventory__get_stock</code>.</li>
+        <li>Sketch or run <code class="inline">inventory_server.py</code>; optional live
+          <code class="inline">ClientSession</code> call when port 8765 is up.</li>
+        <li>State why SSO / gateway / scoped credentials appear in enterprise MCP — and why the lab omits them.</li>
+      </ol>
+      <div class="callout">
+        <strong>Next</strong>
+        Module 10 — A2A Agent Cards (identity, skills, auth, local planner → comms handoff).
+        MCP remains agent → tool; A2A is agent → agent.
+      </div>
+    </section>
+
+    <footer class="nav-footer">
+      <a href="08_claude_agent_sdk.html">← 08 Claude Agent SDK</a>
+      <a href="../index.html">Index</a>
+      <a href="10_a2a_agent_cards.html">10 A2A Agent Cards →</a>
+    </footer>
+  </div>
+</body>
+</html>

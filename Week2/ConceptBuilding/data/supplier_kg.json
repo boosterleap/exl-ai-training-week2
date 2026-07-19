@@ -1,0 +1,17 @@
+{
+  "nodes": [
+    {"id": "SUP-001", "type": "supplier", "name": "NorthStar Components", "region": "US-MW"},
+    {"id": "SUP-002", "type": "supplier", "name": "EuroParts GmbH", "region": "EU"},
+    {"id": "SUP-003", "type": "supplier", "name": "Pacific Backup Supply", "region": "US-W"},
+    {"id": "SKU-1002", "type": "sku", "name": "Brake Pad Kit", "category": "automotive"},
+    {"id": "SKU-2044", "type": "sku", "name": "Hydraulic Pump", "category": "industrial"},
+    {"id": "WH-EU-01", "type": "warehouse", "name": "Frankfurt Hub", "region": "EU"}
+  ],
+  "edges": [
+    {"source": "SUP-001", "target": "SKU-1002", "relation": "supplies"},
+    {"source": "SUP-002", "target": "SKU-2044", "relation": "supplies"},
+    {"source": "SUP-003", "target": "SKU-1002", "relation": "backup_supplier_for"},
+    {"source": "SUP-002", "target": "WH-EU-01", "relation": "ships_via"},
+    {"source": "WH-EU-01", "target": "SKU-2044", "relation": "stores"}
+  ]
+}

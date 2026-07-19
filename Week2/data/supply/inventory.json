@@ -1,0 +1,14 @@
+{
+  "warehouse": "WH-SG-01",
+  "updated_at": "2026-07-15T10:00:00Z",
+  "items": [
+    {"sku": "SKU-1001", "name": "Packing tape 48mm", "qty_on_hand": 420, "reorder_point": 100, "location": "A-12"},
+    {"sku": "SKU-1002", "name": "Corrugated box medium", "qty_on_hand": 85, "reorder_point": 120, "location": "B-03"},
+    {"sku": "SKU-1003", "name": "Pallet wrap roll", "qty_on_hand": 60, "reorder_point": 40, "location": "B-07"},
+    {"sku": "SKU-2001", "name": "GPS tracker unit", "qty_on_hand": 18, "reorder_point": 25, "location": "C-01"},
+    {"sku": "SKU-2002", "name": "Temperature logger", "qty_on_hand": 32, "reorder_point": 20, "location": "C-02"},
+    {"sku": "SKU-3001", "name": "Safety vest XL", "qty_on_hand": 12, "reorder_point": 30, "location": "D-04"},
+    {"sku": "SKU-3002", "name": "Hard hat white", "qty_on_hand": 45, "reorder_point": 20, "location": "D-05"},
+    {"sku": "SKU-4001", "name": "Diesel additive 5L", "qty_on_hand": 7, "reorder_point": 15, "location": "E-02"}
+  ]
+}

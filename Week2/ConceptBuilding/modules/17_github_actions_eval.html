@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>17 — GitHub Actions eval workflow · Week 2 Mastery</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">← All modules</a>
+      <span>
+        <a href="16_diskcache_semantic.html">← 16 diskcache</a>
+        <a href="../index.html">Index →</a>
+      </span>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">Module 17 · Week 2 Day 4 preview · June 2026</div>
+      <h1>GitHub Actions eval workflow</h1>
+      <p class="lead">
+        Ship agents that cannot regress silently. This module teaches
+        <strong>trajectory tests</strong> with <strong>mocked tools</strong>, so CI
+        asserts tool selection and HITL policy — with <strong>zero API spend</strong>
+        on every push. Notebook cells you write here map 1:1 to
+        <code class="inline">pytest</code> jobs in
+        <code class="inline">.github/workflows/eval.yml</code>.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">No live LLM in CI gate</span>
+        <span class="chip">pytest + golden trajectories</span>
+        <span class="chip">HITL required for refunds</span>
+        <span class="chip">Heuristic first · LLM-as-judge offline</span>
+      </div>
+    </header>
+
+    <nav class="toc">
+      <h2>On this page</h2>
+      <ol>
+        <li><a href="#why">Why eval-gated CI</a></li>
+        <li><a href="#trajectory">Trajectory evaluation</a></li>
+        <li><a href="#goldens">Golden trajectory JSON</a></li>
+        <li><a href="#mocks">Mocked tools (deterministic CI)</a></li>
+        <li><a href="#judges">Heuristic vs LLM-as-judge</a></li>
+        <li><a href="#workflow">Sample <code class="inline">eval.yml</code></a></li>
+        <li><a href="#pytest">pytest patterns</a></li>
+        <li><a href="#beginner">Beginner exercises</a></li>
+        <li><a href="#intermediate">Intermediate exercises</a></li>
+        <li><a href="#advanced">Advanced exercises</a></li>
+        <li><a href="#checklist">Ship checklist</a></li>
+      </ol>
+    </nav>
+
+    <!-- ── Why ─────────────────────────────────────────────── -->
+    <section class="section" id="why">
+      <h2>Why eval-gated CI</h2>
+      <p>
+        Final-answer unit tests miss the failure mode that hurts ops most:
+        the agent called the <em>wrong tool</em>, skipped approval, or wrote
+        a refund without HITL. Day 4’s ship goal is a
+        <strong>traced + eval-gated agent</strong>: PRs fail when trajectory
+        or policy scores regress.
+      </p>
+      <div class="callout">
+        <strong>CI gate rule of thumb</strong>
+        Run only <em>offline</em> checks in the merge gate: mocked tools,
+        golden trajectories, heuristic assertions. Keep LLM-as-judge and
+        live API traces for nightly / manual jobs so every push stays free.
+      </div>
+      <table>
+        <thead>
+          <tr><th>Layer</th><th>Where it runs</th><th>Spend</th><th>What it catches</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Heuristic / code</td>
+            <td>PR CI (<code class="inline">eval.yml</code>)</td>
+            <td>$0</td>
+            <td>Wrong tool order, missing HITL, bad args, step-count blowups</td>
+          </tr>
+          <tr>
+            <td>LLM-as-judge</td>
+            <td>Nightly / local notebook</td>
+            <td>Paid tokens</td>
+            <td>Rubric quality, tone, partial correctness</td>
+          </tr>
+          <tr>
+            <td>Online / production</td>
+            <td>Tracing + alerts</td>
+            <td>Ops cost</td>
+            <td>Drift, rare tool failures, cost per task</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Eval-gated CI means: if <code class="inline">pytest</code> fails on
+        trajectory goldens, the deploy (or at least the merge) is blocked.
+        Production traffic later becomes an ever-growing test set — but the
+        <em>anchor</em> set of hand-crafted goldens must always pass offline.
+      </p>
+    </section>
+
+    <!-- ── Trajectory ──────────────────────────────────────── -->
+    <section class="section" id="trajectory">
+      <h2>Trajectory evaluation</h2>
+      <p>
+        A <strong>trajectory</strong> is the ordered path of messages, tool
+        calls, interrupts, and final state — not just the last assistant string.
+        Score the path on:
+      </p>
+      <ul>
+        <li><strong>Tool-selection accuracy</strong> — expected tools appear in order (or as a set).</li>
+        <li><strong>Argument validity</strong> — IDs, amounts, and schemas match contracts.</li>
+        <li><strong>Policy compliance</strong> — irreversible actions require HITL / approval.</li>
+        <li><strong>Step / cost budget</strong> — no runaway loops in CI fixtures.</li>
+        <li><strong>Task success</strong> — final status matches the golden outcome.</li>
+      </ul>
+      <div class="callout warn">
+        <strong>Pitfall (instructor guide)</strong>
+        Test trajectories, not just final answers. CI mocks tools to avoid
+        API spend on every push.
+      </div>
+    </section>
+
+    <!-- ── Goldens ─────────────────────────────────────────── -->
+    <section class="section" id="goldens">
+      <h2>Golden trajectory JSON</h2>
+      <p>
+        Hand-craft 25–100 scenarios as an anchor set (Day 4 lab uses
+        <code class="inline">eval/trajectory_goldens.json</code>). Include at
+        least one <em>intentional failure</em> case so learners see a red CI.
+        Below: minimal shapes you can paste into a notebook cell and later
+        save under <code class="inline">ConceptBuilding/data/</code> or
+        <code class="inline">eval/</code>.
+      </p>
+
+      <h3>Pass case — refund requires HITL</h3>
+<pre>{
+  "id": "bank-refund-hitl-001",
+  "lane": "banking",
+  "prompt": "Customer wants a $40 goodwill credit on loan LN-1001.",
+  "expected_tools": ["lookup_loan", "propose_goodwill_credit"],
+  "forbidden_tools": ["apply_goodwill_credit"],
+  "hitl_required": true,
+  "hitl_action": "apply_goodwill_credit",
+  "max_steps": 6,
+  "expected_outcome": {
+    "status": "awaiting_approval",
+    "amount": 40,
+    "loan_id": "LN-1001"
+  },
+  "notes": "Write path must interrupt before apply_goodwill_credit."
+}</pre>
+
+      <h3>Pass case — read-only shipment status</h3>
+<pre>{
+  "id": "logistics-status-002",
+  "lane": "logistics",
+  "prompt": "Where is shipment SHP-778?",
+  "expected_tools": ["get_shipment_status"],
+  "forbidden_tools": ["release_hold"],
+  "hitl_required": false,
+  "max_steps": 4,
+  "expected_outcome": {
+    "status": "in_transit",
+    "shipment_id": "SHP-778"
+  }
+}</pre>
+
+      <h3>Intentional failure golden (CI should catch regressions that “look” like this)</h3>
+<pre>{
+  "id": "insurance-fnol-bad-tool-order-XFAIL",
+  "lane": "insurance",
+  "prompt": "FNOL for policy POL-AUTO-001 water damage.",
+  "expected_tools": ["lookup_policy", "create_claim_draft"],
+  "forbidden_tools": [],
+  "hitl_required": false,
+  "max_steps": 5,
+  "expected_outcome": { "status": "draft_created" },
+  "intentional_bad_trajectory": {
+    "tools_called": ["create_claim_draft", "lookup_policy"],
+    "reason": "Claim draft before policy lookup — must fail tool-order assert."
+  }
+}</pre>
+
+      <h3>Recorded run trajectory (what your agent / mock runner emits)</h3>
+<pre>{
+  "case_id": "bank-refund-hitl-001",
+  "steps": [
+    {
+      "type": "tool_call",
+      "name": "lookup_loan",
+      "args": { "loan_id": "LN-1001" },
+      "result": { "balance": 1200.0, "status": "current" }
+    },
+    {
+      "type": "tool_call",
+      "name": "propose_goodwill_credit",
+      "args": { "loan_id": "LN-1001", "amount": 40 },
+      "result": { "proposal_id": "GC-9", "needs_approval": true }
+    },
+    {
+      "type": "interrupt",
+      "reason": "hitl",
+      "pending_action": "apply_goodwill_credit",
+      "idempotency_key": "gc-LN-1001-40-v1"
+    }
+  ],
+  "final_state": {
+    "status": "awaiting_approval",
+    "amount": 40,
+    "loan_id": "LN-1001"
+  },
+  "api_calls": 0
+}</pre>
+    </section>
+
+    <!-- ── Mocks ───────────────────────────────────────────── -->
+    <section class="section" id="mocks">
+      <h2>Mocked tools (deterministic CI)</h2>
+      <p>
+        In CI, never call Anthropic / OpenRouter. Replace the planner with a
+        <strong>scripted runner</strong> or stub the LLM to return fixed tool
+        calls from the golden. Domain tools return fixture JSON only — same
+        rule as the Agentic Operations Assistant: never invent claim, loan,
+        policy, or shipment records.
+      </p>
+<pre># notebook / tests/conftest.py — conceptual mocks
+from dataclasses import dataclass, field
+
+@dataclass
+class MockToolEnv:
+    loan_db: dict = field(default_factory=lambda: {
+        "LN-1001": {"balance": 1200.0, "status": "current"}
+    })
+    writes: list = field(default_factory=list)
+
+    def lookup_loan(self, loan_id: str) -> dict:
+        if loan_id not in self.loan_db:
+            raise KeyError(loan_id)
+        return self.loan_db[loan_id]
+
+    def propose_goodwill_credit(self, loan_id: str, amount: float) -> dict:
+        return {"proposal_id": "GC-9", "needs_approval": True,
+                "loan_id": loan_id, "amount": amount}
+
+    def apply_goodwill_credit(self, loan_id: str, amount: float,
+                              idempotency_key: str, approved: bool) -> dict:
+        if not approved:
+            raise PermissionError("HITL approval required")
+        self.writes.append({
+            "op": "apply_goodwill_credit",
+            "loan_id": loan_id,
+            "amount": amount,
+            "idempotency_key": idempotency_key,
+        })
+        return {"status": "applied", "idempotency_key": idempotency_key}
+
+
+def run_scripted_trajectory(tool_plan: list[dict], env: MockToolEnv) -> dict:
+    """Deterministic runner: no LLM. Emits a trajectory dict for asserts."""
+    steps = []
+    for call in tool_plan:
+        name, args = call["name"], call.get("args", {})
+        if name == "apply_goodwill_credit" and not args.get("approved"):
+            steps.append({
+                "type": "interrupt",
+                "reason": "hitl",
+                "pending_action": name,
+                "idempotency_key": args.get("idempotency_key"),
+            })
+            return {
+                "steps": steps,
+                "final_state": {"status": "awaiting_approval", **{
+                    k: args[k] for k in ("loan_id", "amount") if k in args
+                }},
+                "api_calls": 0,
+            }
+        fn = getattr(env, name)
+        result = fn(**args)
+        steps.append({"type": "tool_call", "name": name, "args": args, "result": result})
+    return {"steps": steps, "final_state": {"status": "done"}, "api_calls": 0}</pre>
+    </section>
+
+    <!-- ── Judges ──────────────────────────────────────────── -->
+    <section class="section" id="judges">
+      <h2>Heuristic vs LLM-as-judge</h2>
+      <table>
+        <thead>
+          <tr><th></th><th>Heuristic (code)</th><th>LLM-as-judge</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Mechanism</td>
+            <td><code class="inline">assert</code> on tool names, flags, schemas, regex</td>
+            <td>Rubric prompt + graded JSON score</td>
+          </tr>
+          <tr>
+            <td>Determinism</td>
+            <td>Fully deterministic</td>
+            <td>Stochastic unless temperature 0 + pinned model</td>
+          </tr>
+          <tr>
+            <td>CI fit</td>
+            <td>Ideal for merge gates</td>
+            <td>Nightly / sampling; audit a fraction of scores</td>
+          </tr>
+          <tr>
+            <td>Example</td>
+            <td><code class="inline">hitl_required ⇒ interrupt before apply_*</code></td>
+            <td>“Was the goodwill amount fair given policy?”</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Three-layer model (Day 4): (1) heuristic / code checks, (2) LLM-as-judge
+        with rubric + auditing, (3) distilled / agent-as-judge for cheap full
+        traffic. <strong>This module’s CI gate uses layer 1 only.</strong>
+      </p>
+      <div class="callout">
+        <strong>Eval → guardrail</strong>
+        Once a heuristic always fails on “refund without HITL”, promote it to a
+        runtime guard: write tools stay off until approval + idempotency key.
+      </div>
+    </section>
+
+    <!-- ── Workflow ────────────────────────────────────────── -->
+    <section class="section" id="workflow">
+      <h2>Sample <code class="inline">.github/workflows/eval.yml</code></h2>
+      <p>
+        Place this at repo root. It installs deps, runs offline trajectory
+        tests, and fails the job (and thus the required check) on regression.
+        No provider secrets are needed for the gate.
+      </p>
+<pre>name: Agent trajectory eval
+
+on:
+  pull_request:
+    paths:
+      - "Week2/**"
+      - "eval/**"
+      - "tests/**"
+      - ".github/workflows/eval.yml"
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trajectory-offline:
+    name: Offline trajectory pytest (no API)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Explicitly block accidental live calls
+      LLM_PROVIDER: mock
+      OPENAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      OPENROUTER_API_KEY: ""
+      CI_OFFLINE: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Week2 deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r Week2/requirements.txt
+          pip install pytest pytest-json-report
+
+      - name: Run offline trajectory evals
+        working-directory: Week2
+        run: |
+          pytest W2D4/tests \
+            -q \
+            --tb=short \
+            --json-report --json-report-file=../eval-report.json
+
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: eval-report.json
+
+  # Optional: never block PRs; costs money — schedule only
+  # llm-judge-nightly:
+  #   if: github.event_name == 'schedule'
+  #   runs-on: ubuntu-latest
+  #   steps: ...  # uses secrets.ANTHROPIC_API_KEY</pre>
+      <div class="callout warn">
+        <strong>Branch protection</strong>
+        Mark <code class="inline">Offline trajectory pytest (no API)</code> as a
+        required status check. That is the “eval gate”: merge is blocked when
+        tool-selection or HITL asserts fail.
+      </div>
+    </section>
+
+    <!-- ── pytest ──────────────────────────────────────────── -->
+    <section class="section" id="pytest">
+      <h2>pytest patterns — tool selection &amp; HITL for refund</h2>
+      <p>
+        Copy these into a notebook first; when green, move to
+        <code class="inline">Week2/W2D4/tests/test_content_contract.py</code> so Actions
+        runs the same functions.
+      </p>
+<pre>import json
+from pathlib import Path
+
+import pytest
+
+# Assume MockToolEnv + run_scripted_trajectory from earlier cells / conftest
+
+
+def tools_called(trajectory: dict) -> list[str]:
+    return [s["name"] for s in trajectory["steps"] if s["type"] == "tool_call"]
+
+
+def has_hitl_interrupt(trajectory: dict, pending: str | None = None) -> bool:
+    for s in trajectory["steps"]:
+        if s.get("type") == "interrupt" and s.get("reason") == "hitl":
+            if pending is None or s.get("pending_action") == pending:
+                return True
+    return False
+
+
+GOLDENS = json.loads(Path("data/trajectory_goldens_sample.json").read_text())
+# or inline the bank-refund-hitl-001 dict while prototyping
+
+
+@pytest.mark.parametrize("case", GOLDENS, ids=lambda c: c["id"])
+def test_expected_tools_selected(case, scripted_runner):
+    """Tool-selection accuracy against golden expected_tools."""
+    traj = scripted_runner(case)
+    called = tools_called(traj)
+    for name in case["expected_tools"]:
+        assert name in called, f"missing tool {name} in {called}"
+    for name in case.get("forbidden_tools", []):
+        assert name not in called, f"forbidden tool {name} was called"
+
+
+def test_refund_requires_hitl(scripted_runner):
+    """Write path: goodwill / refund must interrupt before apply_*."""
+    case = {
+        "id": "bank-refund-hitl-001",
+        "prompt": "Goodwill credit $40 on LN-1001",
+        "tool_plan": [
+            {"name": "lookup_loan", "args": {"loan_id": "LN-1001"}},
+            {"name": "propose_goodwill_credit",
+             "args": {"loan_id": "LN-1001", "amount": 40}},
+            {"name": "apply_goodwill_credit",
+             "args": {
+                 "loan_id": "LN-1001",
+                 "amount": 40,
+                 "idempotency_key": "gc-LN-1001-40-v1",
+                 "approved": False,
+             }},
+        ],
+        "expected_outcome": {"status": "awaiting_approval"},
+    }
+    traj = scripted_runner(case)
+    assert "lookup_loan" in tools_called(traj)
+    assert "propose_goodwill_credit" in tools_called(traj)
+    assert "apply_goodwill_credit" not in tools_called(traj)
+    assert has_hitl_interrupt(traj, pending="apply_goodwill_credit")
+    assert traj["final_state"]["status"] == "awaiting_approval"
+    assert traj.get("api_calls", 0) == 0
+
+
+def test_apply_without_approval_is_blocked(env):
+    with pytest.raises(PermissionError, match="HITL"):
+        env.apply_goodwill_credit(
+            loan_id="LN-1001",
+            amount=40,
+            idempotency_key="gc-LN-1001-40-v1",
+            approved=False,
+        )
+
+
+@pytest.mark.live_llm  # excluded in CI via -m "not live_llm"
+def test_llm_judge_refund_rubric():
+    pytest.skip("LLM-as-judge runs nightly only — not in merge gate")</pre>
+    </section>
+
+    <!-- ── Beginner ────────────────────────────────────────── -->
+    <section class="section" id="beginner">
+      <h2><span class="level beginner">Beginner</span> Exercises</h2>
+      <p>
+        Work in a blank notebook with cwd under <code class="inline">Week2/ConceptBuilding</code>
+        (or adjust paths). Every exercise is an offline pytest-shaped function.
+      </p>
+
+      <div class="exercise" id="ex-b1">
+        <div class="ex-label">Exercise B1 · Parse a trajectory</div>
+        <p>
+          Paste the recorded-run JSON from above into a cell as
+          <code class="inline">traj</code>. Write
+          <code class="inline">def tools_called(trajectory) -&gt; list[str]</code>
+          and assert it returns
+          <code class="inline">["lookup_loan", "propose_goodwill_credit"]</code>.
+        </p>
+<pre>def tools_called(trajectory: dict) -&gt; list[str]:
+    ...  # your code
+
+assert tools_called(traj) == ["lookup_loan", "propose_goodwill_credit"]</pre>
+      </div>
+
+      <div class="exercise" id="ex-b2">
+        <div class="ex-label">Exercise B2 · Detect HITL interrupt</div>
+        <p>
+          Implement <code class="inline">has_hitl_interrupt(trajectory, pending=None)</code>.
+          Assert <code class="inline">True</code> for the refund trajectory and
+          <code class="inline">False</code> if you delete the interrupt step.
+        </p>
+<pre>def has_hitl_interrupt(trajectory: dict, pending: str | None = None) -&gt; bool:
+    ...
+
+assert has_hitl_interrupt(traj, pending="apply_goodwill_credit") is True</pre>
+      </div>
+
+      <div class="exercise" id="ex-b3">
+        <div class="ex-label">Exercise B3 · Forbidden tool assert</div>
+        <p>
+          Write a notebook function that fails if
+          <code class="inline">release_hold</code> appears in a logistics
+          status-only golden. Use
+          <code class="inline">pytest.raises(AssertionError)</code> in a tiny
+          harness, or plain <code class="inline">assert</code> with a crafted
+          bad trajectory.
+        </p>
+<pre>def assert_no_forbidden(trajectory: dict, forbidden: list[str]) -&gt; None:
+    called = tools_called(trajectory)
+    for name in forbidden:
+        assert name not in called, f"forbidden: {name}"
+
+# status-only path must not release holds
+assert_no_forbidden(
+    {"steps": [{"type": "tool_call", "name": "get_shipment_status", "args": {}, "result": {}}]},
+    forbidden=["release_hold"],
+)</pre>
+      </div>
+    </section>
+
+    <!-- ── Intermediate ────────────────────────────────────── -->
+    <section class="section" id="intermediate">
+      <h2><span class="level intermediate">Intermediate</span> Exercises</h2>
+
+      <div class="exercise" id="ex-i1">
+        <div class="ex-label">Exercise I1 · Parametrize goldens</div>
+        <p>
+          Save two golden cases (refund HITL + shipment status) as a list
+          <code class="inline">CASES</code>. Write a loop (notebook stand-in for
+          <code class="inline">@pytest.mark.parametrize</code>) that checks
+          <code class="inline">expected_tools</code> ⊆ tools called and
+          <code class="inline">api_calls == 0</code> on each scripted run.
+        </p>
+<pre>CASES = [ ... ]  # paste goldens
+
+def check_case(case: dict, traj: dict) -&gt; None:
+    called = set(tools_called(traj))
+    assert set(case["expected_tools"]) &lt;= called
+    assert traj.get("api_calls", 0) == 0
+    if case.get("hitl_required"):
+        assert has_hitl_interrupt(traj, case.get("hitl_action"))
+
+for case in CASES:
+    traj = run_scripted_trajectory(case["tool_plan"], MockToolEnv())
+    check_case(case, traj)
+    print("OK", case["id"])</pre>
+      </div>
+
+      <div class="exercise" id="ex-i2">
+        <div class="ex-label">Exercise I2 · Refund HITL full pytest cell</div>
+        <p>
+          Port <code class="inline">test_refund_requires_hitl</code> into a
+          notebook cell. Drive it with
+          <code class="inline">run_scripted_trajectory</code> so
+          <code class="inline">apply_goodwill_credit</code> is never in
+          <code class="inline">tools_called</code>, yet an interrupt exists.
+          This is the exact assert CI will run on PRs.
+        </p>
+<pre>def test_refund_requires_hitl():
+    env = MockToolEnv()
+    plan = [
+        {"name": "lookup_loan", "args": {"loan_id": "LN-1001"}},
+        {"name": "propose_goodwill_credit",
+         "args": {"loan_id": "LN-1001", "amount": 40}},
+        {"name": "apply_goodwill_credit",
+         "args": {"loan_id": "LN-1001", "amount": 40,
+                  "idempotency_key": "gc-LN-1001-40-v1", "approved": False}},
+    ]
+    traj = run_scripted_trajectory(plan, env)
+    assert "apply_goodwill_credit" not in tools_called(traj)
+    assert has_hitl_interrupt(traj, "apply_goodwill_credit")
+    assert env.writes == []  # no side effects without approval
+
+test_refund_requires_hitl()</pre>
+      </div>
+
+      <div class="exercise" id="ex-i3">
+        <div class="ex-label">Exercise I3 · Intentional failure case</div>
+        <p>
+          Build the insurance bad-order trajectory from the golden’s
+          <code class="inline">intentional_bad_trajectory</code>. Write
+          <code class="inline">assert_tool_order(called, expected)</code> that
+          requires subsequence order. Confirm the bad path raises / asserts
+          false — this teaches why CI must stay red for regressions.
+        </p>
+<pre>def is_subsequence(called: list[str], expected: list[str]) -&gt; bool:
+    it = iter(called)
+    return all(name in it for name in expected)
+
+expected = ["lookup_policy", "create_claim_draft"]
+bad = ["create_claim_draft", "lookup_policy"]
+assert is_subsequence(bad, expected) is False
+assert is_subsequence(["lookup_policy", "create_claim_draft"], expected) is True</pre>
+      </div>
+    </section>
+
+    <!-- ── Advanced ────────────────────────────────────────── -->
+    <section class="section" id="advanced">
+      <h2><span class="level advanced">Advanced</span> Exercises</h2>
+
+      <div class="exercise" id="ex-a1">
+        <div class="ex-label">Exercise A1 · Map notebook → CI module</div>
+        <p>
+          Create (on paper or in a cell as a string) the file layout CI expects:
+          <code class="inline">Week2/W2D4/tests/test_content_contract.py</code>,
+          <code class="inline">Week2/W2D4/tests/test_fixtures.py</code> with
+          <code class="inline">env</code> / <code class="inline">scripted_runner</code>
+          fixtures, and
+          <code class="inline">eval/trajectory_goldens.json</code>.
+          List which notebook functions move where — no live network.
+        </p>
+<pre># cell: document the mapping
+MOVE = {
+  "tools_called": "tests/test_trajectory.py (helper)",
+  "has_hitl_interrupt": "tests/test_trajectory.py (helper)",
+  "test_refund_requires_hitl": "tests/test_trajectory.py",
+  "MockToolEnv": "tests/conftest.py",
+  "run_scripted_trajectory": "tests/conftest.py",
+  "CASES JSON": "eval/trajectory_goldens.json",
+  "workflow": ".github/workflows/eval.yml",
+}
+for k, v in MOVE.items():
+    print(f"{k:28} -&gt; {v}")</pre>
+      </div>
+
+      <div class="exercise" id="ex-a2">
+        <div class="ex-label">Exercise A2 · Idempotency key on write</div>
+        <p>
+          Extend the refund test: when <code class="inline">approved=True</code>,
+          <code class="inline">apply_goodwill_credit</code> may run once, and the
+          write record must include a non-empty
+          <code class="inline">idempotency_key</code>. Calling apply twice with
+          the same key must not duplicate <code class="inline">env.writes</code>
+          (simulate idempotent store).
+        </p>
+<pre>def test_approved_refund_is_idempotent():
+    env = MockToolEnv()
+    key = "gc-LN-1001-40-v1"
+    args = dict(loan_id="LN-1001", amount=40, idempotency_key=key, approved=True)
+    env.apply_goodwill_credit(**args)
+    # second call: your idempotent wrapper should no-op
+    seen = {w["idempotency_key"] for w in env.writes}
+    assert key in seen
+    assert all(w.get("idempotency_key") for w in env.writes)</pre>
+      </div>
+
+      <div class="exercise" id="ex-a3">
+        <div class="ex-label">Exercise A3 · Heuristic gate vs judge marker</div>
+        <p>
+          In one cell, define two tests: a heuristic that always runs, and a
+          stub marked mentally as <code class="inline">live_llm</code> that
+          <code class="inline">pytest.skip</code>s when
+          <code class="inline">os.environ.get("CI_OFFLINE") == "1"</code>.
+          Explain in a markdown cell why only the heuristic belongs in
+          <code class="inline">eval.yml</code>.
+        </p>
+<pre>import os
+
+def test_heuristic_hitl_gate():
+    assert True  # replace with has_hitl_interrupt(...)
+
+def test_llm_as_judge_rubric():
+    if os.environ.get("CI_OFFLINE") == "1":
+        raise Exception("skip: judge not in merge gate")
+    # would call provider + rubric JSON here
+
+os.environ["CI_OFFLINE"] = "1"
+test_heuristic_hitl_gate()
+try:
+    test_llm_as_judge_rubric()
+except Exception as e:
+    print("correctly blocked:", e)</pre>
+      </div>
+
+      <div class="exercise" id="ex-a4">
+        <div class="ex-label">Exercise A4 · Mini eval report for the gate</div>
+        <p>
+          After looping all cases, emit a dict
+          <code class="inline">{"passed": n, "failed": [...], "api_spend_usd": 0.0}</code>
+          and <code class="inline">assert api_spend_usd == 0</code>. This mirrors
+          the artifact uploaded by Actions and the Day 4 cost-report ship check
+          for the offline gate.
+        </p>
+<pre>def run_suite(cases: list[dict]) -&gt; dict:
+    failed = []
+    for case in cases:
+        try:
+            traj = run_scripted_trajectory(case["tool_plan"], MockToolEnv())
+            check_case(case, traj)
+        except AssertionError as err:
+            failed.append({"id": case["id"], "error": str(err)})
+    report = {
+        "passed": len(cases) - len(failed),
+        "failed": failed,
+        "api_spend_usd": 0.0,
+    }
+    assert report["api_spend_usd"] == 0.0
+    return report</pre>
+      </div>
+    </section>
+
+    <!-- ── Checklist ───────────────────────────────────────── -->
+    <section class="section" id="checklist">
+      <h2>Ship checklist (Day 4 preview)</h2>
+      <ul>
+        <li>Golden trajectories cover tool order, forbidden tools, and HITL writes.</li>
+        <li><code class="inline">pytest</code> asserts refund / goodwill paths interrupt before apply.</li>
+        <li><code class="inline">.github/workflows/eval.yml</code> runs offline only (<code class="inline">CI_OFFLINE=1</code>, empty provider keys).</li>
+        <li>LLM-as-judge is marked out of the merge gate (<code class="inline">not live_llm</code>).</li>
+        <li>Required status check blocks merge on trajectory regression.</li>
+        <li>Report artifact shows <code class="inline">api_spend_usd: 0</code> for the gate job.</li>
+      </ul>
+      <div class="callout">
+        <strong>Next in the classroom</strong>
+        Day 4 PM adds LangSmith traces for debugging; this module’s CI gate
+        stays mocked so the class never burns tokens on every git push.
+      </div>
+    </section>
+
+    <footer class="nav-footer">
+      <a href="16_diskcache_semantic.html">← 16 · diskcache semantic cache</a>
+      <a href="../index.html">Module index →</a>
+    </footer>
+  </div>
+</body>
+</html>

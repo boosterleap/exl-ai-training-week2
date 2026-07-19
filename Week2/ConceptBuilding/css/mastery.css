@@ -1,0 +1,215 @@
+/* Week2 misc mastery track — shared styles (June 2026) */
+:root {
+  --bg: #f6f3ee;
+  --surface: #fffdf9;
+  --ink: #1c2430;
+  --muted: #5b6675;
+  --line: #d9d2c6;
+  --accent: #0f6b5c;
+  --accent-2: #b45309;
+  --beginner: #0f6b5c;
+  --intermediate: #1d4ed8;
+  --advanced: #9f1239;
+  --code-bg: #151b24;
+  --code-fg: #e8eef6;
+  --shadow: 0 10px 30px rgba(28, 36, 48, 0.08);
+  --radius: 14px;
+  --max: 980px;
+  --font: "Segoe UI", "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "Cascadia Code", "Consolas", "SFMono-Regular", monospace;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, #efe7d8 0, transparent 40%),
+    linear-gradient(180deg, #faf7f2, var(--bg));
+  line-height: 1.6;
+}
+
+a { color: var(--accent); }
+a:hover { color: var(--accent-2); }
+
+.wrap { max-width: var(--max); margin: 0 auto; padding: 28px 20px 80px; }
+
+.topnav {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  justify-content: space-between; margin-bottom: 22px;
+}
+.topnav a {
+  text-decoration: none; font-size: 0.92rem; color: var(--muted);
+  border: 1px solid var(--line); background: var(--surface);
+  padding: 6px 12px; border-radius: 999px;
+}
+.topnav a:hover { color: var(--ink); border-color: #b9b0a2; }
+
+.hero {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) + 4px);
+  box-shadow: var(--shadow);
+  padding: 28px 28px 24px;
+  margin-bottom: 28px;
+}
+.eyebrow {
+  display: inline-block; font-size: 0.78rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent); font-weight: 700;
+  margin-bottom: 8px;
+}
+.hero h1 { margin: 0 0 10px; font-size: clamp(1.7rem, 3vw, 2.35rem); line-height: 1.2; }
+.hero p.lead { margin: 0; color: var(--muted); font-size: 1.05rem; max-width: 70ch; }
+.meta-row {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px;
+}
+.chip {
+  font-size: 0.8rem; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: #f3efe7; color: var(--muted);
+}
+.chip.strong { background: #e5f4f0; color: var(--accent); border-color: #b9ddd4; }
+
+.toc {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 18px 20px; margin-bottom: 28px;
+}
+.toc h2 { margin: 0 0 10px; font-size: 1.05rem; }
+.toc ol { margin: 0; padding-left: 1.2rem; }
+.toc li { margin: 4px 0; }
+
+.section {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.section h2 {
+  margin: 0 0 8px; font-size: 1.45rem;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.section h3 { margin: 22px 0 8px; font-size: 1.12rem; }
+.section h4 { margin: 16px 0 6px; font-size: 1rem; color: var(--muted); }
+.level {
+  font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase;
+  font-weight: 700; padding: 3px 8px; border-radius: 999px; color: #fff;
+}
+.level.beginner { background: var(--beginner); }
+.level.intermediate { background: var(--intermediate); }
+.level.advanced { background: var(--advanced); }
+
+.exercise {
+  border: 1px dashed #c9bfb0;
+  background: #fbf8f2;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 14px 0;
+}
+.exercise .ex-label {
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--accent-2); margin-bottom: 4px;
+}
+.exercise p { margin: 0 0 10px; }
+
+/* OS-specific terminal variants */
+.os-pair { margin: 10px 0 14px; }
+.os-label {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 0 0 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.os-label.windows {
+  color: #1e3a8a;
+  background: #dbeafe;
+}
+.os-label.ubuntu {
+  color: #5b21b6;
+  background: #ede9fe;
+}
+pre.os-windows {
+  background: var(--code-bg);
+  color: var(--code-fg);
+  margin: 0 0 10px;
+}
+pre.os-ubuntu {
+  background: #f3e8ff;
+  color: #2e1065;
+  border: 1px solid #d8b4fe;
+  margin: 0;
+}
+code.inline.ubuntu {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+pre, code { font-family: var(--mono); }
+pre {
+  background: var(--code-bg); color: var(--code-fg);
+  border-radius: 12px; padding: 14px 16px; overflow-x: auto;
+  font-size: 0.86rem; line-height: 1.5; margin: 0;
+}
+code.inline {
+  background: #efe9df; padding: 1px 6px; border-radius: 6px;
+  font-size: 0.9em;
+}
+
+.callout {
+  border-left: 4px solid var(--accent);
+  background: #eef8f5;
+  padding: 12px 14px;
+  border-radius: 0 10px 10px 0;
+  margin: 14px 0;
+}
+.callout.warn {
+  border-left-color: var(--accent-2);
+  background: #fff6eb;
+}
+.callout strong { display: block; margin-bottom: 4px; }
+
+table {
+  width: 100%; border-collapse: collapse; margin: 12px 0 4px;
+  font-size: 0.95rem;
+}
+th, td {
+  border: 1px solid var(--line); padding: 8px 10px; text-align: left;
+  vertical-align: top;
+}
+th { background: #f1ebe1; }
+
+.nav-footer {
+  display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--line);
+}
+.nav-footer a {
+  text-decoration: none; background: var(--surface); border: 1px solid var(--line);
+  padding: 10px 14px; border-radius: 10px;
+}
+
+.module-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.module-card {
+  display: block; text-decoration: none; color: inherit;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
+}
+.module-card:hover { border-color: #b7cfc8; transform: translateY(-1px); }
+.module-card .num {
+  font-size: 0.78rem; font-weight: 700; color: var(--accent); letter-spacing: 0.04em;
+}
+.module-card h3 { margin: 6px 0 6px; font-size: 1.05rem; }
+.module-card p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+
+@media (max-width: 640px) {
+  .hero, .section { padding: 18px; }
+  .wrap { padding: 18px 14px 60px; }
+}

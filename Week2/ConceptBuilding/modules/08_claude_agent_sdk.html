@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>08 · Claude Agent SDK — Week 2 Mastery</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">← Mastery index</a>
+      <span>
+        <a href="07_tenacity_reliability.html">Prev · 07 Tenacity</a>
+        <a href="09_mcp_servers_clients.html">Next · 09 MCP</a>
+      </span>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">Module 08 · June 2026 · Offline-first</div>
+      <h1>Claude Agent SDK</h1>
+      <p class="lead">
+        <code class="inline">query()</code> vs <code class="inline">ClaudeSDKClient</code>,
+        tools and in-process MCP, sessions and <code class="inline">CLAUDE.md</code>,
+        permissions, lifecycle hooks, the isolation spectrum
+        (skills → sub-agents → teams), and cost metering.
+        Prefer offline sketches of option shapes and handlers; provider API calls are an optional stretch.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">Package: claude-agent-sdk</span>
+        <span class="chip">Maps to W2D1 PM</span>
+        <span class="chip">PM provider concepts + typed tools</span>
+        <span class="chip">8+ B/I/A exercises</span>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="Table of contents">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#why">Why this SDK (not raw Messages API)</a></li>
+        <li><a href="#query-vs-client">query() vs ClaudeSDKClient</a></li>
+        <li><a href="#options">ClaudeAgentOptions sketch</a></li>
+        <li><a href="#tools">Tools, @tool, in-process MCP</a></li>
+        <li><a href="#sessions">Sessions, resume, CLAUDE.md</a></li>
+        <li><a href="#permissions">Permissions: allowed_tools, can_use_tool</a></li>
+        <li><a href="#hooks">Hooks: PreToolUse / PostToolUse / Stop</a></li>
+        <li><a href="#isolation">Isolation spectrum: skills → sub-agents → teams</a></li>
+        <li><a href="#cost">Cost metering &amp; hard caps</a></li>
+        <li><a href="#day1pm">Map to Week 2 Day 1 PM</a></li>
+        <li><a href="#stretch">Optional provider-call stretch</a></li>
+        <li><a href="#checklist">Exit checklist</a></li>
+      </ol>
+    </nav>
+
+    <!-- ========== WHY ========== -->
+    <section class="section" id="why">
+      <h2><span class="level beginner">Beginner</span> Why this SDK</h2>
+      <p>
+        The Claude Agent SDK wraps the same agent loop that powers Claude Code:
+        gather context → call the model → run tools → repeat, with session memory,
+        permissions, and hooks. You do <em>not</em> hand-roll the tool loop for Day 1 PM.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Layer</th><th>Job</th><th>Day 1 PM touchpoint</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Runtime</td>
+            <td><code class="inline">ClaudeSDKClient</code> + <code class="inline">ClaudeAgentOptions</code></td>
+            <td>PM provider concept → <code class="inline">run_anthropic</code></td>
+          </tr>
+          <tr>
+            <td>Capabilities</td>
+            <td>Built-in tools + in-process MCP domain tools</td>
+            <td><code class="inline">tools.py</code> → <code class="inline">build_sdk_mcp_server</code></td>
+          </tr>
+          <tr>
+            <td>Knowledge / rules</td>
+            <td><code class="inline">CLAUDE.md</code>, optional Skills</td>
+            <td><code class="inline">W2D1PM/CLAUDE.md</code> via <code class="inline">setting_sources=["project"]</code></td>
+          </tr>
+          <tr>
+            <td>Guardrails</td>
+            <td><code class="inline">allowed_tools</code>, <code class="inline">can_use_tool</code>, hooks</td>
+            <td>Logistics write gate; Day 2 hooks demo</td>
+          </tr>
+          <tr>
+            <td>Metering</td>
+            <td><code class="inline">max_turns</code>, <code class="inline">max_budget_usd</code>, usage on <code class="inline">ResultMessage</code></td>
+            <td><code class="inline">CostLog</code> / budget experiment</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Mental model</strong>
+        Tools and MCP are verbs (what the agent can do). Skills / CLAUDE.md are manuals
+        (how to do the job). Sub-agents and teams change isolation and coordination —
+        not “more tools.”
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B1 · Name the layers</div>
+        <p>
+          Without opening code, list the five rows in the table above from memory.
+          Then open <code class="inline">W2D1/W2D1PM/_README.html</code> and check which
+          CLI command exercises each layer.
+        </p>
+        <pre>Expected mapping sketch (fill blanks):
+  Runtime     → d1pmt6c02_guarded_operations_assistant.py
+  Capabilities → _______________________________
+  Rules       → _______________________________
+  Guardrails  → permissions-demo
+  Metering    → triage --max-steps 3</pre>
+      </div>
+    </section>
+
+    <!-- ========== QUERY VS CLIENT ========== -->
+    <section class="section" id="query-vs-client">
+      <h2><span class="level beginner">Beginner</span> query() vs ClaudeSDKClient</h2>
+      <p>
+        Both entry points take a prompt and <code class="inline">ClaudeAgentOptions</code>.
+        They differ in session lifecycle and interactive control.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Feature</th><th><code class="inline">query()</code></th><th><code class="inline">ClaudeSDKClient</code></th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Session</td><td>New session by default</td><td>Reuses one session across calls</td></tr>
+          <tr><td>Conversation</td><td>Single exchange (unless resume / continue)</td><td>Multi-turn in the same context</td></tr>
+          <tr><td>Connection</td><td>Managed for you</td><td>You own connect / disconnect</td></tr>
+          <tr><td>Interrupts</td><td>Not supported</td><td>Supported</td></tr>
+          <tr><td>Custom tools &amp; hooks</td><td>Supported</td><td>Supported (preferred for lab UX)</td></tr>
+          <tr><td>Best for</td><td>One-off scripts</td><td>PM lab: sessions, permissions, follow-ups</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Offline shapes (no network)</h3>
+<pre># One-off — fire and stream
+async for message in query(prompt="Triage claim CLM-424063", options=options):
+    print(message)
+
+# Stateful client — PM lab shape
+async with ClaudeSDKClient(options=options) as client:
+    await client.query("Triage claim CLM-424063")
+    async for message in client.receive_response():
+        print(message)
+    # later, same session:
+    await client.query("What was the reserve?")
+    async for message in client.receive_response():
+        print(message)</pre>
+
+      <div class="callout warn">
+        <strong>Day 1 PM choice</strong>
+        <code class="inline">providers.run_anthropic</code> uses <code class="inline">ClaudeSDKClient</code>
+        so banking can resume, permissions can callback, and traces stay one session.
+        OpenRouter cohorts get the same CLI via LangGraph — same schemas, different runtime.
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B2 · Pick the entry point</div>
+        <p>For each scenario, write <code class="inline">query</code> or <code class="inline">client</code>:</p>
+        <pre>1. Nightly batch: summarize 200 FNOL emails, no follow-up     → _____
+2. Banking: turn 1 lookup, turn 2 "apply $25 goodwill"       → _____
+3. Operator hits Cancel mid-tool-loop                        → _____
+4. Teaching slide: smallest possible Agent SDK demo          → _____</pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B3 · Trace the receive loop</div>
+        <p>
+          Sketch (paper or notebook cell, no API) the objects you expect while
+          <code class="inline">receive_response()</code> runs: at least
+          <code class="inline">AssistantMessage</code> content blocks and a final
+          <code class="inline">ResultMessage</code>. Label which fields hold
+          <code class="inline">session_id</code>, <code class="inline">total_cost_usd</code>,
+          and <code class="inline">structured_output</code>.
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== OPTIONS ========== -->
+    <section class="section" id="options">
+      <h2><span class="level beginner">Beginner</span> ClaudeAgentOptions sketch</h2>
+      <p>
+        Options are configuration around the model — not prompt text. Day 1 PM
+        builds roughly this offline dict (types shown as comments):
+      </p>
+<pre>from claude_agent_sdk import ClaudeAgentOptions  # runtime import optional
+
+# Offline sketch of the PM Anthropic branch
+option_sketch = {
+    "model": "claude-sonnet-4-6",                 # Sonnet for cost; Opus when justified
+    "system_prompt": "... lane-specific ...",
+    "cwd": "Week2/W2D1/W2D1PM",                   # project root for CLAUDE.md discovery
+    "setting_sources": ["project"],               # load project CLAUDE.md / settings
+    "mcp_servers": {"ops": "&lt;in-process server&gt;"},
+    "strict_mcp_config": True,
+    "tools": [                                    # restrict available MCP tool names
+        "mcp__ops__policy_lookup",
+        "mcp__ops__claims_status",
+        "mcp__ops__loan_lookup",
+        "mcp__ops__shipment_lookup",
+        "mcp__ops__apply_goodwill_credit",
+        "mcp__ops__release_hold",
+    ],
+    "allowed_tools": [                            # auto-approve reads only
+        "mcp__ops__policy_lookup",
+        "mcp__ops__claims_status",
+        "mcp__ops__loan_lookup",
+        "mcp__ops__shipment_lookup",
+    ],
+    "can_use_tool": "&lt;permission_gate callback&gt;", # writes need --approve-writes
+    "max_turns": 10,                              # AGENT_MAX_STEPS
+    "max_budget_usd": 0.50,                       # AGENT_MAX_BUDGET_USD
+    "thinking": {"type": "disabled"},             # or enabled + budget_tokens
+    "output_format": {
+        "type": "json_schema",
+        "schema": "&lt;TriageDecision.model_json_schema()&gt;",
+    },
+    "resume": None,                               # or prior ResultMessage.session_id
+}
+
+# Constructing for real (stretch):
+# options = ClaudeAgentOptions(**kwargs_matching_sketch)</pre>
+
+      <div class="callout">
+        <strong>allowed_tools ≠ tools allowlist</strong>
+        <code class="inline">allowed_tools</code> auto-approves matching tools; it does
+        <em>not</em> remove other tools. Unlisted tools fall through to
+        <code class="inline">permission_mode</code> / <code class="inline">can_use_tool</code>.
+        The PM lab therefore also sets the available <code class="inline">tools</code> list
+        to the six domain MCP tools.
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B4 · Options quiz</div>
+        <p>True or false (write T/F):</p>
+        <pre>1. max_turns is a soft suggestion the model may ignore.                    → __
+2. setting_sources=["project"] loads W2D1PM/CLAUDE.md when cwd is PM root. → __
+3. Putting a write tool only in tools (not allowed_tools) auto-runs it.    → __
+4. resume continues an SDK session without replaying the full transcript.  → __
+5. output_format json_schema replaces the need for domain tools.           → __</pre>
+      </div>
+    </section>
+
+    <!-- ========== TOOLS ========== -->
+    <section class="section" id="tools">
+      <h2><span class="level intermediate">Intermediate</span> Tools, @tool, in-process MCP</h2>
+      <p>
+        Custom tools are declared with the SDK <code class="inline">@tool</code> decorator,
+        then registered on an in-process MCP server via
+        <code class="inline">create_sdk_mcp_server</code>. Names surface as
+        <code class="inline">mcp__&lt;server&gt;__&lt;tool&gt;</code>.
+      </p>
+
+      <h3>Decorator sketch (offline)</h3>
+<pre>from typing import Any
+# from claude_agent_sdk import tool, create_sdk_mcp_server
+
+@tool("policy_lookup", "Fetch policy metadata by policy id.", {"policy_id": str})
+async def sdk_policy_lookup(args: dict[str, Any]) -> dict[str, Any]:
+    # Call your domain function — never invent records
+    payload = {"found": True, "policy_id": args["policy_id"], "status": "active"}
+    return {"content": [{"type": "text", "text": json.dumps(payload)}]}
+
+@tool(
+    "release_hold",
+    "Queue a shipment hold release. This write requires approval.",
+    {"container_id": str, "reason": str, "idempotency_key": str},
+)
+async def sdk_release_hold(args: dict[str, Any]) -> dict[str, Any]:
+    # Write path: idempotency_key required in the PM lab
+    ...
+
+ops = create_sdk_mcp_server(
+    name="ops",
+    version="1.0.0",
+    tools=[sdk_policy_lookup, sdk_release_hold, ...],
+)
+# ClaudeAgentOptions(mcp_servers={"ops": ops}, ...)</pre>
+
+      <h3>Read vs write tools in the lab</h3>
+      <table>
+        <thead><tr><th>Kind</th><th>Names</th><th>Policy</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Read</td>
+            <td><code class="inline">policy_lookup</code>, <code class="inline">claims_status</code>,
+                <code class="inline">loan_lookup</code>, <code class="inline">shipment_lookup</code></td>
+            <td>In <code class="inline">allowed_tools</code> → auto-approve</td>
+          </tr>
+          <tr>
+            <td>Write</td>
+            <td><code class="inline">apply_goodwill_credit</code>, <code class="inline">release_hold</code></td>
+            <td>Not auto-approved; <code class="inline">can_use_tool</code> denies unless
+                <code class="inline">--approve-writes</code>; require idempotency key</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Message blocks you will see in traces</h3>
+      <ul>
+        <li><code class="inline">TextBlock</code> — assistant prose</li>
+        <li><code class="inline">ToolUseBlock</code> — name + arguments</li>
+        <li><code class="inline">ToolResultBlock</code> — observation</li>
+        <li><code class="inline">ThinkingBlock</code> — when thinking is enabled</li>
+        <li><code class="inline">ResultMessage</code> — final text / structured output / usage / cost / session_id</li>
+      </ul>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I1 · Name the MCP surface</div>
+        <p>
+          Given server name <code class="inline">ops</code> and tool
+          <code class="inline">claims_status</code>, write the full tool id the model must call.
+          Then write a second id for <code class="inline">release_hold</code>.
+        </p>
+        <pre>claims_status → mcp__ops_________________
+release_hold  → mcp__ops_________________</pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I2 · Sketch a new read tool</div>
+        <p>
+          Offline only: draft an <code class="inline">@tool</code> for
+          <code class="inline">customer_thread_lookup(customer_id: str)</code> that returns
+          MCP text content JSON. Do not invent thread data — return
+          <code class="inline">{"found": False, ...}</code> when the id is unknown.
+          Note where you would register it in <code class="inline">create_sdk_mcp_server</code>.
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== SESSIONS ========== -->
+    <section class="section" id="sessions">
+      <h2><span class="level intermediate">Intermediate</span> Sessions, resume, CLAUDE.md</h2>
+      <p>
+        After a run, <code class="inline">ResultMessage.session_id</code> identifies the SDK session.
+        Pass that id as <code class="inline">resume=...</code> on the next
+        <code class="inline">ClaudeAgentOptions</code> (or keep the same
+        <code class="inline">ClaudeSDKClient</code> open for in-process multi-turn).
+      </p>
+
+      <h3>Resume sketch (matches banking session-demo)</h3>
+<pre># Turn 1
+async with ClaudeSDKClient(options=options) as client:
+    await client.query("Look up loan LN-10042 for customer C-778")
+    async for msg in client.receive_response():
+        if isinstance(msg, ResultMessage):
+            provider_session_id = msg.session_id
+            save_session("banking-session-demo", {
+                "provider": "anthropic",
+                "provider_session_id": provider_session_id,
+            })
+
+# Turn 2 — new process, same SDK session
+options_resume = ClaudeAgentOptions(
+    ...,
+    resume=load_session("banking-session-demo")["provider_session_id"],
+)
+async with ClaudeSDKClient(options=options_resume) as client:
+    await client.query("What payoff amount did we just see?")
+    ...</pre>
+
+      <h3>Project context: CLAUDE.md</h3>
+      <p>
+        With <code class="inline">cwd</code> set to the PM folder and
+        <code class="inline">setting_sources=["project"]</code>, the SDK loads project
+        instructions from <code class="inline">CLAUDE.md</code>. Day 1 PM rules include:
+      </p>
+      <ul>
+        <li>Three lanes: insurance / banking / logistics</li>
+        <li>Use domain tools for facts — never invent claim, loan, policy, or shipment records</li>
+        <li>Goodwill credits and hold releases are writes → approval + idempotency key</li>
+        <li>Return a valid <code class="inline">TriageDecision</code>; keep summaries operator-facing</li>
+      </ul>
+      <div class="callout">
+        <strong>Compaction note</strong>
+        Long sessions may summarize older turns to free context. Compacted history is lossy —
+        persist durable facts in your own session store / artifacts when they must survive.
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I3 · Session continuity plan</div>
+        <p>
+          Design a two-field JSON session record for banking (learner id + provider session id).
+          Write the save path under <code class="inline">W2D1PM/outputs/sessions/</code>.
+          Explain in one sentence why the OpenRouter path stores local history instead of an SDK session id.
+        </p>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I4 · CLAUDE.md constraints</div>
+        <p>
+          Open <code class="inline">W2D1/W2D1PM/CLAUDE.md</code>. Quote (copy) the rule about
+          inventing records, and the rule about write operations. Then write one additional
+          bullet you would add for your own ops desk — keep it one line.
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== PERMISSIONS ========== -->
+    <section class="section" id="permissions">
+      <h2><span class="level intermediate">Intermediate</span> Permissions</h2>
+      <p>
+        Permission evaluation order (simplified): settings allow rules →
+        <code class="inline">allowed_tools</code> / permission mode →
+        <code class="inline">can_use_tool</code> callback when the flow would prompt.
+        To gate <em>every</em> tool call regardless of allowlists, use a
+        <code class="inline">PreToolUse</code> hook (next section).
+      </p>
+
+      <h3>can_use_tool sketch (PM logistics gate)</h3>
+<pre>from claude_agent_sdk.types import (
+    PermissionResultAllow,
+    PermissionResultDeny,
+    ToolPermissionContext,
+)
+
+WRITE_TOOL_NAMES = {"apply_goodwill_credit", "release_hold"}
+
+async def permission_gate(
+    tool_name: str,
+    input_data: dict,
+    context: ToolPermissionContext,
+) -> PermissionResultAllow | PermissionResultDeny:
+    short_name = tool_name.rsplit("__", 1)[-1]  # strip mcp__ops__
+    if short_name in WRITE_TOOL_NAMES and not approve_writes:
+        return PermissionResultDeny(
+            message="Write tool blocked. Re-run with --approve-writes.",
+            interrupt=False,
+        )
+    return PermissionResultAllow(updated_input=input_data)</pre>
+
+      <table>
+        <thead><tr><th>CLI</th><th>Expected behavior</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">d1pmt5c02_enforce_write_permission.py</code></td>
+            <td>Write denied; denial appears in result / permission_denials</td>
+          </tr>
+          <tr>
+            <td><code class="inline">... permissions-demo --approve-writes</code></td>
+            <td>Write allowed; idempotent receipt under <code class="inline">outputs/actions/</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I5 · Design a deny message</div>
+        <p>
+          Write a <code class="inline">PermissionResultDeny</code> message for
+          <code class="inline">apply_goodwill_credit</code> when amount_usd &gt; 100 even if
+          writes are approved. Keep it operator-facing (one sentence). Note whether you would
+          enforce this in <code class="inline">can_use_tool</code>, PreToolUse, or both — and why.
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== HOOKS ========== -->
+    <section class="section" id="hooks">
+      <h2><span class="level advanced">Advanced</span> Hooks: PreToolUse / PostToolUse / Stop</h2>
+      <p>
+        Hooks run <em>your</em> deterministic code at lifecycle points. The model cannot
+        talk its way past a deny. Python hook events include (among others):
+        PreToolUse, PostToolUse, PostToolUseFailure, Stop, SubagentStart, SubagentStop,
+        UserPromptSubmit, PreCompact, PermissionRequest.
+      </p>
+      <table>
+        <thead><tr><th>Event</th><th>Use</th><th>Lab parallel</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>PreToolUse</td>
+            <td>Validate / transform / deny before execution</td>
+            <td>Block refunds; audit “allowed”</td>
+          </tr>
+          <tr>
+            <td>PostToolUse</td>
+            <td>Log results, redact, metrics</td>
+            <td>Record result keys after loan_lookup</td>
+          </tr>
+          <tr>
+            <td>Stop</td>
+            <td>Record why the run ended</td>
+            <td>blocked_or_done / max_turns / budget</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>HookMatcher registration sketch</h3>
+<pre>from claude_agent_sdk import ClaudeAgentOptions, HookMatcher
+
+async def validate_write(input_data, tool_use_id, context):
+    name = input_data.get("tool_name", "")
+    if name.endswith("release_hold"):
+        args = input_data.get("tool_input") or {}
+        if not args.get("idempotency_key"):
+            return {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": "idempotency_key required",
+                }
+            }
+    return {}
+
+async def audit_post(input_data, tool_use_id, context):
+    print("PostToolUse", input_data.get("tool_name"))
+    return {}
+
+async def on_stop(input_data, tool_use_id, context):
+    print("Stop", input_data)
+    return {}
+
+options = ClaudeAgentOptions(
+    hooks={
+        "PreToolUse": [
+            HookMatcher(matcher="mcp__ops__release_hold", hooks=[validate_write]),
+            HookMatcher(hooks=[lambda *a: {}]),  # all tools no-op example
+        ],
+        "PostToolUse": [HookMatcher(hooks=[audit_post])],
+        "Stop": [HookMatcher(hooks=[on_stop])],
+    },
+)</pre>
+
+      <h3>Offline handler pattern (Day 2 hooks_demo style)</h3>
+<pre># No SDK required — pure functions you can unit-test today
+DISALLOWED = {"issue_refund"}
+
+def pre_tool_use(tool_name: str, args: dict) -> dict:
+    if tool_name in DISALLOWED:
+        return {"hook": "PreToolUse", "allowed": False, "audit": "blocked", ...}
+    return {"hook": "PreToolUse", "allowed": True, "audit": "allowed", ...}
+
+def post_tool_use(tool_name: str, result: dict) -> dict:
+    return {"hook": "PostToolUse", "ok": "error" not in result, "audit": "logged"}
+
+def stop_hook(reason: str, event_count: int) -> dict:
+    return {"hook": "Stop", "reason": reason, "events": event_count, "audit": "stopped"}</pre>
+
+      <div class="callout warn">
+        <strong>Permissions vs hooks</strong>
+        <code class="inline">can_use_tool</code> runs when the permission flow would prompt.
+        Tools already in <code class="inline">allowed_tools</code> skip that callback.
+        Use PreToolUse when you need a hard gate on every matching call.
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A1 · Hook audit walk</div>
+        <p>
+          Simulate offline: <code class="inline">loan_lookup</code> then
+          <code class="inline">issue_refund</code>. List the hook events in order and the
+          final Stop reason. Compare with the structure written by
+          <code class="inline">W2D2/W2D2AM/d2amt4c02_real_hooks.py</code>.
+        </p>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A2 · PreToolUse deny payload</div>
+        <p>
+          Hand-write the <code class="inline">hookSpecificOutput</code> dict that denies
+          <code class="inline">Bash</code> when the command contains
+          <code class="inline">rm -rf /</code>. No provider call — just the return shape.
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== ISOLATION ========== -->
+    <section class="section" id="isolation">
+      <h2><span class="level advanced">Advanced</span> Isolation spectrum: skills → sub-agents → teams</h2>
+      <p>
+        Pick the primitive by how much context isolation and peer coordination you need —
+        not by how “agentic” the marketing sounds.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Primitive</th><th>Isolation</th><th>Communication</th><th>SDK / Code surface</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Skills</strong></td>
+            <td>Same context window (progressive disclosure)</td>
+            <td>N/A — knowledge loaded into the session</td>
+            <td><code class="inline">.claude/skills/*/SKILL.md</code>,
+                <code class="inline">skills=["name"]</code> or <code class="inline">"all"</code></td>
+          </tr>
+          <tr>
+            <td><strong>Sub-agents</strong></td>
+            <td>Fresh context per worker; summary returns to parent</td>
+            <td>Parent → child via Agent tool; one-way report back</td>
+            <td><code class="inline">agents={...: AgentDefinition(...)}</code>,
+                include <code class="inline">Agent</code> in allowed_tools</td>
+          </tr>
+          <tr>
+            <td><strong>Agent teams</strong> (experimental)</td>
+            <td>Separate processes / instances</td>
+            <td>Shared task list + direct teammate messaging</td>
+            <td>CLI/feature flag oriented; not a Day 1 PM option knob.
+                Study TeammateIdle / TaskCompleted hooks in TS docs</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Skills sketch</h3>
+<pre># Knowledge, not capability — teach "how we triage FNOL"
+# Filesystem: .claude/skills/fnol-triage/SKILL.md
+options = ClaudeAgentOptions(
+    setting_sources=["project"],
+    skills=["fnol-triage"],   # or "all"; [] disables
+    # When skills are set, SDK enables the Skill tool
+)</pre>
+
+      <h3>Sub-agent sketch</h3>
+<pre>from claude_agent_sdk import AgentDefinition, ClaudeAgentOptions
+
+options = ClaudeAgentOptions(
+    allowed_tools=["Read", "Grep", "Agent", "mcp__ops__claims_status"],
+    agents={
+        "claims_researcher": AgentDefinition(
+            description="Deep-dive claim history without polluting main context",
+            prompt="You research claims. Return a short operator summary only.",
+            tools=["mcp__ops__claims_status", "mcp__ops__policy_lookup"],
+            # AgentDefinition uses camelCase field names on the wire:
+            # disallowedTools, maxTurns, permissionMode, ...
+        ),
+    },
+)</pre>
+
+      <div class="callout">
+        <strong>Day 1 PM stays left of the spectrum</strong>
+        Insurance / banking / logistics use one main agent + MCP tools + CLAUDE.md.
+        Sub-agents and teams are Day 2+ concepts — know the spectrum so you do not
+        over-build isolation for a single triage decision.
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A3 · Choose the primitive</div>
+        <p>For each need, write Skill / Sub-agent / Team:</p>
+        <pre>1. House style for operator summaries (same every insurance run)     → ________
+2. Parallel review of 12 policies without flooding main context      → ________
+3. Researcher + writer iterating with shared backlog + peer chat     → ________
+4. "Never invent claim ids" standing rule for the whole project      → CLAUDE.md
+   (not on this spectrum — say why in one line)</pre>
+      </div>
+    </section>
+
+    <!-- ========== COST ========== -->
+    <section class="section" id="cost">
+      <h2><span class="level advanced">Advanced</span> Cost metering &amp; hard caps</h2>
+      <p>
+        Treat spend and steps as hard stops you configure, then log what the run actually used.
+      </p>
+      <table>
+        <thead><tr><th>Knob</th><th>Anthropic Agent SDK</th><th>OpenRouter / LangGraph path</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Steps</td>
+            <td><code class="inline">max_turns</code> → subtype <code class="inline">error_max_turns</code></td>
+            <td>Graph <code class="inline">recursion_limit</code></td>
+          </tr>
+          <tr>
+            <td>Spend</td>
+            <td><code class="inline">max_budget_usd</code> → <code class="inline">error_max_budget_usd</code></td>
+            <td>Track tokens; no identical USD hard stop</td>
+          </tr>
+          <tr>
+            <td>Tokens</td>
+            <td>Recorded on ResultMessage; mark exceeded after run if over AGENT_MAX_TOKENS</td>
+            <td><code class="inline">max_tokens</code> per model call</td>
+          </tr>
+          <tr>
+            <td>Report</td>
+            <td><code class="inline">total_cost_usd</code>, usage, <code class="inline">num_turns</code></td>
+            <td>Token totals + CostLog fields</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>CostLog sketch</h3>
+<pre>cost_log = {
+    "steps_used": result_message.num_turns,
+    "max_steps": settings["max_steps"],
+    "input_tokens": usage.get("input_tokens", 0),
+    "output_tokens": usage.get("output_tokens", 0),
+    "total_tokens": ...,
+    "max_tokens": settings["max_tokens"],
+    "total_cost_usd": result_message.total_cost_usd,
+    "max_budget_usd": settings["max_budget_usd"],
+    "stopped_reason": result_message.subtype,  # or token_budget_exceeded
+}</pre>
+
+      <div class="callout warn">
+        <strong>2026 metering awareness</strong>
+        Client-side <code class="inline">total_cost_usd</code> is an estimate compared against
+        <code class="inline">max_budget_usd</code>. Always write a cost log even when the
+        provider omits USD — steps and tokens still prove the run stayed inside policy.
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A4 · Budget experiment design</div>
+        <p>
+          Offline: predict what happens if you run insurance triage with
+          <code class="inline">max_turns=1</code> when the case needs policy + claim tools.
+          Write the expected <code class="inline">stopped_reason</code> family and whether
+          <code class="inline">TriageDecision</code> may be missing or incomplete.
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== DAY 1 PM MAP ========== -->
+    <section class="section" id="day1pm">
+      <h2>Map to Week 2 Day 1 PM</h2>
+      <p>
+        This module is the conceptual spine for the Agentic Operations Assistant lab.
+        Apply it in order:
+      </p>
+      <table>
+        <thead><tr><th>Topic here</th><th>Teach / apply</th><th>Command or artifact</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>query vs ClaudeSDKClient</td>
+            <td>PM topic 1 + provider-routing concept</td>
+            <td>Client path only on anthropic</td>
+          </tr>
+          <tr>
+            <td>Options, tools, MCP</td>
+            <td>Pass 2 insurance structured output</td>
+            <td><code class="inline">triage --email-id CLN-001</code></td>
+          </tr>
+          <tr>
+            <td>Sessions + CLAUDE.md</td>
+            <td>Pass 3 banking</td>
+            <td><code class="inline">session-demo --session-id banking-session-demo</code></td>
+          </tr>
+          <tr>
+            <td>Permissions / writes</td>
+            <td>PM topic 5 + logistics</td>
+            <td><code class="inline">permissions-demo</code> (± <code class="inline">--approve-writes</code>)</td>
+          </tr>
+          <tr>
+            <td>max_turns / max_budget_usd</td>
+            <td>Step-budget experiment</td>
+            <td><code class="inline">triage ... --max-steps 3</code></td>
+          </tr>
+          <tr>
+            <td>Hooks</td>
+            <td>Preview here; deepen Day 2 AM</td>
+            <td><code class="inline">W2D2/W2D2AM/d2amt4c02_real_hooks.py</code></td>
+          </tr>
+          <tr>
+            <td>Skills / sub-agents / teams</td>
+            <td>Spectrum literacy; not required for Day 1 pass criteria</td>
+            <td>Framework landscape / Day 2 orchestration</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Pass criteria reminder</strong>
+        Valid TriageDecision on three FNOL emails · domain tools in trace · banking follow-up
+        recalls context · logistics write blocked without approval · cost log shows steps /
+        tokens / limits / provider cost when available.
+      </div>
+    </section>
+
+    <!-- ========== STRETCH ========== -->
+    <section class="section" id="stretch">
+      <h2>Optional provider-call stretch</h2>
+      <div class="callout warn">
+        <strong>Requires keys and spend</strong>
+        Only after the optional provider API steps in <code class="inline">W2D1/W2D1PM/_README.html</code> and a populated
+        <code class="inline">Week2/.env</code>. Prefer dry-run first.
+      </div>
+<pre># From Week2 root
+uv run python W2D1\W2D1PM\d1pmt1c01_sdk_message_flow.py
+uv run python W2D1\W2D1PM\d1pmt1c02_bounded_offline_assistant.py
+uv run python W2D1\W2D1PM\d1pmt4c02_resume_customer_session.py
+uv run python W2D1\W2D1PM\d1pmt5c02_enforce_write_permission.py
+uv run python W2D1\W2D1PM\d1pmt6c01_cost_budget.py
+uv run python W2D1\W2D1PM\d1pmt6c02_guarded_operations_assistant.py</pre>
+      <p>
+        Inspect <code class="inline">outputs/day1_pm/</code> traces for ToolUse / ToolResult blocks
+        and the cost object. Do not paste API keys into notebooks or this HTML.
+      </p>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A5 · Provider-call stretch (optional)</div>
+        <p>
+          If keys are available: run dry-run, one provider-backed triage, and permissions-demo without
+          approve. Paste only redacted fields into your notes: tool names called, whether a
+          write was denied, and <code class="inline">total_cost_usd</code> if present.
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== CHECKLIST ========== -->
+    <section class="section" id="checklist">
+      <h2>Exit checklist</h2>
+      <ul>
+        <li>I can explain when to use <code class="inline">query()</code> vs <code class="inline">ClaudeSDKClient</code>.</li>
+        <li>I can sketch <code class="inline">ClaudeAgentOptions</code> with tools, allowed_tools, max_turns, max_budget_usd, resume.</li>
+        <li>I know <code class="inline">@tool</code> + <code class="inline">create_sdk_mcp_server</code> naming (<code class="inline">mcp__ops__...</code>).</li>
+        <li>I can describe session resume and what <code class="inline">CLAUDE.md</code> contributes via setting_sources.</li>
+        <li>I can contrast allowed_tools auto-approve vs can_use_tool vs PreToolUse hard gates.</li>
+        <li>I can place Skills, sub-agents, and teams on the isolation spectrum.</li>
+        <li>I can read a CostLog / ResultMessage metering fields and map them to Day 1 PM limits.</li>
+      </ul>
+      <p>
+        Next module: <a href="09_mcp_servers_clients.html">09 · MCP servers &amp; clients</a>
+        (in-process vs Streamable HTTP — deeper than the ops server sketch here).
+      </p>
+    </section>
+
+    <nav class="nav-footer">
+      <a href="07_tenacity_reliability.html">← 07 · Tenacity reliability</a>
+      <a href="09_mcp_servers_clients.html">09 · MCP servers &amp; clients →</a>
+    </nav>
+  </div>
+</body>
+</html>

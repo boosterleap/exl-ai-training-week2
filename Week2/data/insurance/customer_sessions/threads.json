@@ -1,0 +1,38 @@
+{
+  "customers": [
+    {
+      "customer_id": "CU-204",
+      "sessions": [
+        {
+          "session_id": "sess_cust_204_a",
+          "turns": [
+            {
+              "role": "user",
+              "text": "I reported theft of my car yesterday. Will rental be covered?"
+            },
+            {
+              "role": "assistant",
+              "text": "Theft rental reimbursement requires police report within 24 hours and cooperation with law enforcement."
+            }
+          ],
+          "durable_facts": {
+            "claim_type": "auto_theft",
+            "police_report_filed": true,
+            "garaging_state": "TX",
+            "current_state": "CA"
+          }
+        },
+        {
+          "session_id": "sess_cust_204_b",
+          "turns": [
+            {
+              "role": "user",
+              "text": "Following up from yesterday - I live in California now. Does that change rental coverage?"
+            }
+          ],
+          "durable_facts": {}
+        }
+      ]
+    }
+  ]
+}

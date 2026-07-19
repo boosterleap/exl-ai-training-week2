@@ -1,0 +1,165 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: #f7f6f3;
+  color: #111;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+a {
+  color: #1e3a5f;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+a:hover { color: #0f2744; }
+
+.page-header {
+  background: #1a1a2e;
+  color: #fff;
+  padding: 28px 40px 24px;
+}
+.page-header h1 {
+  font-size: 26px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.page-header .meta {
+  font-size: 15px;
+  color: #c8c8d4;
+  max-width: 920px;
+}
+.page-header .meta strong { color: #fff; font-weight: 600; }
+.page-header .hint {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #a8a8b8;
+  max-width: 920px;
+}
+.page-header .hint code {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.2);
+  color: #e8e8ef;
+}
+
+.content {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 28px 40px 48px;
+}
+
+.content h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 28px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e0ddd6;
+}
+.content h2:first-child { margin-top: 0; }
+
+.content h3 {
+  font-size: 16px;
+  font-weight: 650;
+  color: #333;
+  margin: 20px 0 8px;
+}
+
+.content p { margin: 0 0 12px; color: #333; }
+.content ul, .content ol {
+  margin: 0 0 14px 1.25rem;
+  color: #333;
+}
+.content li { margin: 4px 0; }
+.content li::marker { color: #888; }
+
+.content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin: 0 0 16px;
+  background: #fff;
+  border: 1px solid #e0ddd6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.content th,
+.content td {
+  border: 1px solid #e8e7e0;
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+.content th {
+  background: #fafaf7;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+.content td { color: #333; }
+
+.content pre {
+  background: #1a1a2e;
+  color: #e8e8ef;
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+.content pre code {
+  font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+.content code {
+  font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+  font-size: 0.9em;
+  background: #f1efe8;
+  border: 0.5px solid #d8d5cc;
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: #3d3a32;
+}
+
+.content a code {
+  color: #1e3a5f;
+  background: #e8eef6;
+  border-color: #b8c9de;
+}
+
+.folder-map {
+  background: #fff;
+  border: 1px solid #e0ddd6;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 0 0 16px;
+}
+.folder-map pre {
+  background: #fafaf7;
+  color: #1a1a2e;
+  border: 1px solid #e8e7e0;
+  margin: 0;
+}
+
+.callout {
+  background: #fff;
+  border: 1px solid #e0ddd6;
+  border-left: 4px solid #1e3a5f;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 0 0 16px;
+  font-size: 15px;
+  color: #333;
+}
+
+.pass-list li { margin: 6px 0; }
+
+@media (max-width: 720px) {
+  .page-header, .content { padding-left: 20px; padding-right: 20px; }
+  .content table { font-size: 13px; }
+}

@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>13 — Sentence Transformers · Embeddings &amp; Cross-Encoder Rerank</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">← Mastery index</a>
+      <span>
+        <a href="12_chromadb.html">Prev · 12 ChromaDB</a>
+        <a href="14_llama_index_rag.html">Next · 14 LlamaIndex RAG</a>
+      </span>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">Week 2 · Day 3 AM · Module 13 · June 2026 APIs</div>
+      <h1>sentence-transformers — embeddings + cross-encoder rerank</h1>
+      <p class="lead">
+        Map policy text to dense vectors with a bi-encoder, rank by cosine similarity,
+        then refine the shortlist with
+        <code class="inline">cross-encoder/ms-marco-MiniLM-L-6-v2</code>.
+        Model-only exercises can run locally after the first Hugging Face download; rebuilt Day 3
+        combines these embeddings and CrossEncoder scores with configured Pinecone and Anthropic paths.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">Bi-encoder: all-MiniLM-L6-v2</span>
+        <span class="chip strong">Reranker: ms-marco-MiniLM-L-6-v2</span>
+        <span class="chip">data/policies</span>
+        <span class="chip">data/rag_goldens.json</span>
+        <span class="chip">Offline after cache</span>
+      </div>
+    </header>
+
+    <nav class="toc">
+      <h2>On this page</h2>
+      <ol>
+        <li><a href="#why">Why this module</a></li>
+        <li><a href="#setup">Setup, cache, and offline mode</a></li>
+        <li><a href="#biencoder">Bi-encoder anatomy</a></li>
+        <li><a href="#beginner">Beginner — encode &amp; cosine</a></li>
+        <li><a href="#intermediate">Intermediate — policy search &amp; CrossEncoder</a></li>
+        <li><a href="#advanced">Advanced — hybrid keyword+dense + goldens</a></li>
+        <li><a href="#pitfalls">Pitfalls &amp; classroom tips</a></li>
+        <li><a href="#reference">Quick API reference (June 2026)</a></li>
+      </ol>
+    </nav>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="section" id="why">
+      <h2>Why this module</h2>
+      <p>
+        Day 3 retrieval is not “call Chroma and hope.” Operators need a mental model for
+        <strong>two stages</strong>:
+      </p>
+      <ol>
+        <li><strong>Retrieve</strong> — fast bi-encoder embeddings + optional keyword score (recall).</li>
+        <li><strong>Rerank</strong> — slower cross-encoder over query–document pairs (precision).</li>
+      </ol>
+      <p>
+        Module <a href="12_chromadb.html">12</a> explains the runtime-deferred Chroma alternative.
+        This module builds and scores vectors used by the primary Pinecone path.
+        Module <a href="14_llama_index_rag.html">14</a> is a supplemental LlamaIndex comparison;
+        the teaching implementation uses native Pinecone clients and LangGraph.
+        Classroom eval targets live in <code class="inline">data/rag_goldens.json</code>;
+        source text is under <code class="inline">data/policies/</code>.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Stage</th><th>Class</th><th>Model</th><th>Input</th><th>Output</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Encode / retrieve</td>
+            <td><code class="inline">SentenceTransformer</code></td>
+            <td><code class="inline">all-MiniLM-L6-v2</code></td>
+            <td>One string at a time (batched)</td>
+            <td>384-d vector; cosine vs corpus</td>
+          </tr>
+          <tr>
+            <td>Rerank</td>
+            <td><code class="inline">CrossEncoder</code></td>
+            <td><code class="inline">cross-encoder/ms-marco-MiniLM-L-6-v2</code></td>
+            <td><code class="inline">(query, passage)</code> pairs</td>
+            <td>Scalar relevance logit / score</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Working directory</strong>
+        Copy cells into a notebook whose cwd is <code class="inline">Week2/ConceptBuilding</code>
+        so relative paths <code class="inline">data/policies</code> and
+        <code class="inline">data/rag_goldens.json</code> resolve. Adjust if you keep notebooks elsewhere.
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="section" id="setup">
+      <h2>Setup, cache, and offline mode</h2>
+      <p>
+        Install once from the Week2 venv (<code class="inline">sentence-transformers&gt;=3.0</code>
+        is already in the Week1/Week2 requirements pin family). First load pulls weights into the
+        Hugging Face hub cache (typically <code class="inline">~/.cache/huggingface/hub</code>).
+      </p>
+<pre><code># From Week2 root (or ConceptBuilding) — once online
+from sentence_transformers import SentenceTransformer, CrossEncoder
+
+EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+encoder = SentenceTransformer(EMBED_MODEL)
+reranker = CrossEncoder(RERANK_MODEL)
+print("embed dim:", encoder.get_embedding_dimension())
+print("device:", encoder.device)</code></pre>
+      <div class="callout warn">
+        <strong>June 2026 rename</strong>
+        Prefer <code class="inline">get_embedding_dimension()</code>. The older
+        <code class="inline">get_sentence_embedding_dimension()</code> still works but emits a
+        <code class="inline">FutureWarning</code>.
+      </div>
+<pre><code># After models are cached — force offline (no network)
+import os
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
+encoder = SentenceTransformer(EMBED_MODEL, local_files_only=True)
+reranker = CrossEncoder(RERANK_MODEL, local_files_only=True)</code></pre>
+      <p>
+        Optional: pin a local folder with <code class="inline">encoder.save("models/minilm")</code>
+        and reload from that path for air-gapped classroom images.
+      </p>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="section" id="biencoder">
+      <h2>Bi-encoder anatomy (what <code class="inline">encode</code> does)</h2>
+      <p>
+        A <strong>bi-encoder</strong> runs the transformer once per text and pools token states into
+        a fixed vector. Query and document are encoded <em>independently</em>, so you can precompute
+        all policy chunk vectors and compare with cosine (or dot product if L2-normalised).
+      </p>
+      <p>
+        A <strong>cross-encoder</strong> concatenates query and document, attends jointly, and emits
+        one score. Too slow for the full corpus; perfect for top-5 / top-20 candidates.
+      </p>
+<pre><code>from sentence_transformers import SentenceTransformer, util
+
+encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+
+docs = [
+    "Rental reimbursement after theft up to USD 40 per day.",
+    "Flood rider does not cover sewer backup alone.",
+]
+q = "Is rental car covered after theft?"
+
+doc_emb = encoder.encode(docs, normalize_embeddings=True, show_progress_bar=False)
+q_emb = encoder.encode(q, normalize_embeddings=True, show_progress_bar=False)
+
+# util.cos_sim works with lists or 2-D arrays; with normalize_embeddings=True,
+# scores ≈ dot products in [-1, 1]
+scores = util.cos_sim(q_emb, doc_emb)  # shape (1, n)
+print(scores)</code></pre>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="section" id="beginner">
+      <h2><span class="level beginner">Beginner</span> Encode &amp; cosine similarity</h2>
+      <p>
+        Goal: load the MiniLM bi-encoder, produce vectors, and rank short strings by cosine —
+        no files yet.
+      </p>
+
+      <h3>Core pattern — <code class="inline">SentenceTransformer.encode</code></h3>
+<pre><code>from sentence_transformers import SentenceTransformer
+import numpy as np
+
+encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+
+texts = [
+    "Burst pipe water damage under homeowners policy.",
+    "MRI prior authorization for outpatient imaging.",
+    "Shipment delayed at customs warehouse.",
+]
+emb = encoder.encode(
+    texts,
+    batch_size=16,
+    normalize_embeddings=True,
+    convert_to_numpy=True,
+    show_progress_bar=False,
+)
+print(emb.shape)          # (3, 384)
+print(emb.dtype)          # float32
+# L2 norms ≈ 1.0 when normalize_embeddings=True
+print(np.linalg.norm(emb, axis=1))</code></pre>
+
+      <h3>Cosine without sklearn</h3>
+<pre><code>from sentence_transformers import util
+
+# Pairwise matrix
+sim = util.cos_sim(emb, emb)  # (3, 3) tensor
+print(sim)
+
+# Or explicit formula on numpy rows
+def cosine(a, b):
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-12))
+
+print("0 vs 1:", round(cosine(emb[0], emb[1]), 3))</code></pre>
+
+      <div class="exercise" id="ex-b1">
+        <div class="ex-label">Exercise B1 · Shape check</div>
+        <p>
+          Encode five one-line insurance snippets of your choice. Assert
+          <code class="inline">emb.shape == (5, encoder.get_embedding_dimension())</code>.
+          Print the device string. Toggle <code class="inline">normalize_embeddings</code> and
+          compare L2 norms.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-b2">
+        <div class="ex-label">Exercise B2 · Paraphrase vs distractor</div>
+        <p>
+          Build a 4×4 cosine matrix for: (A) “rental car after theft”, (B) paraphrase of A,
+          (C) “MRI prior auth”, (D) paraphrase of C. Confirm A–B and C–D are the highest
+          off-diagonal pairs. Use <code class="inline">util.cos_sim</code>.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-b3">
+        <div class="ex-label">Exercise B3 · Mini semantic search</div>
+        <p>
+          Given a fixed corpus of 8 strings and query
+          <code class="inline">"emergency MRI without prior authorization"</code>,
+          rank with <code class="inline">util.semantic_search(q_emb, corpus_emb, top_k=3)</code>
+          (encode query/corpus with <code class="inline">convert_to_tensor=True</code>).
+          Write which rank-1 string you expect before running.
+        </p>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="section" id="intermediate">
+      <h2><span class="level intermediate">Intermediate</span> Policy corpus + CrossEncoder</h2>
+      <p>
+        Load real Day 3 fixtures, chunk naively by markdown headings, embed, then rerank the
+        dense shortlist with the MS MARCO MiniLM cross-encoder.
+      </p>
+
+      <h3>Load <code class="inline">data/policies</code></h3>
+<pre><code>from pathlib import Path
+import re
+
+POLICIES = Path("data/policies")
+assert POLICIES.is_dir(), "Run notebook from Week2/ConceptBuilding (or fix path)"
+
+def load_heading_chunks(root: Path) -> list[dict]:
+    """Split each policy markdown on ## headings into searchable chunks."""
+    chunks = []
+    for path in sorted(root.glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        policy_id = path.stem.split("_")[0]  # e.g. POL-AUTO-001
+        # Keep H1 body + each ## section
+        parts = re.split(r"(?m)^##\s+", text)
+        preamble = parts[0].strip()
+        if preamble:
+            chunks.append({
+                "chunk_id": f"{path.stem}#preamble",
+                "policy_id": policy_id,
+                "path": str(path),
+                "text": preamble,
+            })
+        for block in parts[1:]:
+            lines = block.splitlines()
+            heading = lines[0].strip()
+            body = "\n".join(lines[1:]).strip()
+            slug = re.sub(r"[^a-z0-9]+", "-", heading.lower()).strip("-")
+            chunks.append({
+                "chunk_id": f"{path.stem}#{slug}",
+                "policy_id": policy_id,
+                "path": str(path),
+                "heading": heading,
+                "text": f"{heading}\n{body}",
+            })
+    return chunks
+
+chunks = load_heading_chunks(POLICIES)
+print(len(chunks), "chunks from", len(list(POLICIES.glob('*.md'))), "files")
+print(chunks[0]["chunk_id"], "→", chunks[0]["text"][:80], "...")</code></pre>
+
+      <h3>Dense rank over policy chunks</h3>
+<pre><code>from sentence_transformers import SentenceTransformer, util
+
+encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+corpus = [c["text"] for c in chunks]
+corpus_emb = encoder.encode(
+    corpus, normalize_embeddings=True, convert_to_tensor=True, show_progress_bar=True
+)
+
+query = "After theft, is rental car covered if the driver lives out of state?"
+q_emb = encoder.encode(query, normalize_embeddings=True, convert_to_tensor=True)
+hits = util.semantic_search(q_emb, corpus_emb, top_k=5)[0]
+
+for h in hits:
+    row = chunks[h["corpus_id"]]
+    print(f"{h['score']:.3f}  {row['chunk_id']}")
+    print("   ", row["text"][:100].replace("\\n", " "), "...")</code></pre>
+      <div class="callout">
+        <strong>Golden G-001 evidence</strong>
+        Expected chunks include
+        <code class="inline">POL-AUTO-001_coverage#rental-reimbursement</code> and
+        <code class="inline">POL-AUTO-001_exclusions#rental-car-limits</code>
+        (see <code class="inline">data/rag_goldens.json</code>). Your heading slugs should match
+        those suffixes if you mirror the lab’s chunk_id scheme.
+      </div>
+
+      <h3>Cross-encoder rerank — <code class="inline">CrossEncoder.predict</code></h3>
+<pre><code>from sentence_transformers import CrossEncoder
+
+reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+
+# Take dense top-5, score (query, passage) jointly
+candidate_idxs = [h["corpus_id"] for h in hits]
+pairs = [(query, chunks[i]["text"]) for i in candidate_idxs]
+ce_scores = reranker.predict(pairs)  # numpy array of floats
+
+reranked = sorted(
+    zip(candidate_idxs, ce_scores),
+    key=lambda t: float(t[1]),
+    reverse=True,
+)
+for idx, score in reranked:
+    print(f"{float(score):7.3f}  {chunks[idx]['chunk_id']}")</code></pre>
+      <p>
+        Higher scores mean “more relevant” for the MS MARCO-trained checkpoint. Absolute values
+        are not probabilities; use them only for ordering unless you calibrate.
+      </p>
+
+      <div class="exercise" id="ex-i1">
+        <div class="ex-label">Exercise I1 · Chunk inventory</div>
+        <p>
+          Run <code class="inline">load_heading_chunks</code> on <code class="inline">data/policies</code>.
+          List every <code class="inline">chunk_id</code>. Circle (on paper) the six ids referenced
+          across all goldens in <code class="inline">data/rag_goldens.json</code>. Fix your slugger
+          if rental / burst-pipe / imaging headings do not align.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-i2">
+        <div class="ex-label">Exercise I2 · Dense vs CE disagreement</div>
+        <p>
+          For golden <code class="inline">G-005</code> (“Are emergency MRI scans covered without
+          prior auth?”), print dense top-5 and cross-encoder top-3. Note any chunk that jumps
+          more than two ranks after <code class="inline">predict</code>. Explain in one sentence
+          using the joint attention intuition.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-i3">
+        <div class="ex-label">Exercise I3 · Batch predict</div>
+        <p>
+          Call <code class="inline">reranker.predict(pairs, batch_size=8, show_progress_bar=False)</code>
+          on all golden questions × their dense top-5 (25 pairs). Time it. Then time scoring the
+          same 25 pairs in a Python for-loop of single pairs. Record the speedup.
+        </p>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="section" id="advanced">
+      <h2><span class="level advanced">Advanced</span> Hybrid keyword + dense + goldens eval</h2>
+      <p>
+        Pure dense retrieval misses exact clause tokens (“sewer backup”, “prior auth”).
+        Pure keyword misses paraphrase. Day 3’s sketch: blend both, then cross-encode the blend’s
+        top-N — same idea as <code class="inline">W2D3/W2D3AM/d3amt2c04_hybrid_rerank_eval.py</code>, but self-contained
+        against <code class="inline">ConceptBuilding/data</code>.
+      </p>
+
+      <h3>Keyword score sketch</h3>
+<pre><code>import math, re
+from collections import Counter
+
+def tokenize(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", text.lower())
+
+def keyword_score(query: str, text: str) -> float:
+    """Lightweight TF-style overlap (not full BM25)."""
+    q = tokenize(query)
+    d = tokenize(text)
+    if not q or not d:
+        return 0.0
+    counts = Counter(d)
+    score = 0.0
+    for tok in set(q):
+        tf = counts.get(tok, 0)
+        if tf:
+            score += 1.0 + math.log(1.0 + tf)
+    return score</code></pre>
+
+      <h3>Hybrid rank sketch</h3>
+<pre><code>import numpy as np
+from sentence_transformers import SentenceTransformer, util
+
+encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+corpus_emb = encoder.encode(
+    [c["text"] for c in chunks],
+    normalize_embeddings=True,
+    convert_to_numpy=True,
+    show_progress_bar=False,
+)
+
+def dense_scores(query: str) -> np.ndarray:
+    q = encoder.encode(query, normalize_embeddings=True, convert_to_numpy=True)
+    # (n,) cosine since vectors are L2-normalised → dot product
+    return corpus_emb @ q
+
+def minmax(x: np.ndarray) -> np.ndarray:
+    lo, hi = float(x.min()), float(x.max())
+    if hi - lo &lt; 1e-12:
+        return np.zeros_like(x)
+    return (x - lo) / (hi - lo)
+
+def hybrid_rank(query: str, alpha: float = 0.5, top_n: int = 5) -> list[dict]:
+    """alpha * keyword + (1-alpha) * dense, both min-max scaled to [0, 1]."""
+    kw = np.array([keyword_score(query, c["text"]) for c in chunks], dtype=np.float64)
+    dens = dense_scores(query).astype(np.float64)
+    combined = alpha * minmax(kw) + (1.0 - alpha) * minmax(dens)
+    order = np.argsort(-combined)[:top_n]
+    out = []
+    for i in order:
+        out.append({
+            **chunks[int(i)],
+            "keyword": float(kw[i]),
+            "dense": float(dens[i]),
+            "combined": float(combined[i]),
+        })
+    return out
+
+# Smoke test on G-001
+for row in hybrid_rank(
+    "After theft, is rental car covered if the driver lives out of state?",
+    alpha=0.5,
+):
+    print(f"{row['combined']:.3f} kw={row['keyword']:.2f} d={row['dense']:.3f}  {row['chunk_id']}")</code></pre>
+
+      <h3>Rerank + evaluate against <code class="inline">data/rag_goldens.json</code></h3>
+<pre><code>import json
+from sentence_transformers import CrossEncoder
+
+goldens = json.loads(Path("data/rag_goldens.json").read_text(encoding="utf-8"))["goldens"]
+reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+
+def rerank(query: str, candidates: list[dict], top_n: int = 3) -> list[dict]:
+    pairs = [(query, row["text"]) for row in candidates]
+    scores = reranker.predict(pairs)
+    ranked = [{**row, "rerank_score": float(s)} for row, s in zip(candidates, scores)]
+    ranked.sort(key=lambda r: r["rerank_score"], reverse=True)
+    return ranked[:top_n]
+
+def eval_goldens(alpha: float = 0.5) -> list[dict]:
+    rows = []
+    for g in goldens:
+        q = g["question"]
+        required = set(g["required_chunk_ids"])
+        hybrid = hybrid_rank(q, alpha=alpha, top_n=5)
+        hybrid_ids = [r["chunk_id"] for r in hybrid[:3]]
+        ce = rerank(q, hybrid, top_n=3)
+        ce_ids = [r["chunk_id"] for r in ce]
+        rows.append({
+            "question_id": g["question_id"],
+            "hybrid_top3": hybrid_ids,
+            "rerank_top3": ce_ids,
+            "required": sorted(required),
+            "hybrid_pass": required.issubset(set(hybrid_ids)),
+            "rerank_pass": required.issubset(set(ce_ids)),
+        })
+    return rows
+
+for row in eval_goldens():
+    print(
+        row["question_id"],
+        "hybrid=", row["hybrid_pass"],
+        "rerank=", row["rerank_pass"],
+        "need=", row["required"],
+    )</code></pre>
+      <div class="callout warn">
+        <strong>Chunk-id contract</strong>
+        Goldens use ids like <code class="inline">POL-HOME-010_water#burst-pipe-coverage</code>.
+        If your local heading slugger differs, map aliases or align headings before claiming a fail.
+        The point of the exercise is the <em>ranking pipeline</em>, not brittle string equality.
+        <code class="inline">POL-HOME-010</code> is the parent policy; where a golden expects
+        <code class="inline">POL-HOME-FLOOD</code>, that value identifies the rider expectation,
+        not a replacement parent policy ID.
+      </div>
+
+      <div class="exercise" id="ex-a1">
+        <div class="ex-label">Exercise A1 · Sweep alpha</div>
+        <p>
+          Evaluate goldens for <code class="inline">alpha in [0.0, 0.25, 0.5, 0.75, 1.0]</code>
+          (dense-only → keyword-only). Plot or table hybrid_pass rate vs alpha. Which value wins
+          on this tiny set? Would you trust that alpha in production without more questions?
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-a2">
+        <div class="ex-label">Exercise A2 · Rerank depth</div>
+        <p>
+          Keep alpha fixed. Feed the cross-encoder the hybrid top-3 vs top-10, still returning
+          top-3 after <code class="inline">predict</code>. Does G-001 / G-005 flip? Document the
+          latency vs precision trade-off in one short paragraph for an ops audience.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-a3">
+        <div class="ex-label">Exercise A3 — HF offline eval_goldens</div>
+        <p>
+          With models already cached, set <code class="inline">HF_HUB_OFFLINE=1</code> and
+          <code class="inline">local_files_only=True</code>, disconnect (or refuse) network, and
+          re-run <code class="inline">eval_goldens()</code>. Confirm identical pass flags. Then
+          deliberately point <code class="inline">SentenceTransformer</code> at a missing path and
+          catch the error message you would show a learner.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-a4">
+        <div class="ex-label">Exercise A4 · Operator summary card</div>
+        <p>
+          Write a function <code class="inline">triage_retrieval(question_id) -&gt; dict</code> that
+          returns <code class="inline">question</code>, <code class="inline">hybrid_top3</code>,
+          <code class="inline">rerank_top3</code>, <code class="inline">required</code>,
+          <code class="inline">rerank_pass</code>, and a one-line
+          <code class="inline">operator_summary</code> (no model prose — template string only).
+          Run it for all five goldens.
+        </p>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="section" id="pitfalls">
+      <h2>Pitfalls &amp; classroom tips</h2>
+      <table>
+        <thead><tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>First cell “hangs”</td>
+            <td>Model download</td>
+            <td>Wait; pre-warm cache before class; then set offline flags</td>
+          </tr>
+          <tr>
+            <td>Cosine all ~0.2–0.3</td>
+            <td>Comparing unrelated domains / bad chunking</td>
+            <td>Check chunk text; try paraphrase pairs as a sanity unit test</td>
+          </tr>
+          <tr>
+            <td>CE scores look “random”</td>
+            <td>Wrong model id or swapped pair order</td>
+            <td>Pairs must be <code class="inline">(query, passage)</code>; use ms-marco MiniLM</td>
+          </tr>
+          <tr>
+            <td>Golden always fails</td>
+            <td>chunk_id slug mismatch</td>
+            <td>Print ids side-by-side with <code class="inline">rag_goldens.json</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">FutureWarning</code> on dim</td>
+            <td>Deprecated method name</td>
+            <td>Use <code class="inline">get_embedding_dimension()</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Teaching beat</strong>
+        Show dense-only missing a keyword-heavy exclusion clause, then hybrid recovering it, then
+        cross-encoder promoting the true evidence chunk into top-3. That three-step demo is the
+        Day 3 “aha.” The assessed run then carries that ranking evidence through Pinecone and a
+        model-returned typed Anthropic answer rather than presenting the local scoring output as the full run.
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="section" id="reference">
+      <h2>Quick API reference (June 2026)</h2>
+      <table>
+        <thead><tr><th>API</th><th>Role</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">SentenceTransformer(name)</code></td>
+            <td>Load bi-encoder</td>
+            <td><code class="inline">SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">encode(...)</code></td>
+            <td>Embed strings</td>
+            <td><code class="inline">encode(texts, normalize_embeddings=True, batch_size=32, convert_to_tensor=True)</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">get_embedding_dimension()</code></td>
+            <td>Vector size</td>
+            <td><code class="inline">384</code> for MiniLM-L6</td>
+          </tr>
+          <tr>
+            <td><code class="inline">util.cos_sim</code> / <code class="inline">util.semantic_search</code></td>
+            <td>Similarity / top-k</td>
+            <td><code class="inline">util.semantic_search(q, corpus, top_k=5)</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">CrossEncoder(name)</code></td>
+            <td>Load reranker</td>
+            <td><code class="inline">CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">predict(pairs)</code></td>
+            <td>Score pairs</td>
+            <td><code class="inline">predict([(q, doc), ...], batch_size=16)</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">save</code> / path load</td>
+            <td>Air-gap</td>
+            <td><code class="inline">model.save("models/minilm")</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">local_files_only=True</code></td>
+            <td>Offline</td>
+            <td>With <code class="inline">HF_HUB_OFFLINE=1</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Fixtures for this module:
+        <code class="inline">../data/policies/*.md</code>,
+        <code class="inline">../data/rag_goldens.json</code>
+        (paths from this HTML file; from a notebook in <code class="inline">ConceptBuilding/</code> use
+        <code class="inline">data/...</code>).
+      </p>
+    </section>
+
+    <nav class="nav-footer">
+      <a href="12_chromadb.html">← 12 · ChromaDB</a>
+      <a href="../index.html">Mastery index</a>
+      <a href="14_llama_index_rag.html">14 · LlamaIndex RAG →</a>
+    </nav>
+  </div>
+</body>
+</html>

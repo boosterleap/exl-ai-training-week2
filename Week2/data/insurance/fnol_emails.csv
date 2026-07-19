@@ -1,0 +1,13 @@
+email_id,subject,body,email_category,urgency_ground_truth,claim_number_ground_truth,route_queue_ground_truth,policy_id_ground_truth
+CLN-001,Property claim CLM-424063 — fence damage,"Jennifer Garcia reports vandalism at 6650 Broadway. Claim CLM-424063. Policy POL-787532354. Police report PR-20250822-4864. Estimated damage $5,834. Photos available.",fnol,high,CLM-424063,fnol_intake,POL-787532354
+CLN-002,Break-in at Lexington storefront CLM-748422,"Michael Miller in-person report. Townhouse at 2850 Main St damaged. Claim CLM-748422. Policy POL-930881789. Estimate $9,415.",fnol,medium,CLM-748422,fnol_intake,POL-930881789
+CLN-003,Malfunction damage CLM-255335,"David Taylor reports equipment malfunction caused building damage. Claim CLM-255335. Repair estimate $423,312.",fnol,medium,CLM-255335,fnol_intake,POL-441002118
+CLN-004,Portal submission CLM-988147,"Jennifer Johnson submitted via portal. Water heater leak. Claim CLM-988147. Policy POL-552901774.",fnol,medium,CLM-988147,fnol_intake,POL-552901774
+CLN-005,Windstorm roof CLM-597471,"Robert Chen — wind damage to roof. Claim CLM-597471. Contractor estimate $52,774.",fnol,high,CLM-597471,fnol_intake,POL-661204889
+CLN-006,General liability CLM-699674,"Sarah Lopez liability incident at rental property. Claim CLM-699674. Policy effective May 27.",fnol,medium,CLM-699674,liability_review,POL-778301002
+CLN-007,Auto glass only — no claim number yet,"Quick question: can I add glass coverage mid-term? No active claim.",inquiry,low,,policy_servicing,POL-990112334
+CLN-008,Urgent fire CLM-860535,"Water and smoke damage from neighbor fire. Claim CLM-860535. Estimate $19,400. Needs immediate adjuster.",fnol,high,CLM-860535,fnol_intake,POL-635143991
+CLN-009,Duplicate notice CLM-424063,"Following up on CLM-424063 — contractor can start Monday if approved.",fnol,medium,CLM-424063,fnol_intake,POL-787532354
+CLN-010,Policy cancellation request,"Please cancel POL-441002118 effective next month. No new loss.",servicing,low,,policy_servicing,POL-441002118
+CLN-011,Hail damage CLM-531517,"Hail dented vehicles and siding. Claim CLM-531517 filed today.",fnol,medium,CLM-531517,fnol_intake,POL-882901445
+CLN-012,Fraud tip — suspicious FNOL,"Anonymous tip that CLM-255335 photos may be reused from another address.",fraud_review,high,CLM-255335,special_investigations,POL-441002118

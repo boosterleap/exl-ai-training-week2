@@ -1,0 +1,40 @@
+{
+  "goldens": [
+    {
+      "question_id": "G-001",
+      "question": "After theft, is rental car covered if the driver lives out of state?",
+      "required_chunk_ids": [
+        "POL-AUTO-001_coverage#rental-reimbursement",
+        "POL-AUTO-001_exclusions#rental-car-limits"
+      ],
+      "expected_policy_ids": ["POL-AUTO-001"]
+    },
+    {
+      "question_id": "G-002",
+      "question": "Is burst pipe water damage covered under homeowners?",
+      "required_chunk_ids": ["POL-HOME-010_water#burst-pipe-coverage"],
+      "expected_policy_ids": ["POL-HOME-010"]
+    },
+    {
+      "question_id": "G-003",
+      "question": "Does flood rider cover sewer backup without flood event?",
+      "required_chunk_ids": ["POL-HOME-010_flood_rider#not-covered"],
+      "expected_policy_ids": ["POL-HOME-FLOOD"]
+    },
+    {
+      "question_id": "G-004",
+      "question": "When is MRI prior authorization required?",
+      "required_chunk_ids": ["POL-HEALTH-020_prior_auth#imaging-services"],
+      "expected_policy_ids": ["POL-HEALTH-020"]
+    },
+    {
+      "question_id": "G-005",
+      "question": "Are emergency MRI scans covered without prior auth?",
+      "required_chunk_ids": [
+        "POL-HEALTH-020_prior_auth#imaging-services",
+        "POL-HEALTH-020_emergency#emergency-definition"
+      ],
+      "expected_policy_ids": ["POL-HEALTH-020"]
+    }
+  ]
+}

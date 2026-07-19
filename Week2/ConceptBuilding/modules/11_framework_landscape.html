@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>11 — Framework landscape (conceptual literacy)</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">All modules</a>
+      <a href="10_a2a_agent_cards.html">← Prev 10 · A2A</a>
+      <a href="12_chromadb.html">Next 12 · ChromaDB →</a>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">Module 11 · Week 2 Day 2 AM · Conceptual literacy</div>
+      <h1>Framework landscape</h1>
+      <p class="lead">
+        Compare agent frameworks, vector databases, and managed runtimes — then understand
+        <strong>why Week 2 labs deepen LangGraph + Claude Agent SDK</strong> instead of installing
+        every toolkit. All exercises are offline Python decision helpers and dict quizzes.
+        Do <em>not</em> <code class="inline">pip install</code> CrewAI, ADK, or cloud SDKs for this page.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">Compare only</span>
+        <span class="chip">June 2026 concepts</span>
+        <span class="chip">Maps to W2D2 AM topic 1</span>
+        <span class="chip">Offline dicts / quizzes</span>
+      </div>
+    </header>
+
+    <nav class="toc">
+      <h2>On this page</h2>
+      <ol>
+        <li><a href="#why">Why scaffold beats “install everything”</a></li>
+        <li><a href="#beginner">Beginner — frameworks &amp; lab choice</a></li>
+        <li><a href="#intermediate">Intermediate — vectors, GraphRAG cost, isolation</a></li>
+        <li><a href="#advanced">Advanced — managed runtimes &amp; decision engines</a></li>
+        <li><a href="#checkpoint">Checkpoint &amp; Day mapping</a></li>
+      </ol>
+    </nav>
+
+    <!-- ========== WHY ========== -->
+    <section class="section" id="why">
+      <h2>Why this module exists</h2>
+      <p>
+        The same model can swing roughly <strong>~30 points on hard agent benchmarks (e.g. GAIA)</strong>
+        depending on orchestration scaffold: retries, typed tools, checkpoints, HITL placement, and
+        budgets. Architecture reliability is not only a model-quality problem.
+      </p>
+      <div class="callout">
+        <strong>Lab depth vs slide literacy</strong>
+        Week 2 <em>labs</em> go deep on <strong>LangGraph</strong> (graph state, SQLite checkpoints,
+        durable HITL) and <strong>Claude Agent SDK</strong> (tools, sessions, permissions, hooks).
+        CrewAI, OpenAI Agents SDK, Google ADK, and Microsoft Agent Framework appear in comparison
+        tables only. Managed clouds (Bedrock AgentCore, Vertex Agent Builder, Azure AI Foundry,
+        Anthropic Managed Agents) are enterprise concepts — learners use local mocks instead.
+      </div>
+      <pre><code># Offline demo — scaffold reliability (no API)
+demo = {
+  "model": "same-sonnet",
+  "naive_prompt_only": {"reliability": 0.45, "auditable": False},
+  "graph_with_checkpoints_hitl": {"reliability": 0.78, "auditable": True},
+}
+print(demo["graph_with_checkpoints_hitl"]["reliability"]
+      - demo["naive_prompt_only"]["reliability"])  # 0.33 ≈ "scaffold swing"</code></pre>
+    </section>
+
+    <!-- ========== BEGINNER ========== -->
+    <section class="section" id="beginner">
+      <h2><span class="level beginner">Beginner</span> Frameworks &amp; why we pick two</h2>
+
+      <h3>Compare table (memorize roles, not APIs)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Framework</th>
+            <th>Core idea</th>
+            <th>Strength</th>
+            <th>Week 2 role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>LangGraph 1.x</td>
+            <td>Graph state machine</td>
+            <td>Checkpoints, durable HITL, conditional edges</td>
+            <td><strong>Primary orchestration</strong></td>
+          </tr>
+          <tr>
+            <td>Claude Agent SDK</td>
+            <td>Agent runtime + tools</td>
+            <td>Sessions, permissions, hooks, MCP</td>
+            <td><strong>Primary agent runtime</strong></td>
+          </tr>
+          <tr>
+            <td>CrewAI 1.x</td>
+            <td>Role-based crews</td>
+            <td>Fast multi-agent role stories</td>
+            <td>Compare only</td>
+          </tr>
+          <tr>
+            <td>OpenAI Agents SDK</td>
+            <td>Handoffs + tool agents</td>
+            <td>Clean agent-to-agent handoff API</td>
+            <td>Compare only</td>
+          </tr>
+          <tr>
+            <td>Google ADK 1.0</td>
+            <td>Google ecosystem agents</td>
+            <td>Vertex / Gemini-native tooling</td>
+            <td>Compare only</td>
+          </tr>
+          <tr>
+            <td>Microsoft Agent Framework 1.0</td>
+            <td>Enterprise MS stack</td>
+            <td>Azure / M365 integration story</td>
+            <td>Compare only</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Production mentions for LangGraph (instructor talking points): Klarna, Uber, LinkedIn,
+        BlackRock, JPMorgan — useful for “why graph state in regulated ops,” not for installing
+        every competitor.
+      </p>
+
+      <div class="exercise" id="b1">
+        <div class="ex-label">Exercise B1 · Print the landscape dict</div>
+        <p>Copy into a notebook. Confirm each row’s <code class="inline">lab_role</code>.</p>
+        <pre><code>frameworks = [
+  {"name": "LangGraph", "strength": "Graph state, checkpoints, durable HITL",
+   "lab_role": "primary orchestration"},
+  {"name": "Claude Agent SDK", "strength": "Tools, sessions, permissions, hooks",
+   "lab_role": "primary agent runtime"},
+  {"name": "CrewAI", "strength": "Role-based multi-agent crews",
+   "lab_role": "compare only"},
+  {"name": "OpenAI Agents SDK", "strength": "Handoffs and tool agents",
+   "lab_role": "compare only"},
+  {"name": "Google ADK", "strength": "Google ecosystem agents",
+   "lab_role": "compare only"},
+  {"name": "Microsoft Agent Framework", "strength": "Enterprise Microsoft stack",
+   "lab_role": "compare only"},
+]
+
+for row in frameworks:
+  print(f"{row['name']}: {row['strength']} | {row['lab_role']}")
+
+primary = [r["name"] for r in frameworks if r["lab_role"].startswith("primary")]
+assert primary == ["LangGraph", "Claude Agent SDK"]
+print("OK — lab primaries:", primary)</code></pre>
+      </div>
+
+      <div class="exercise" id="b2">
+        <div class="ex-label">Exercise B2 · Decision quiz: which tool for HITL resume?</div>
+        <p>Fill <code class="inline">answers</code>, then score yourself. No installs.</p>
+        <pre><code>quiz = [
+  {"q": "Need interrupt_before + SQLite resume after process kill",
+   "options": ["CrewAI", "LangGraph", "Google ADK"], "answer": "LangGraph"},
+  {"q": "Need PreToolUse hook to block a disallowed refund",
+   "options": ["OpenAI Agents SDK", "Claude Agent SDK", "Milvus"],
+   "answer": "Claude Agent SDK"},
+  {"q": "Want a slide story about role-based research crews",
+   "options": ["CrewAI", "pgvector", "tenacity"], "answer": "CrewAI"},
+  {"q": "Customer already on Azure + M365 identity",
+   "options": ["Microsoft Agent Framework", "Chroma", "NetworkX"],
+   "answer": "Microsoft Agent Framework"},
+]
+
+# YOUR answers (copy option strings):
+answers = {
+  0: "LangGraph",
+  1: "Claude Agent SDK",
+  2: "CrewAI",
+  3: "Microsoft Agent Framework",
+}
+
+score = sum(1 for i, item in enumerate(quiz) if answers[i] == item["answer"])
+print(f"{score}/{len(quiz)}")
+assert score == len(quiz)</code></pre>
+      </div>
+
+      <div class="exercise" id="b3">
+        <div class="ex-label">Exercise B3 · “Install all” anti-pattern</div>
+        <p>Write a function that rejects installing compare-only frameworks in the Week 2 lab venv.</p>
+        <pre><code>ALLOWED_LAB = {"langgraph", "claude-agent-sdk", "mcp", "chromadb", "tenacity"}
+COMPARE_ONLY = {"crewai", "openai-agents", "google-adk", "microsoft-agent-framework"}
+
+def may_install(package: str) -> str:
+  p = package.lower().strip()
+  if p in COMPARE_ONLY:
+    return "reject: compare-only — use slide literacy, not pip"
+  if p in ALLOWED_LAB:
+    return "ok: Week 2 lab depth"
+  return "ask instructor: unknown package"
+
+for pkg in ["crewai", "langgraph", "google-adk", "chromadb"]:
+  print(pkg, "->", may_install(pkg))
+
+assert "reject" in may_install("crewai")
+assert may_install("langgraph").startswith("ok")</code></pre>
+      </div>
+
+      <div class="exercise" id="b4">
+        <div class="ex-label">Exercise B4 · Map strengths to EXL lanes</div>
+        <p>Insurance FNOL, banking loan servicing, logistics holds — pick the primary stack.</p>
+        <pre><code>lane_needs = {
+  "insurance_fnol": ["typed tools", "TriageDecision", "HITL for write ops"],
+  "banking_loan": ["resumable sessions", "permission gates", "audit log"],
+  "logistics_hold": ["idempotency key", "flaky API retries", "status tools"],
+}
+
+def stack_for(lane: str) -> dict:
+  needs = lane_needs[lane]
+  return {
+    "orchestration": "LangGraph",
+    "runtime": "Claude Agent SDK",
+    "why": needs,
+    "not_now": ["CrewAI crew of 8", "ADK Vertex deploy"],
+  }
+
+for lane in lane_needs:
+  print(lane, stack_for(lane)["orchestration"], "+", stack_for(lane)["runtime"])</code></pre>
+      </div>
+
+      <div class="exercise" id="b5">
+        <div class="ex-label">Exercise B5 · Scaffold vs model blame</div>
+        <p>Given two runs with the same model, attribute the failure correctly.</p>
+        <pre><code>runs = [
+  {"id": "A", "model": "sonnet", "scaffold": "prompt_only",
+   "bug": "no interrupt on goodwill credit"},
+  {"id": "B", "model": "sonnet", "scaffold": "langgraph_hitl",
+   "bug": "wrong policy exclusion cited"},
+]
+
+def blame(run: dict) -> str:
+  if run["scaffold"] == "prompt_only" and "interrupt" in run["bug"]:
+    return "scaffold: missing HITL / write gate"
+  if "cited" in run["bug"] or "policy" in run["bug"]:
+    return "retrieval_or_prompt: check evidence, not framework switch"
+  return "investigate"
+
+assert "scaffold" in blame(runs[0])
+assert "retrieval" in blame(runs[1])
+print([blame(r) for r in runs])</code></pre>
+      </div>
+
+      <div class="exercise" id="b6">
+        <div class="ex-label">Exercise B6 · One-sentence pitch per framework</div>
+        <p>Build a dict of elevator pitches; print markdown bullets for the whiteboard.</p>
+        <pre><code>pitches = {
+  "LangGraph": "Stateful graphs with durable checkpoints for operator workflows.",
+  "Claude Agent SDK": "Tool agent runtime with sessions, budgets, and hooks.",
+  "CrewAI": "Role-playing crews when the story is multi-persona research.",
+  "OpenAI Agents SDK": "First-party handoffs when the stack is OpenAI-centric.",
+  "Google ADK": "Google-cloud-native agents beside Vertex services.",
+  "Microsoft Agent Framework": "Enterprise agents inside Azure / M365 boundaries.",
+}
+
+for name, line in pitches.items():
+  print(f"- **{name}**: {line}")</code></pre>
+      </div>
+
+      <div class="exercise" id="b7">
+        <div class="ex-label">Exercise B7 · True/false conceptual quiz</div>
+        <pre><code>statements = [
+  ("Week 2 requires installing CrewAI to pass Day 2", False),
+  ("Scaffold can move reliability as much as model choice", True),
+  ("Claude Agent SDK hooks are deterministic code you own", True),
+  ("LangGraph interrupt_before is the lab HITL pattern", True),
+  ("Google ADK is the default retrieval DB for Day 3", False),
+]
+
+my = [False, True, True, True, False]
+score = sum(1 for (s, ans), a in zip(statements, my) if ans is a)
+print(f"{score}/{len(statements)}")
+assert score == len(statements)</code></pre>
+      </div>
+
+      <div class="exercise" id="b8">
+        <div class="ex-label">Exercise B8 · “When would we choose CrewAI?” memo</div>
+        <p>Write a tiny decision helper that returns <code class="inline">lab</code> vs <code class="inline">compare</code>.</p>
+        <pre><code>def choose_crew_story(need_roles: bool, need_durable_hitl: bool, cloud_lockin_ok: bool) -> str:
+  if need_durable_hitl:
+    return "lab: LangGraph (+ SDK tools), not CrewAI"
+  if need_roles and not cloud_lockin_ok:
+    return "compare: CrewAI slide — do not install for Week 2 ship"
+  if cloud_lockin_ok:
+    return "enterprise later: revisit ADK / MS / OpenAI Agents with customer stack"
+  return "start single-agent LangGraph + SDK"
+
+assert "LangGraph" in choose_crew_story(True, True, False)
+assert "compare" in choose_crew_story(True, False, False)
+print(choose_crew_story(False, False, True))</code></pre>
+      </div>
+
+      <div class="exercise" id="b9">
+        <div class="ex-label">Exercise B9 · Fill comparison matrix (partial → complete)</div>
+        <pre><code># Complete missing cells, then assert
+matrix = {
+  "LangGraph": {"state": "graph", "hitl": "native interrupt", "lab": True},
+  "Claude Agent SDK": {"state": "session", "hitl": "permissions + hooks", "lab": True},
+  "CrewAI": {"state": "crew/task", "hitl": "limited vs graph", "lab": False},
+  "OpenAI Agents SDK": {"state": "agent+handoff", "hitl": "sdk patterns", "lab": False},
+  "Google ADK": {"state": "adk runtime", "hitl": "ecosystem", "lab": False},
+  "Microsoft Agent Framework": {"state": "ms runtime", "hitl": "enterprise", "lab": False},
+}
+
+lab_true = [k for k, v in matrix.items() if v["lab"]]
+assert set(lab_true) == {"LangGraph", "Claude Agent SDK"}
+print("lab frameworks:", lab_true)</code></pre>
+      </div>
+
+      <div class="exercise" id="b10">
+        <div class="ex-label">Exercise B10 · Explain “why two primaries” in 4 bullets</div>
+        <p>Generate a teaching script from a dict (instructor / self-study).</p>
+        <pre><code>why_two = {
+  "LangGraph": [
+    "Durable execution across kill/resume",
+    "Explicit edges for underwriting / claim graphs",
+    "HITL as a first-class node, not a prompt hope",
+  ],
+  "Claude Agent SDK": [
+    "Tool contracts + permission modes for write ops",
+    "Hooks for PreToolUse block / audit",
+    "Sessions for banking lane continuity",
+  ],
+  "together": "Graph orchestrates; SDK (or langchain tools under graph) executes tools safely.",
+}
+
+for k, v in why_two.items():
+  if isinstance(v, list):
+    print(f"## {k}")
+    for bullet in v:
+      print(" -", bullet)
+  else:
+    print("## together\n -", v)</code></pre>
+      </div>
+
+      <div class="callout warn">
+        <strong>Beginner bar</strong>
+        You can name all six frameworks, state which two are lab-deep, and refuse to
+        <code class="inline">pip install</code> compare-only packages for the ship check.
+      </div>
+    </section>
+
+    <!-- ========== INTERMEDIATE ========== -->
+    <section class="section" id="intermediate">
+      <h2><span class="level intermediate">Intermediate</span> Vectors, GraphRAG cost, isolation spectrum</h2>
+
+      <h3>Vector database landscape (Day 3 preview — literacy, not all installs)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Store</th>
+            <th>Shape</th>
+            <th>Typical fit</th>
+            <th>Week 2 stance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Chroma</td>
+            <td>Local / embedded</td>
+            <td>Classroom PersistentClient</td>
+            <td><strong>Lab default (module 12)</strong></td>
+          </tr>
+          <tr>
+            <td>pgvector</td>
+            <td>Postgres extension</td>
+            <td>App DB already on Postgres</td>
+            <td>Prod upgrade mention</td>
+          </tr>
+          <tr>
+            <td>Pinecone</td>
+            <td>Managed cloud</td>
+            <td>Low-ops SaaS vectors</td>
+            <td>Paid / compare</td>
+          </tr>
+          <tr>
+            <td>Weaviate</td>
+            <td>Cloud or self-host</td>
+            <td>Hybrid + modules ecosystem</td>
+            <td>Paid / compare</td>
+          </tr>
+          <tr>
+            <td>Milvus</td>
+            <td>Scale-out OSS</td>
+            <td>Large vector fleets</td>
+            <td>Compare (ops heavy)</td>
+          </tr>
+          <tr>
+            <td>Qdrant</td>
+            <td>Rust engine / cloud</td>
+            <td>Filters + performance focus</td>
+            <td>Compare</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>GraphRAG cost note (~3–5×)</h3>
+      <p>
+        GraphRAG (entity/relation extract → knowledge graph → traverse + vector search) helps
+        multi-hop questions like “who supplies whom.” It often costs <strong>~3–5×</strong> a
+        single-pass RAG path (extraction, storage, traversal tokens). Use it when
+        <em>relationships</em> matter; otherwise stay hybrid vector + keyword. Lab depth uses
+        NetworkX + local fixtures (module 15), not paid Neo4j Aura.
+      </p>
+
+      <h3>Claude Agent SDK isolation spectrum (review)</h3>
+      <table>
+        <thead>
+          <tr><th>Level</th><th>Isolation</th><th>Handoff</th><th>Typical use</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Skills</td>
+            <td>Shared context with parent</td>
+            <td>None (same session)</td>
+            <td>Policy lookup skill in one chat</td>
+          </tr>
+          <tr>
+            <td>Sub-agents</td>
+            <td>Isolated context</td>
+            <td>One-way result → parent</td>
+            <td>Claims worker returns a summary only</td>
+          </tr>
+          <tr>
+            <td>Agent teams</td>
+            <td>Separate processes (experimental)</td>
+            <td>Message protocol</td>
+            <td>Parallel ownership, harder boundaries</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Model roles</strong>
+        Stronger orchestrator (e.g. Opus-class) for planning/routing; cheaper workers
+        (e.g. Sonnet-class) for narrow tool work. Avoid sub-agent sprawl — context, cost, and
+        OOM risk multiply.
+      </div>
+
+      <div class="exercise" id="i1">
+        <div class="ex-label">Exercise I1 · Vector store picker</div>
+        <pre><code>VECTOR_OPTIONS = {
+  "chromadb": {"cost": "free_local", "ops": "low", "lab": True},
+  "pgvector": {"cost": "infra_postgres", "ops": "med", "lab": False},
+  "pinecone": {"cost": "paid_saas", "ops": "low", "lab": False},
+  "weaviate": {"cost": "paid_or_self", "ops": "med", "lab": False},
+  "milvus": {"cost": "self_host_scale", "ops": "high", "lab": False},
+  "qdrant": {"cost": "self_or_cloud", "ops": "med", "lab": False},
+}
+
+def pick_vector(classroom: bool, already_postgres: bool, need_managed_saas: bool) -> str:
+  if classroom:
+    return "chromadb"
+  if already_postgres:
+    return "pgvector"
+  if need_managed_saas:
+    return "pinecone"  # or weaviate/qdrant cloud — customer preference
+  return "chromadb"  # default safe start
+
+assert pick_vector(True, False, False) == "chromadb"
+assert pick_vector(False, True, False) == "pgvector"
+print({k: v["lab"] for k, v in VECTOR_OPTIONS.items()})</code></pre>
+      </div>
+
+      <div class="exercise" id="i2">
+        <div class="ex-label">Exercise I2 · GraphRAG worth-it quiz (cost 3–5×)</div>
+        <pre><code>cases = [
+  {"id": "C1", "question": "What is the deductible on POL-HOME-010?",
+   "needs_multihop": False, "answer": "vector_or_hybrid"},
+  {"id": "C2", "question": "Which tier-2 supplier feeds SKU-88 via Acme Plastics?",
+   "needs_multihop": True, "answer": "graphrag"},
+  {"id": "C3", "question": "List claims mentioning water damage last week",
+   "needs_multihop": False, "answer": "vector_or_hybrid"},
+  {"id": "C4", "question": "Find the upstream risk if Port-7 closes for Supplier-X",
+   "needs_multihop": True, "answer": "graphrag"},
+]
+
+COST_MULTIPLIER = (3, 5)  # approximate vs single-pass RAG
+
+def route_retrieval(case: dict) -> dict:
+  mode = "graphrag" if case["needs_multihop"] else "vector_or_hybrid"
+  return {
+    "id": case["id"],
+    "mode": mode,
+    "est_cost_x": COST_MULTIPLIER if mode == "graphrag" else (1, 1),
+    "lab_tool": "networkx+chroma" if mode == "graphrag" else "chromadb",
+  }
+
+for c in cases:
+  r = route_retrieval(c)
+  assert r["mode"] == c["answer"]
+  print(r)</code></pre>
+      </div>
+
+      <div class="exercise" id="i3">
+        <div class="ex-label">Exercise I3 · Isolation spectrum review dict</div>
+        <pre><code>isolation_spectrum = [
+  {"level": "skill", "context": "shared_with_parent", "handoff": "none",
+   "example": "policy_lookup skill in the same chat"},
+  {"level": "sub_agent", "context": "isolated", "handoff": "one_way_result_to_parent",
+   "example": "claims worker returns a summary only"},
+  {"level": "agent_team", "context": "separate_process", "handoff": "message_protocol",
+   "example": "planner and comms agents with distinct runtimes"},
+]
+
+model_roles = {
+  "orchestrator": "stronger model for planning and routing",
+  "worker": "cheaper model for narrow tool calls",
+}
+
+def recommend_isolation(pollute_parent: bool, need_parallel_ownership: bool) -> str:
+  if need_parallel_ownership:
+    return "agent_team"  # experimental — classroom: discuss, rarely ship
+  if pollute_parent:
+    return "sub_agent"
+  return "skill"
+
+assert recommend_isolation(False, False) == "skill"
+assert recommend_isolation(True, False) == "sub_agent"
+for row in isolation_spectrum:
+  print(f"{row['level']}: context={row['context']}, handoff={row['handoff']}")
+print("model_roles:", model_roles)</code></pre>
+      </div>
+
+      <div class="exercise" id="i4">
+        <div class="ex-label">Exercise I4 · Sub-agent sprawl budget</div>
+        <p>Cap workers; refuse designs that explode context.</p>
+        <pre><code>MAX_SUBAGENTS_CLASSROOM = 3  # teaching cap; product limits can be far higher
+
+def plan_workers(tasks: list[str]) -> dict:
+  if len(tasks) > MAX_SUBAGENTS_CLASSROOM:
+    return {
+      "ok": False,
+      "advice": "collapse tasks into fewer workers or sequential skills",
+      "tasks": tasks,
+    }
+  return {"ok": True, "workers": tasks, "orchestrator": "opus_class", "worker_model": "sonnet_class"}
+
+assert plan_workers(["intake", "adjudicate"])["ok"] is True
+assert plan_workers(["a", "b", "c", "d"])["ok"] is False
+print(plan_workers(["intake", "adjudicate", "comms"]))</code></pre>
+      </div>
+
+      <div class="exercise" id="i5">
+        <div class="ex-label">Exercise I5 · Framework × vector matching quiz</div>
+        <pre><code>pairs_quiz = [
+  {"need": "local classroom RAG", "pick": "chromadb"},
+  {"need": "Postgres already stores policies", "pick": "pgvector"},
+  {"need": "managed SaaS, low ops", "pick": "pinecone"},
+  {"need": "multi-hop supplier graph in lab", "pick": "networkx_graphrag_concept"},
+  {"need": "durable underwriting HITL", "pick": "langgraph"},
+]
+
+# shuffle mentally; score:
+my_picks = {p["need"]: p["pick"] for p in pairs_quiz}
+assert my_picks["local classroom RAG"] == "chromadb"
+assert my_picks["durable underwriting HITL"] == "langgraph"
+print("matched", len(my_picks), "needs")</code></pre>
+      </div>
+
+      <div class="exercise" id="i6">
+        <div class="ex-label">Exercise I6 · Cost estimator for GraphRAG vs hybrid</div>
+        <pre><code>def estimate_relative_cost(mode: str, base_usd: float = 0.02) -> dict:
+  if mode == "hybrid_rag":
+    mult = 1.0
+  elif mode == "graphrag":
+    mult = 4.0  # midpoint of 3–5×
+  else:
+    raise ValueError(mode)
+  return {"mode": mode, "est_usd": round(base_usd * mult, 4), "multiplier": mult}
+
+h = estimate_relative_cost("hybrid_rag")
+g = estimate_relative_cost("graphrag")
+assert g["est_usd"] == h["est_usd"] * 4
+print(h, g)
+print("Only pay GraphRAG tax when relationships are the product question.")</code></pre>
+      </div>
+
+      <div class="exercise" id="i7">
+        <div class="ex-label">Exercise I7 · Isolation spectrum scenario quiz</div>
+        <pre><code>scenarios = [
+  {"desc": "Add a CLAUDE.md skill for FNOL field glossary", "level": "skill"},
+  {"desc": "Run a long PDF extract without filling parent window", "level": "sub_agent"},
+  {"desc": "Experimental parallel planner + comms processes", "level": "agent_team"},
+]
+
+def choose_level(desc: str) -> str:
+  d = desc.lower()
+  if "parallel" in d or "process" in d:
+    return "agent_team"
+  if "without filling" in d or "extract" in d:
+    return "sub_agent"
+  return "skill"
+
+for s in scenarios:
+  assert choose_level(s["desc"]) == s["level"]
+print("isolation quiz OK")</code></pre>
+      </div>
+
+      <div class="exercise" id="i8">
+        <div class="ex-label">Exercise I8 · “Start single-agent” rule</div>
+        <pre><code>def need_multi_agent(context_isolation_required: bool,
+                     true_parallelism: bool,
+                     role_play_demo_only: bool) -> str:
+  if role_play_demo_only:
+    return "slides: CrewAI story OK; lab stays single graph + optional sub_agent"
+  if context_isolation_required or true_parallelism:
+    return "add sub_agent / team carefully with budgets"
+  return "stay single-agent: LangGraph nodes + SDK tools"
+
+assert "single" in need_multi_agent(False, False, False)
+assert "sub_agent" in need_multi_agent(True, False, False)
+print(need_multi_agent(False, False, True))</code></pre>
+      </div>
+
+      <div class="exercise" id="i9">
+        <div class="ex-label">Exercise I9 · Build a retrieval architecture card</div>
+        <pre><code>arch_card = {
+  "chunking": ["by_heading", "overlap_tokens"],
+  "search": ["keyword", "dense_vector"],
+  "rerank": "cross_encoder_optional",
+  "store_lab": "chromadb.PersistentClient",
+  "store_prod_options": ["pgvector", "pinecone", "weaviate", "milvus", "qdrant"],
+  "graphrag": {
+    "when": "multi-hop entity relations",
+    "cost_x": "3-5x",
+    "lab": "networkx + supplier_kg.json",
+    "not_lab": "Neo4j Aura paid",
+  },
+  "acl": "filter metadata BEFORE retrieve — same rights as user",
+}
+
+assert "3-5x" in arch_card["graphrag"]["cost_x"]
+assert arch_card["store_lab"].startswith("chromadb")
+from pprint import pprint
+pprint(arch_card)</code></pre>
+      </div>
+
+      <div class="exercise" id="i10">
+        <div class="ex-label">Exercise I10 · Combined decision quiz (framework + store + isolation)</div>
+        <pre><code>ticket = {
+  "goal": "resumable claim adjudication with tool audit",
+  "classroom": True,
+  "multihop_supply_question": False,
+  "pdf_extract_pollutes_context": True,
+}
+
+def design(ticket: dict) -> dict:
+  return {
+    "orchestration": "LangGraph",
+    "runtime": "Claude Agent SDK",
+    "vector": "chromadb" if ticket["classroom"] else "pgvector_or_saas",
+    "graphrag": ticket["multihop_supply_question"],
+    "isolation": "sub_agent" if ticket["pdf_extract_pollutes_context"] else "skill",
+  }
+
+d = design(ticket)
+assert d["orchestration"] == "LangGraph"
+assert d["graphrag"] is False
+assert d["isolation"] == "sub_agent"
+print(d)</code></pre>
+      </div>
+
+      <div class="callout warn">
+        <strong>Intermediate bar</strong>
+        Pick Chroma for classroom RAG; name five production vector options; know GraphRAG’s
+        ~3–5× tax; map skills → sub-agents → teams with orchestrator/worker model roles.
+      </div>
+    </section>
+
+    <!-- ========== ADVANCED ========== -->
+    <section class="section" id="advanced">
+      <h2><span class="level advanced">Advanced</span> Managed runtimes &amp; full decision engines</h2>
+
+      <h3>Managed agent platforms (enterprise literacy)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Cloud home</th>
+            <th>What you buy</th>
+            <th>Classroom substitute</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Bedrock AgentCore</td>
+            <td>AWS</td>
+            <td>Managed agents on Bedrock</td>
+            <td>Local LangGraph + SDK + mock tools</td>
+          </tr>
+          <tr>
+            <td>Vertex Agent Builder</td>
+            <td>GCP</td>
+            <td>Agent builder on Vertex</td>
+            <td>Same local stack; ADK = compare slide</td>
+          </tr>
+          <tr>
+            <td>Azure AI Foundry</td>
+            <td>Azure</td>
+            <td>Foundry agent hosting</td>
+            <td>Local stack; MS framework = compare</td>
+          </tr>
+          <tr>
+            <td>Anthropic Managed Agents</td>
+            <td>Anthropic</td>
+            <td>Hosted agent ops</td>
+            <td>Claude Agent SDK locally + hooks</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Enterprise CRM/ERP (Salesforce Agentforce, ServiceNow, SAP) often show up via
+        <strong>MCP</strong> gateways. Learners call a local inventory MCP server instead of paid
+        Agentforce (see modules 09–10).
+      </p>
+
+      <div class="exercise" id="a1">
+        <div class="ex-label">Exercise A1 · Managed runtime matcher</div>
+        <pre><code>MANAGED = {
+  "aws": "Bedrock AgentCore",
+  "gcp": "Vertex Agent Builder",
+  "azure": "Azure AI Foundry",
+  "anthropic": "Anthropic Managed Agents",
+}
+
+def recommend_managed(cloud: str, classroom: bool) -> str:
+  if classroom:
+    return "local: LangGraph + Claude Agent SDK (no managed bill)"
+  return MANAGED[cloud]
+
+assert "local" in recommend_managed("aws", True)
+assert recommend_managed("gcp", False) == "Vertex Agent Builder"
+for cloud, name in MANAGED.items():
+  print(cloud, "->", name)</code></pre>
+      </div>
+
+      <div class="exercise" id="a2">
+        <div class="ex-label">Exercise A2 · Lock-in awareness scorecard</div>
+        <pre><code>def lockin_score(choice: str) -> dict:
+  profiles = {
+    "langgraph_sdk_local": {"portability": 8, "ops": 6, "hitl_control": 9},
+    "bedrock_agentcore": {"portability": 3, "ops": 8, "hitl_control": 6},
+    "vertex_agent_builder": {"portability": 3, "ops": 8, "hitl_control": 6},
+    "azure_ai_foundry": {"portability": 3, "ops": 8, "hitl_control": 6},
+    "anthropic_managed": {"portability": 4, "ops": 8, "hitl_control": 7},
+    "crewai_cloud": {"portability": 4, "ops": 7, "hitl_control": 5},
+  }
+  return profiles[choice]
+
+lab = lockin_score("langgraph_sdk_local")
+assert lab["hitl_control"] >= lockin_score("bedrock_agentcore")["hitl_control"]
+print("lab HITL control", lab["hitl_control"])</code></pre>
+      </div>
+
+      <div class="exercise" id="a3">
+        <div class="ex-label">Exercise A3 · Full stack decision engine</div>
+        <p>One function that returns orchestration, runtime, vector, graph, isolation, managed.</p>
+        <pre><code>def design_stack(
+  *,
+  classroom: bool,
+  need_durable_hitl: bool,
+  multihop_relations: bool,
+  pollute_parent: bool,
+  customer_cloud: str | None,
+) -> dict:
+  orch = "LangGraph" if need_durable_hitl or classroom else "evaluate_customer_std"
+  runtime = "Claude Agent SDK"
+  vector = "chromadb" if classroom else (
+    "pgvector" if customer_cloud is None else "managed_vector_on_" + customer_cloud
+  )
+  managed = (
+    None if classroom else
+    {"aws": "Bedrock AgentCore", "gcp": "Vertex Agent Builder",
+     "azure": "Azure AI Foundry", "anthropic": "Anthropic Managed Agents"}.get(customer_cloud)
+  )
+  return {
+    "orchestration": orch,
+    "runtime": runtime,
+    "vector": vector,
+    "graphrag": multihop_relations,
+    "graphrag_cost_x": (3, 5) if multihop_relations else (1, 1),
+    "isolation": "sub_agent" if pollute_parent else "skill",
+    "managed_runtime": managed,
+    "compare_only_mention": ["CrewAI", "OpenAI Agents SDK", "Google ADK", "Microsoft Agent Framework"],
+  }
+
+s = design_stack(
+  classroom=True,
+  need_durable_hitl=True,
+  multihop_relations=True,
+  pollute_parent=True,
+  customer_cloud="aws",
+)
+assert s["vector"] == "chromadb"
+assert s["managed_runtime"] is None
+assert s["graphrag_cost_x"] == (3, 5)
+print(s)</code></pre>
+      </div>
+
+      <div class="exercise" id="a4">
+        <div class="ex-label">Exercise A4 · Enterprise RFP response (dict → markdown)</div>
+        <pre><code>rfp = {
+  "customer": "Regional insurer",
+  "must": ["HITL on payouts", "resume after crash", "tool audit"],
+  "cloud": "azure",
+  "our_lab_proof": "Week2 LangGraph checkpoint + SDK hooks on mocks",
+  "prod_path": ["keep graph semantics", "host on Azure AI Foundry or self-host",
+                "pgvector or Azure AI Search for vectors"],
+}
+
+def rfp_md(r: dict) -> str:
+  lines = [f"# Response — {r['customer']}", "## Must-haves"]
+  lines += [f"- {m}" for m in r["must"]]
+  lines += ["## Proof from Week 2 lab", f"- {r['our_lab_proof']}", "## Production path"]
+  lines += [f"- {p}" for p in r["prod_path"]]
+  lines += [f"- Managed option if required: Azure AI Foundry (cloud={r['cloud']})"]
+  return "\n".join(lines)
+
+print(rfp_md(rfp))
+assert "HITL" in rfp_md(rfp)</code></pre>
+      </div>
+
+      <div class="exercise" id="a5">
+        <div class="ex-label">Exercise A5 · Anti-sprawl + anti-install lint</div>
+        <pre><code>PROPOSAL = {
+  "agents": ["supervisor", "intake", "adj", "fraud", "comms", "legal", "ops"],
+  "pip": ["langgraph", "crewai", "google-adk"],
+}
+
+def lint_proposal(p: dict) -> list[str]:
+  issues = []
+  if len(p["agents"]) > 4:
+    issues.append("too many agents — collapse roles")
+  for pkg in p["pip"]:
+    if pkg in {"crewai", "google-adk", "openai-agents"}:
+      issues.append(f"remove compare-only install: {pkg}")
+  return issues
+
+issues = lint_proposal(PROPOSAL)
+assert any("too many" in i for i in issues)
+assert any("crewai" in i for i in issues)
+print(issues)</code></pre>
+      </div>
+
+      <div class="exercise" id="a6">
+        <div class="ex-label">Exercise A6 · GAIA-style scaffold swing memo</div>
+        <pre><code>scaffold_memo = {
+  "claim": "Same model, different scaffold → large score swing (~30 pts class of effect)",
+  "drivers": ["retries", "typed tools", "checkpoints", "HITL placement", "budgets"],
+  "wrong_fix": "Swap to CrewAI hoping for magic",
+  "right_fix": "Harden LangGraph edges + SDK hooks + eval trajectories",
+}
+
+def advise(failure_mode: str) -> str:
+  if failure_mode == "no_resume":
+    return "add SqliteSaver + thread_id"
+  if failure_mode == "bad_write":
+    return "PreToolUse hook + interrupt_before human_approve"
+  if failure_mode == "flaky_tool":
+    return "tenacity retry + model fallback (module 07)"
+  return "measure with trajectory eval (module 17)"
+
+assert "Sqlite" in advise("no_resume")
+print(scaffold_memo["right_fix"])
+print(advise("bad_write"))</code></pre>
+      </div>
+
+      <div class="exercise" id="a7">
+        <div class="ex-label">Exercise A7 · Vector vendor shortlist for a bank</div>
+        <pre><code>def bank_vector_shortlist(has_postgres_regulated: bool, forbid_foreign_saas: bool) -> list[str]:
+  if has_postgres_regulated:
+    return ["pgvector"]  # stay in existing compliance boundary
+  if forbid_foreign_saas:
+    return ["milvus_self_host", "qdrant_self_host", "weaviate_self_host"]
+  return ["pinecone", "weaviate_cloud", "qdrant_cloud"]
+
+assert bank_vector_shortlist(True, True) == ["pgvector"]
+print(bank_vector_shortlist(False, True))</code></pre>
+      </div>
+
+      <div class="exercise" id="a8">
+        <div class="ex-label">Exercise A8 · GraphRAG go / no-go with budget gate</div>
+        <pre><code>def graphrag_gate(monthly_rag_usd: float, relation_questions_pct: float) -> dict:
+  # If &lt;15% of questions need multi-hop, 4× cost rarely pays
+  projected = monthly_rag_usd * (1 + relation_questions_pct * 3)  # rough blend
+  go = relation_questions_pct >= 0.15 and monthly_rag_usd * 4 &lt; monthly_rag_usd * 6
+  return {
+    "go_graphrag": relation_questions_pct >= 0.20,
+    "hybrid_ok": relation_questions_pct &lt; 0.20,
+    "note": "lab still demos NetworkX concept even if prod stays hybrid",
+    "projected_blend_usd": round(projected, 2),
+  }
+
+g = graphrag_gate(1000, 0.05)
+assert g["hybrid_ok"] is True
+assert graphrag_gate(1000, 0.35)["go_graphrag"] is True
+print(g)</code></pre>
+      </div>
+
+      <div class="exercise" id="a9">
+        <div class="ex-label">Exercise A9 · Isolation spectrum review exam (mixed)</div>
+        <pre><code>exam = [
+  {"prompt": "Shared glossary skill", "expect": "skill"},
+  {"prompt": "Isolated fraud review returning JSON only", "expect": "sub_agent"},
+  {"prompt": "Separate process team (experimental)", "expect": "agent_team"},
+  {"prompt": "Orchestrator Opus + worker Sonnet", "expect": "model_roles"},
+]
+
+def grade(prompt: str) -> str:
+  p = prompt.lower()
+  if "opus" in p or "sonnet" in p:
+    return "model_roles"
+  if "separate process" in p or "team" in p:
+    return "agent_team"
+  if "isolated" in p or "returning" in p:
+    return "sub_agent"
+  return "skill"
+
+score = sum(1 for item in exam if grade(item["prompt"]) == item["expect"])
+assert score == len(exam)
+print(f"exam {score}/{len(exam)}")</code></pre>
+      </div>
+
+      <div class="exercise" id="a10">
+        <div class="ex-label">Exercise A10 · Teaching checklist generator</div>
+        <p>Emit the AM whiteboard agenda as structured data (for instructors).</p>
+        <pre><code>am_agenda = [
+  {"mins": 10, "item": "Recap Day 1 triage agent"},
+  {"mins": 35, "item": "Framework landscape table — pick LangGraph + SDK"},
+  {"mins": 30, "item": "Draw underwriting graph + HITL node"},
+  {"mins": 25, "item": "Hooks preview — PreToolUse block"},
+  {"mins": 10, "item": "Break"},
+  {"mins": 30, "item": "Checkpoint + interrupt lab"},
+  {"mins": 25, "item": "Retry / fallback with tenacity"},
+  {"mins": 25, "item": "Kill & resume demo"},
+  {"mins": 10, "item": "MCP + A2A preview"},
+]
+
+assert sum(x["mins"] for x in am_agenda) == 200  # stretch block incl. break
+for row in am_agenda:
+  print(f"{row['mins']:2d}m  {row['item']}")
+print("Next: W2D2/W2D2AM/_CONCEPTS.ipynb section 2")</code></pre>
+      </div>
+
+      <div class="exercise" id="a11">
+        <div class="ex-label">Exercise A11 · Capstone: defend the Week 2 stack in 12 lines</div>
+        <pre><code>defense = """
+1. Lab depth beats shallow installs of six frameworks.
+2. LangGraph gives durable HITL and kill/resume for ops lanes.
+3. Claude Agent SDK gives tools, sessions, permissions, hooks.
+4. CrewAI / OpenAI Agents / ADK / MS Framework = compare literacy.
+5. Chroma is classroom RAG; Pinecone/Weaviate/pgvector/Milvus/Qdrant = prod map.
+6. GraphRAG (~3–5×) only when multi-hop relations are the question.
+7. Skills → sub-agents → teams: escalate isolation deliberately.
+8. Orchestrator strong / workers cheap.
+9. Managed runtimes (Bedrock AgentCore, Vertex Agent Builder, Azure AI Foundry,
+   Anthropic Managed Agents) are customer hosting choices, not Day-2 pip targets.
+10. MCP/A2A integrate enterprises; local mocks prove the pattern.
+11. Scaffold swings reliability; measure with evals later.
+12. Ship: resumable graph + audited tools — not a zoo of SDKs.
+""".strip()
+
+assert "3–5×" in defense or "3-5" in defense.replace("–", "-")
+assert "LangGraph" in defense and "Claude Agent SDK" in defense
+print(defense)
+print("\nLines:", defense.count("\n") + 1)</code></pre>
+      </div>
+
+      <div class="callout warn">
+        <strong>Advanced bar</strong>
+        You can design a stack for classroom vs AWS/GCP/Azure customers, lint agent sprawl,
+        gate GraphRAG by question mix, and explain managed runtimes without opening a cloud console.
+      </div>
+    </section>
+
+    <!-- ========== CHECKPOINT ========== -->
+    <section class="section" id="checkpoint">
+      <h2>Checkpoint &amp; Day mapping</h2>
+      <ul>
+        <li>Name six frameworks; mark LangGraph + Claude Agent SDK as lab primaries.</li>
+        <li>Explain scaffold swing (~architecture, not only model).</li>
+        <li>Recite isolation spectrum: skills → sub-agents → agent teams + model roles.</li>
+        <li>Map Chroma (lab) vs Pinecone / Weaviate / pgvector / Milvus / Qdrant (prod literacy).</li>
+        <li>State GraphRAG ~3–5× cost rule and when NetworkX concept labs apply.</li>
+        <li>Place Bedrock AgentCore, Vertex Agent Builder, Azure AI Foundry, Anthropic Managed Agents as hosting options with local substitutes.</li>
+      </ul>
+      <div class="callout">
+        <strong>Continue</strong>
+        Concept notebook: <code class="inline">W2D2/W2D2AM/_CONCEPTS.ipynb</code>, section 1.
+        → <code class="inline">W2D2/W2D2AM/_CONCEPTS.ipynb</code>, section 2 →
+        <code class="inline">W2D2/W2D2AM/d2amt1c02_framework_selector.py</code>.
+        Next mastery module: <a href="12_chromadb.html">12 · ChromaDB</a> (Day 3 retrieval foundation).
+      </div>
+      <table>
+        <thead><tr><th>Day</th><th>How this module shows up</th></tr></thead>
+        <tbody>
+          <tr><td>D2 AM</td><td>Framework landscape slide + isolation spectrum before HITL lab</td></tr>
+          <tr><td>D2 PM</td><td>Managed runtimes / enterprise MCP as compare; local MCP ship</td></tr>
+          <tr><td>D3</td><td>Vector DB literacy + GraphRAG cost before Chroma / NetworkX labs</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <nav class="nav-footer">
+      <a href="10_a2a_agent_cards.html">← 10 · A2A Agent Cards</a>
+      <a href="../index.html">Index</a>
+      <a href="12_chromadb.html">12 · ChromaDB →</a>
+    </nav>
+  </div>
+</body>
+</html>

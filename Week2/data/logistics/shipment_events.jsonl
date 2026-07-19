@@ -1,0 +1,9 @@
+{"event_id": "EVT-MSKU123-001", "container_id": "MSKU123", "timestamp": "2026-07-14T06:12:00Z", "location": "Port of Los Angeles", "status": "loaded", "detail": "Container loaded onto vessel MV Pacific Star"}
+{"event_id": "EVT-MSKU123-002", "container_id": "MSKU123", "timestamp": "2026-07-14T18:40:00Z", "location": "Pacific Ocean", "status": "in_transit", "detail": "Departed LA bound for Singapore"}
+{"event_id": "EVT-MSKU123-003", "container_id": "MSKU123", "timestamp": "2026-07-20T09:05:00Z", "location": "Pacific Ocean", "status": "weather_delay", "detail": "Minor reroute due to tropical storm advisory; ETA +18h"}
+{"event_id": "EVT-MSKU123-004", "container_id": "MSKU123", "timestamp": "2026-07-28T14:22:00Z", "location": "Port of Singapore", "status": "arrived", "detail": "Vessel berthed; customs inspection scheduled"}
+{"event_id": "EVT-MSKU123-005", "container_id": "MSKU123", "timestamp": "2026-07-29T11:00:00Z", "location": "Singapore DC", "status": "customs_cleared", "detail": "Released for inland transport"}
+{"event_id": "EVT-MSKU123-006", "container_id": "MSKU123", "timestamp": "2026-07-30T08:15:00Z", "location": "Kuala Lumpur Hub", "status": "in_transit", "detail": "On truck convoy to regional distribution center"}
+{"event_id": "EVT-MSKU456-001", "container_id": "MSKU456", "timestamp": "2026-07-13T10:00:00Z", "location": "Rotterdam", "status": "loaded", "detail": "Electronics pallet secured"}
+{"event_id": "EVT-MSKU456-002", "container_id": "MSKU456", "timestamp": "2026-07-15T07:30:00Z", "location": "North Sea", "status": "in_transit", "detail": "On schedule"}
+{"event_id": "EVT-MSKU789-001", "container_id": "MSKU789", "timestamp": "2026-07-12T16:45:00Z", "location": "Chicago Rail Yard", "status": "held", "detail": "Awaiting documentation — bill of lading mismatch"}

@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>12 — ChromaDB PersistentClient · Week 2 Mastery</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">← Mastery index</a>
+      <span>
+        <a href="11_framework_landscape.html">Prev · 11</a>
+        <a href="13_sentence_transformers.html">Next · 13</a>
+      </span>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">Module 12 · Week 2 Day 3 · June 2026 APIs</div>
+      <h1>ChromaDB PersistentClient — local vector index</h1>
+      <p class="lead">
+        Explore the fully implemented local Chroma alternative with
+        <code class="inline">chromadb.PersistentClient</code>, chunk
+        <code class="inline">data/policies/*.md</code>, upsert with metadata, query with
+        <code class="inline">where</code> filters, and wire retrieval into an agentic RAG
+        foundation. The assessed classroom path uses Pinecone; Chroma runtime verification is intentionally deferred.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">chromadb ≥ 0.5</span>
+        <span class="chip">PersistentClient</span>
+        <span class="chip">SentenceTransformerEmbeddingFunction</span>
+        <span class="chip">Local alternative</span>
+        <span class="chip">Maps to d3amt2c06</span>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="Table of contents">
+      <h2>On this page</h2>
+      <ol>
+        <li><a href="#why">Why Chroma on Day 3</a></li>
+        <li><a href="#setup">Setup and paths</a></li>
+        <li><a href="#beginner">Beginner — client, collections, embeddings</a></li>
+        <li><a href="#intermediate">Intermediate — chunk, upsert, query, filters</a></li>
+        <li><a href="#advanced">Advanced — persistence, rebuild, agentic RAG</a></li>
+        <li><a href="#checklist">Mastery checklist</a></li>
+      </ol>
+    </nav>
+
+    <!-- ========== WHY ========== -->
+    <section class="section" id="why">
+      <h2>Why Chroma on Day 3</h2>
+      <p>
+        Agentic RAG needs a <strong>semantic retrieval</strong> layer: policy clauses, SOPs, and
+        product facts live outside the prompt. Rebuilt Day 3 uses Pinecone as its primary
+        implemented and runtime-tested classroom path. This module explains the equivalent local
+        Chroma implementation represented by <code class="inline">d3amt2c06_chroma_fallback.py</code>;
+        its runtime verification is intentionally deferred.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Layer</th><th>Holds</th><th>Day 3 role</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Working</td>
+            <td>Current-turn tool results</td>
+            <td>Retrieval trace for this question</td>
+          </tr>
+          <tr>
+            <td>Episodic</td>
+            <td>Session summaries / durable facts</td>
+            <td>Customer threads (later modules)</td>
+          </tr>
+          <tr>
+            <td>Semantic</td>
+            <td>Long-term KB</td>
+            <td><strong>Chroma policy index alternative</strong> (this module)</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Classroom contract</strong>
+        Use <code class="inline">PersistentClient</code> for this alternative. Pinecone remains the
+        classroom path documented in <code class="inline">W2D3AM/_VECTOR_STORES_SETUP.html</code>.
+        Embeddings use Chroma’s default MiniLM function or an explicit
+        <code class="inline">SentenceTransformerEmbeddingFunction</code>. Persist under
+        <code class="inline">ConceptBuilding/data/chroma_concept_building_lab/</code> for this track (gitignored).
+      </div>
+      <p>
+        The rebuilt Chroma alternative uses <code class="inline">data/chroma_persist/</code> through
+        <code class="inline">W2D3/W2D3AM/d3amt2c06_chroma_fallback.py</code>. This mastery module
+        mirrors that pattern against <code class="inline">ConceptBuilding/data/policies/</code>
+        without touching classroom-generated state.
+      </p>
+    </section>
+
+    <!-- ========== SETUP ========== -->
+    <section class="section" id="setup">
+      <h2>Setup and paths</h2>
+      <p>
+        Working directory for every snippet:
+        <code class="inline">Week2/ConceptBuilding</code> (open a blank notebook there, or
+        <code class="inline">os.chdir</code> to it).
+      </p>
+<pre><code># From Week2 root (once)
+uv pip install -r requirements.txt
+# chromadb, sentence-transformers already listed</code></pre>
+      <table>
+        <thead>
+          <tr><th>Path</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">data/policies/*.md</code></td>
+            <td>Six insurance policy markdown files (source of truth)</td>
+          </tr>
+          <tr>
+            <td><code class="inline">data/chroma_concept_building_lab/</code></td>
+            <td>Local PersistentClient store for this module’s labs</td>
+          </tr>
+          <tr>
+            <td><code class="inline">../../data/chroma_persist/</code></td>
+            <td>Generated Chroma alternative (do not overwrite from ConceptBuilding labs)</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout warn">
+        <strong>Gitignore note</strong>
+        Generated Chroma directories must never be committed (binary SQLite + HNSW files, model
+        cache noise). <code class="inline">Week2/.gitignore</code> already lists
+        <code class="inline">data/chroma_persist/</code> and
+        <code class="inline">ConceptBuilding/data/chroma_concept_building_lab/</code> (and the root
+        <code class="inline">**/chroma_persist/</code> pattern). If your clone is old, add:
+<pre><code>ConceptBuilding/data/chroma_concept_building_lab/</code></pre>
+        Delete the folder to reset labs; rebuild is intentional and cheap for six policy files.
+      </div>
+    </section>
+
+    <!-- ========== BEGINNER ========== -->
+    <section class="section" id="beginner">
+      <h2><span class="level beginner">Beginner</span> Client, collections, offline embeddings</h2>
+
+      <h3>1. PersistentClient vs ephemeral</h3>
+      <p>
+        June 2026 Python API (stable surface used in Week 2):
+      </p>
+<pre><code>import chromadb
+from pathlib import Path
+
+# In-memory only — gone when the process exits
+# client = chromadb.Client()
+
+PERSIST = Path("data/chroma_concept_building_lab").resolve()
+PERSIST.mkdir(parents=True, exist_ok=True)
+
+client = chromadb.PersistentClient(path=str(PERSIST))
+print(client.list_collections())
+print("Persist path:", PERSIST)</code></pre>
+      <p>
+        On open, Chroma loads existing collections from disk. On
+        <code class="inline">add</code> / <code class="inline">upsert</code>, it writes under
+        that path. Restart the kernel and the same
+        <code class="inline">PersistentClient(path=...)</code> recovers the index.
+      </p>
+
+      <div class="exercise" id="ex-b1">
+        <div class="ex-label">Exercise B1 · Create the lab client</div>
+        <p>
+          In a notebook with cwd <code class="inline">Week2/ConceptBuilding</code>, create
+          <code class="inline">PersistentClient</code> at
+          <code class="inline">data/chroma_concept_building_lab</code>. Print
+          <code class="inline">list_collections()</code> and confirm the folder exists on disk
+          (empty or with Chroma internals after first write).
+        </p>
+      </div>
+
+      <h3>2. Collections and get_or_create</h3>
+<pre><code>collection = client.get_or_create_collection(
+    name="policy_chunks_lab",
+    metadata={"hnsw:space": "cosine", "lane": "insurance", "lab": "concept_building_12"},
+)
+print(collection.name, collection.count())</code></pre>
+      <ul>
+        <li><code class="inline">create_collection</code> — fails if the name already exists.</li>
+        <li><code class="inline">get_or_create_collection</code> — idempotent; prefer this in labs.</li>
+        <li><code class="inline">get_collection</code> — fails if missing (good for “index must exist” checks).</li>
+        <li><code class="inline">delete_collection</code> — wipe one collection; folder may remain.</li>
+      </ul>
+
+      <div class="exercise" id="ex-b2">
+        <div class="ex-label">Exercise B2 · Collection lifecycle</div>
+        <p>
+          Call <code class="inline">get_or_create_collection("scratch_demo")</code>, print
+          <code class="inline">count()</code>, then <code class="inline">delete_collection</code>
+          and confirm it no longer appears in <code class="inline">list_collections()</code>.
+          Leave <code class="inline">policy_chunks_lab</code> alone for later exercises.
+        </p>
+      </div>
+
+      <h3>3. Offline embedding functions (June 2026)</h3>
+      <p>
+        If you omit an embedding function, Chroma’s <strong>default</strong> is local Sentence
+        Transformers <code class="inline">all-MiniLM-L6-v2</code> (downloads once). For explicit,
+        reproducible classroom code, attach
+        <code class="inline">SentenceTransformerEmbeddingFunction</code>:
+      </p>
+<pre><code>from chromadb.utils.embedding_functions import (
+    DefaultEmbeddingFunction,
+    SentenceTransformerEmbeddingFunction,
+)
+
+# Option A — default (still local MiniLM)
+# ef = DefaultEmbeddingFunction()
+
+# Option B — explicit (matches rebuilt Day 3 embedding contract)
+ef = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+
+collection = client.get_or_create_collection(
+    name="policy_chunks_lab",
+    embedding_function=ef,
+    metadata={"hnsw:space": "cosine"},
+)</code></pre>
+      <div class="callout">
+        <strong>Same function for add and query</strong>
+        The embedding function bound at collection create/get time encodes both documents and
+        <code class="inline">query_texts</code>. Do not mix OpenAI embeddings in one process and
+        MiniLM in another against the same persist dir — distances become meaningless.
+      </div>
+
+      <div class="exercise" id="ex-b3">
+        <div class="ex-label">Exercise B3 · Tiny upsert without files</div>
+        <p>
+          With the embedding function attached, upsert two toy documents with ids
+          <code class="inline">toy-1</code>, <code class="inline">toy-2</code>, metadata
+          <code class="inline">{"policy_id": "TOY", "heading": "demo"}</code>, then
+          <code class="inline">query(query_texts=["theft coverage"], n_results=1)</code>.
+          Print documents and distances. Delete those ids afterward with
+          <code class="inline">collection.delete(ids=[...])</code>.
+        </p>
+      </div>
+
+      <h3>4. add vs upsert vs update</h3>
+      <table>
+        <thead>
+          <tr><th>Method</th><th>Missing id</th><th>Existing id</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code class="inline">add</code></td><td>Inserts</td><td>Errors / rejects duplicate</td></tr>
+          <tr><td><code class="inline">update</code></td><td>Ignored / logged</td><td>Updates fields; re-embeds if documents change</td></tr>
+          <tr><td><code class="inline">upsert</code></td><td>Inserts</td><td>Updates — <strong>preferred for rebuilds</strong></td></tr>
+        </tbody>
+      </table>
+<pre><code>collection.upsert(
+    ids=["demo#covered-perils"],
+    documents=["Comprehensive coverage pays for theft, vandalism, fire, and hail."],
+    metadatas=[{"policy_id": "POL-AUTO-001", "heading": "Covered perils", "lane": "insurance"}],
+)
+print("count:", collection.count())</code></pre>
+    </section>
+
+    <!-- ========== INTERMEDIATE ========== -->
+    <section class="section" id="intermediate">
+      <h2><span class="level intermediate">Intermediate</span> Chunk policies, upsert, query, filters</h2>
+
+      <h3>5. Chunk <code class="inline">data/policies/*.md</code> by <code class="inline">##</code> headings</h3>
+      <p>
+        Mirror the classroom splitter: one chunk per <code class="inline">##</code> section,
+        stable ids, rich metadata for ACL and lineage.
+      </p>
+<pre><code>import re
+from pathlib import Path
+
+POLICIES = Path("data/policies")
+
+def slug(value: str) -&gt; str:
+    cleaned = re.sub(r"[^a-zA-Z0-9]+", "-", value.lower()).strip("-")
+    return cleaned or "section"
+
+def split_markdown(path: Path) -&gt; list[dict]:
+    text = path.read_text(encoding="utf-8")
+    policy_id = path.stem.split("_")[0]  # POL-AUTO-001_coverage -&gt; POL-AUTO-001
+    chunks, heading, buffer = [], "intro", []
+    for line in text.splitlines():
+        if line.startswith("## "):
+            if buffer:
+                body = "\n".join(buffer).strip()
+                if body:
+                    chunks.append({
+                        "chunk_id": f"{path.stem}#{slug(heading)}",
+                        "policy_id": policy_id,
+                        "source_file": path.name,
+                        "heading": heading,
+                        "text": body,
+                        "lane": "insurance",
+                        "version": "v1",
+                    })
+                buffer = []
+            heading = line[3:].strip()
+        else:
+            buffer.append(line)
+    body = "\n".join(buffer).strip()
+    if body:
+        chunks.append({
+            "chunk_id": f"{path.stem}#{slug(heading)}",
+            "policy_id": policy_id,
+            "source_file": path.name,
+            "heading": heading,
+            "text": body,
+            "lane": "insurance",
+            "version": "v1",
+        })
+    return chunks
+
+all_chunks = []
+for path in sorted(POLICIES.glob("*.md")):
+    all_chunks.extend(split_markdown(path))
+
+print(f"{len(list(POLICIES.glob('*.md')))} files → {len(all_chunks)} chunks")
+for c in all_chunks[:3]:
+    print(c["chunk_id"], "|", c["heading"], "|", c["text"][:60].replace("\n", " "), "...")</code></pre>
+
+      <div class="exercise" id="ex-i1">
+        <div class="ex-label">Exercise I1 · Inspect the chunk table</div>
+        <p>
+          Run the splitter on all six files. Print a small table:
+          <code class="inline">policy_id</code>, chunk count per policy, and unique
+          <code class="inline">heading</code> values. Confirm
+          <code class="inline">POL-AUTO-001</code> appears from both
+          <code class="inline">_coverage</code> and <code class="inline">_exclusions</code> files.
+        </p>
+      </div>
+
+      <h3>6. Upsert the full policy index</h3>
+<pre><code>from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+
+ef = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+collection = client.get_or_create_collection(
+    name="policy_chunks_lab",
+    embedding_function=ef,
+    metadata={"hnsw:space": "cosine"},
+)
+
+# Optional clean rebuild for the lab collection only
+existing = collection.get()
+if existing.get("ids"):
+    collection.delete(ids=existing["ids"])
+
+collection.upsert(
+    ids=[c["chunk_id"] for c in all_chunks],
+    documents=[c["text"] for c in all_chunks],
+    metadatas=[{
+        "policy_id": c["policy_id"],
+        "source_file": c["source_file"],
+        "heading": c["heading"],
+        "lane": c["lane"],
+        "version": c["version"],
+    } for c in all_chunks],
+)
+print("Indexed:", collection.count(), "→", PERSIST)</code></pre>
+      <p>
+        First run may download MiniLM weights (one-time). Subsequent upserts are fast.
+        Metadata values must be scalars (str / int / float / bool) — no nested dicts/lists.
+      </p>
+
+      <div class="exercise" id="ex-i2">
+        <div class="ex-label">Exercise I2 · Full upsert + persist smoke test</div>
+        <p>
+          Upsert all chunks into <code class="inline">policy_chunks_lab</code>. Restart the
+          kernel, reopen the same <code class="inline">PersistentClient</code> path with the
+          same embedding function, <code class="inline">get_collection</code>, and assert
+          <code class="inline">count()</code> equals your chunk list length. That is the
+          persistence proof for Day 3.
+        </p>
+      </div>
+
+      <h3>7. Semantic query with <code class="inline">query_texts</code></h3>
+<pre><code>def show_hits(results, title="hits"):
+    print(title)
+    for doc, meta, dist, cid in zip(
+        results["documents"][0],
+        results["metadatas"][0],
+        results["distances"][0],
+        results["ids"][0],
+    ):
+        print(f"  dist={dist:.4f} | {cid}")
+        print(f"    {meta['policy_id']} · {meta['heading']}")
+        print(f"    {doc[:120].replace(chr(10), ' ')}...")
+
+results = collection.query(
+    query_texts=["Is rental car reimbursement included after theft?"],
+    n_results=3,
+    include=["documents", "metadatas", "distances"],
+)
+show_hits(results, "Top-3 semantic")</code></pre>
+      <p>
+        With <code class="inline">hnsw:space: cosine</code>, smaller distance ≈ closer.
+        Always keep <code class="inline">ids</code> in the result for citations in grounded answers.
+      </p>
+
+      <div class="exercise" id="ex-i3">
+        <div class="ex-label">Exercise I3 · Three operator questions</div>
+        <p>
+          Query these and write which <code class="inline">chunk_id</code> you would cite:
+        </p>
+        <ol>
+          <li>flood / rising water on a homeowners policy</li>
+          <li>emergency room without prior authorization</li>
+          <li>wear and tear / mechanical breakdown exclusions on auto</li>
+        </ol>
+        <p>
+          For each, print top-2 ids + headings. Note any near-miss (wrong policy family).
+        </p>
+      </div>
+
+      <h3>8. Metadata <code class="inline">where</code> filters</h3>
+      <p>
+        Filters restrict the candidate set <em>before</em> / as part of ANN search — critical for
+        permission-aware retrieval (Day 3 AM ACL demos).
+      </p>
+<pre><code># Equality
+auto_only = collection.query(
+    query_texts=["deductible for comprehensive claims"],
+    n_results=3,
+    where={"policy_id": "POL-AUTO-001"},
+    include=["documents", "metadatas", "distances"],
+)
+show_hits(auto_only, "where policy_id = POL-AUTO-001")
+
+# $and / $or / $ne / $in (Chroma where operators)
+home_water = collection.query(
+    query_texts=["water damage from burst pipe"],
+    n_results=3,
+    where={
+        "$and": [
+            {"policy_id": {"$in": ["POL-HOME-010"]}},
+            {"lane": "insurance"},
+        ]
+    },
+    include=["documents", "metadatas", "distances"],
+)
+show_hits(home_water, "home + insurance lane")</code></pre>
+      <p>
+        Document content filters use <code class="inline">where_document</code>
+        (e.g. <code class="inline">{"$contains": "deductible"}</code>) — use sparingly; prefer
+        structured metadata for production ACL.
+      </p>
+
+      <div class="exercise" id="ex-i4">
+        <div class="ex-label">Exercise I4 · Filter vs no filter</div>
+        <p>
+          For query <em>“prior authorization for elective procedures”</em>, run once with no
+          <code class="inline">where</code> and once with
+          <code class="inline">where={"policy_id": "POL-HEALTH-020"}</code>. Compare top ids.
+          Explain in one sentence why agent tools should pass policy/lane filters when the
+          session already knows the product.
+        </p>
+      </div>
+
+      <h3>9. get / peek for debugging (not retrieval)</h3>
+<pre><code># Exact fetch by id — lineage / citation check
+got = collection.get(
+    ids=[all_chunks[0]["chunk_id"]],
+    include=["documents", "metadatas"],
+)
+print(got)
+
+# Peek sample
+print(collection.peek(limit=2))</code></pre>
+
+      <div class="exercise" id="ex-i5">
+        <div class="ex-label">Exercise I5 · Citation round-trip</div>
+        <p>
+          From a query result, take the winning <code class="inline">id</code>, call
+          <code class="inline">collection.get(ids=[...])</code>, and assert the document text
+          equals what <code class="inline">query</code> returned. This is the operator check
+          before you trust a grounded answer citation.
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== ADVANCED ========== -->
+    <section class="section" id="advanced">
+      <h2><span class="level advanced">Advanced</span> Rebuild, governance, agentic RAG hookup</h2>
+
+      <h3>10. Idempotent rebuild helper</h3>
+      <p>
+        Classroom pattern: env flag <code class="inline">REBUILD_INDEX</code>. For ConceptBuilding labs,
+        encapsulate chunk → upsert so you can wipe and refresh after editing markdown.
+      </p>
+<pre><code>import os
+
+def rebuild_policy_lab(client, persist_path: Path, collection_name: str = "policy_chunks_lab"):
+    """Chunk data/policies and upsert into a persistent collection."""
+    from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+
+    chunks = []
+    for path in sorted(Path("data/policies").glob("*.md")):
+        chunks.extend(split_markdown(path))
+    if not chunks:
+        raise SystemExit("No policy markdown under data/policies")
+
+    ef = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+    col = client.get_or_create_collection(name=collection_name, embedding_function=ef)
+    existing = col.get()
+    if existing.get("ids"):
+        col.delete(ids=existing["ids"])
+    col.upsert(
+        ids=[c["chunk_id"] for c in chunks],
+        documents=[c["text"] for c in chunks],
+        metadatas=[{
+            "policy_id": c["policy_id"],
+            "source_file": c["source_file"],
+            "heading": c["heading"],
+            "lane": c["lane"],
+            "version": c["version"],
+        } for c in chunks],
+    )
+    print(f"Rebuilt {collection_name} at {persist_path} ({len(chunks)} chunks)")
+    return col
+
+if os.getenv("REBUILD_INDEX", "true").lower() == "true":
+    collection = rebuild_policy_lab(client, PERSIST)</code></pre>
+
+      <div class="exercise" id="ex-a1">
+        <div class="ex-label">Exercise A1 · Edit → rebuild → re-query</div>
+        <p>
+          Temporarily append a unique phrase (e.g. your initials + “lab marker”) to one
+          <code class="inline">##</code> section in a <em>copy</em> of a policy file under
+          <code class="inline">data/policies/</code> <strong>or</strong> upsert a one-off chunk
+          with that phrase (prefer upsert if you do not want to dirty shared fixtures). Rebuild
+          or upsert, query the phrase, confirm the hit, then remove the lab chunk / revert.
+          Never commit edited fixtures.
+        </p>
+      </div>
+
+      <h3>11. Retrieve tool shape for agentic RAG</h3>
+      <p>
+        Single-pass RAG: retrieve once → stuff context → answer. Agentic RAG: the agent (or
+        LangGraph node) may re-query with a refined question, tighter
+        <code class="inline">where</code>, or higher <code class="inline">n_results</code> after a
+        grader says evidence is weak. Chroma is the <strong>tool backend</strong>, not the agent.
+      </p>
+<pre><code>from typing import Any
+
+def retrieve_policy(
+    question: str,
+    *,
+    n_results: int = 4,
+    policy_id: str | None = None,
+    collection=collection,
+) -&gt; list[dict[str, Any]]:
+    """Operator-facing retrieve tool — returns citation-ready dicts."""
+    where = {"policy_id": policy_id} if policy_id else None
+    raw = collection.query(
+        query_texts=[question],
+        n_results=n_results,
+        where=where,
+        include=["documents", "metadatas", "distances"],
+    )
+    hits = []
+    for i in range(len(raw["ids"][0])):
+        hits.append({
+            "chunk_id": raw["ids"][0][i],
+            "text": raw["documents"][0][i],
+            "metadata": raw["metadatas"][0][i],
+            "distance": raw["distances"][0][i],
+        })
+    return hits
+
+# --- agentic loop sketch (no LLM required for this module) ---
+question = "Does flood damage require a rider?"
+hits = retrieve_policy(question, n_results=3)
+enough = any("flood" in h["text"].lower() or "flood" in h["metadata"]["heading"].lower() for h in hits)
+if not enough:
+    hits = retrieve_policy(
+        "flood rider rising water exclusion homeowners",
+        n_results=5,
+        policy_id="POL-HOME-010",
+    )
+for h in hits:
+    print(h["chunk_id"], h["distance"], h["metadata"]["heading"])</code></pre>
+
+      <div class="exercise" id="ex-a2">
+        <div class="ex-label">Exercise A2 · Grade-then-requery without an LLM</div>
+        <p>
+          Implement a tiny grader: evidence is “strong” if the top hit distance &lt; 0.55
+          <em>and</em> at least one of the tokens <code class="inline">flood</code>,
+          <code class="inline">rental</code>, <code class="inline">prior auth</code> (match your
+          question) appears in the top-2 texts. Start with a vague question, show weak grade,
+          re-query with a sharpened question + <code class="inline">where</code>, show strong
+          grade. Print both traces — this is the Day 3 agentic RAG foundation without calling a
+          model.
+        </p>
+      </div>
+
+      <h3>12. Permission-aware metadata (preview of ACL retrieval)</h3>
+      <p>
+        Day 3 AM teaches filter-before-retrieve. Extend metadata now so later ACL demos are natural:
+      </p>
+<pre><code># Example: tag sensitivity when upserting (lab only)
+# metadatas include e.g. {"acl_role_min": "teller"} or {"audience": "internal"}
+
+# At query time — never trust the model to self-filter
+role = "teller"
+allowed = {"teller", "adjuster", "underwriter"}  # demo set
+assert role in allowed
+results = collection.query(
+    query_texts=["customer deductible"],
+    n_results=3,
+    where={"lane": "insurance"},  # stand-in; real ACL uses role-tagged metadata
+)</code></pre>
+      <div class="callout warn">
+        <strong>Never invent records</strong>
+        Vector hits are still facts only if the source markdown said so. Grounded answers must
+        cite <code class="inline">chunk_id</code> / <code class="inline">source_file</code>. If
+        retrieval is empty, the agent should say evidence is missing — not hallucinate a clause.
+      </div>
+
+      <div class="exercise" id="ex-a3">
+        <div class="ex-label">Exercise A3 · Empty-hit honesty</div>
+        <p>
+          Query with an impossible filter, e.g.
+          <code class="inline">where={"policy_id": "POL-DOES-NOT-EXIST"}</code>. Handle the empty
+          <code class="inline">ids[0]</code> list and return a structured message
+          <code class="inline">{"status": "no_evidence", "hits": []}</code>. That response shape
+          belongs in your retrieve tool contract before any generate node runs.
+        </p>
+      </div>
+
+      <h3>13. Tie-in map — ConceptBuilding lab → classroom Day 3</h3>
+      <table>
+        <thead>
+          <tr><th>This module</th><th>Classroom equivalent</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">data/policies/*.md</code></td>
+            <td><code class="inline">Week2/data/insurance/policies/</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">data/chroma_concept_building_lab/</code></td>
+            <td><code class="inline">data/chroma_persist/</code> (+ gitignore)</td>
+          </tr>
+          <tr>
+            <td><code class="inline">rebuild_policy_lab()</code></td>
+            <td><code class="inline">W2D3/W2D3AM/d3amt2c06_chroma_fallback.py</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">retrieve_policy()</code></td>
+            <td><code class="inline">W2D3/W2D3AM/d3amt1c03_bounded_langgraph_rag.py</code> uses native Pinecone retrieval; this helper is the Chroma-equivalent tool shape</td>
+          </tr>
+          <tr>
+            <td>Module 13–14</td>
+            <td>SentenceTransformers/CrossEncoder rerank + native-client/LangGraph agentic RAG; LlamaIndex remains supplemental</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="exercise" id="ex-a4">
+        <div class="ex-label">Exercise A4 · Operator one-pager</div>
+        <p>
+          In markdown in your notebook, write five bullets an ops lead would care about:
+          persist path, embedding model name, collection name, how to rebuild, and what is
+          gitignored. Keep it under 120 words. This is the handoff note before PM builds
+          retrieve → grade → generate on the same index.
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== CHECKLIST ========== -->
+    <section class="section" id="checklist">
+      <h2>Mastery checklist</h2>
+      <ul>
+        <li>☑ Open <code class="inline">PersistentClient</code> on a local path and recover after restart.</li>
+        <li>☑ Attach default or <code class="inline">SentenceTransformerEmbeddingFunction</code> (offline).</li>
+        <li>☑ Chunk all <code class="inline">data/policies/*.md</code> files by <code class="inline">##</code> headings.</li>
+        <li>☑ <code class="inline">upsert</code> with stable ids + scalar metadata; prefer upsert over add for rebuilds.</li>
+        <li>☑ <code class="inline">query</code> with <code class="inline">query_texts</code> and read distances + ids.</li>
+        <li>☑ Apply <code class="inline">where</code> / <code class="inline">$and</code> / <code class="inline">$in</code> filters.</li>
+        <li>☑ Keep <code class="inline">ConceptBuilding/data/chroma_concept_building_lab/</code> gitignored; never commit the index.</li>
+        <li>☑ Expose retrieval as a citation-ready tool that can re-query — agentic RAG foundation.</li>
+      </ul>
+      <div class="callout">
+        <strong>Next</strong>
+        Module 13 deepens embedding / CrossEncoder reranking. Module 14 is an optional LlamaIndex
+        comparison; rebuilt Day 3 teaching scripts use native Pinecone clients and LangGraph.
+      </div>
+    </section>
+
+    <footer class="nav-footer">
+      <a href="11_framework_landscape.html">← 11 · Framework landscape</a>
+      <a href="13_sentence_transformers.html">13 · Sentence Transformers →</a>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>07 — tenacity reliability (retries, backoff, fallback)</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">← Mastery index</a>
+      <span>
+        <a href="06_langgraph_checkpoint_hitl.html">Prev</a>
+        ·
+        <a href="08_claude_agent_sdk.html">Next</a>
+      </span>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">Week 2 · Day 2 AM · Module 07 · June 2026 APIs</div>
+      <h1>tenacity — retries, exponential backoff, model/path fallback</h1>
+      <p class="lead">
+        Production agents call flaky upstreams: carrier APIs time out, LLM providers
+        return 429s, secondary lookup paths degrade. <code class="inline">tenacity</code>
+        makes retry policy declarative. This module walks Beginner → Advanced with
+        offline simulators only — no network, no API keys. The running story is the
+        <strong>logistics lane</strong>: container status lookup with a primary path,
+        a cheaper fallback, step/cost budgets, and attempt logging.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">Offline demos</span>
+        <span class="chip">Logistics lane</span>
+        <span class="chip">retry · stop_after_attempt · wait_exponential</span>
+        <span class="chip">retry_if_exception_type</span>
+        <span class="chip">Copy into Jupyter</span>
+      </div>
+    </header>
+
+    <nav class="toc" id="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#why">Why retries belong in the agent scaffold</a></li>
+        <li><a href="#apis">June 2026 API map</a></li>
+        <li><a href="#ascii">ASCII mental model</a></li>
+        <li><a href="#beginner">Beginner — FlakyError &amp; basic @retry</a></li>
+        <li><a href="#intermediate">Intermediate — backoff, typing, logging</a></li>
+        <li><a href="#advanced">Advanced — fallback + budgets (logistics)</a></li>
+        <li><a href="#reference">Quick reference &amp; pitfalls</a></li>
+        <li><a href="#ship">Ship checklist</a></li>
+      </ol>
+    </nav>
+
+    <!-- ========== WHY ========== -->
+    <section class="section" id="why">
+      <h2>Why retries belong in the agent scaffold</h2>
+      <p>
+        Week 2 Day 2 PDF topic <strong>05 — Reliability engineering</strong> pairs with
+        the instructor demo at 14:40: <em>Retry + model fallback</em> on the logistics
+        lane. Retries are not “try harder forever.” They are a bounded policy:
+      </p>
+      <ul>
+        <li><strong>What</strong> to retry (transient only — e.g. <code class="inline">FlakyError</code>)</li>
+        <li><strong>How long</strong> to wait (exponential backoff, capped)</li>
+        <li><strong>When to stop</strong> (attempt cap, then fallback or fail)</li>
+        <li><strong>How much it costs</strong> (each attempt burns a step and/or USD)</li>
+      </ul>
+      <div class="callout">
+        <strong>Classroom fixture</strong>
+        Standalone companion to <code class="inline">Week2/W2D2/W2D2AM/d2amt5c02_reliable_workflow.py</code>.
+        Working directory for pasted cells: <code class="inline">Week2/ConceptBuilding</code>.
+        Install once: <code class="inline">uv pip install tenacity</code> (already in Week2 requirements).
+      </div>
+    </section>
+
+    <!-- ========== API MAP ========== -->
+    <section class="section" id="apis">
+      <h2>June 2026 API map</h2>
+      <p>
+        Stable imports used throughout this track. Prefer keyword args on
+        <code class="inline">@retry</code> — the decorator builds a
+        <code class="inline">Retrying</code> object under the hood.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Import / symbol</th><th>Role</th><th>Typical use</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">retry</code></td>
+            <td>Decorator / factory</td>
+            <td><code class="inline">@retry(stop=..., wait=..., retry=...)</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">stop_after_attempt(n)</code></td>
+            <td>Stop condition</td>
+            <td>Cap at n tries (includes the first call)</td>
+          </tr>
+          <tr>
+            <td><code class="inline">wait_exponential(...)</code></td>
+            <td>Wait strategy</td>
+            <td><code class="inline">multiplier</code>, <code class="inline">min</code>, <code class="inline">max</code> seconds</td>
+          </tr>
+          <tr>
+            <td><code class="inline">retry_if_exception_type(...)</code></td>
+            <td>Retry predicate</td>
+            <td>Only retry named exception types</td>
+          </tr>
+          <tr>
+            <td><code class="inline">reraise=True</code></td>
+            <td>Error surfacing</td>
+            <td>Re-raise the last exception (not wrapped <code class="inline">RetryError</code>)</td>
+          </tr>
+          <tr>
+            <td><code class="inline">before_sleep_log</code> / custom <code class="inline">before_sleep</code></td>
+            <td>Observability</td>
+            <td>Log attempt number before waiting</td>
+          </tr>
+          <tr>
+            <td><code class="inline">stop_after_delay</code>, <code class="inline">wait_random_exponential</code></td>
+            <td>Extras</td>
+            <td>Wall-clock cap; jittered backoff for thundering herds</td>
+          </tr>
+        </tbody>
+      </table>
+      <pre><code>from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log,
+)</code></pre>
+    </section>
+
+    <!-- ========== ASCII ========== -->
+    <section class="section" id="ascii">
+      <h2>ASCII mental model — logistics lookup</h2>
+<pre><code> Operator asks: "Status of container MSKU123?"
+                    |
+                    v
+         +---------------------+
+         |  primary_lookup()   |  &lt;-- carrier API (flaky)
+         +----------+----------+
+                    |
+         FlakyError?|--no--&gt; return {provider: primary, status: ...}
+                    |
+                   yes
+                    |
+         wait_exponential (capped)
+                    |
+         attempt &lt; N? --yes--&gt; retry primary
+                    |
+                   no (exhausted)
+                    |
+                    v
+         +---------------------+
+         | fallback_lookup()   |  &lt;-- cheaper / degraded path
+         +----------+----------+
+                    |
+                    v
+         {mode: fallback, status: unknown_degraded}
+
+ Parallel guardrails (outside tenacity, same run loop):
+   steps used  &lt;= MAX_STEPS
+   spent_usd   &lt;= MAX_BUDGET_USD
+</code></pre>
+      <div class="callout warn">
+        <strong>Do not retry write operations blindly</strong>
+        Hold releases and goodwill credits need an idempotency key and learner approval.
+        Retries are for <em>reads</em> and safe idempotent calls. Treat writes as HITL-gated.
+      </div>
+    </section>
+
+    <!-- ========== BEGINNER ========== -->
+    <section class="section" id="beginner">
+      <h2><span class="level beginner">Beginner</span> FlakyError simulator &amp; basic @retry</h2>
+      <p>
+        Goal: replace a manual <code class="inline">while</code> loop with
+        <code class="inline">@retry(stop=stop_after_attempt(...))</code>. All demos are
+        in-process counters — zero network.
+      </p>
+
+      <h3>Concept — FlakyError</h3>
+      <pre><code>class FlakyError(RuntimeError):
+    """Simulated transient upstream failure (timeout / 503)."""
+
+
+def primary_lookup(container_id: str, attempts: dict) -> dict:
+    attempts["primary"] += 1
+    if attempts["primary"] &lt; 3:
+        raise FlakyError("temporary upstream timeout")
+    return {
+        "provider": "primary",
+        "container_id": container_id,
+        "status": "in_transit",
+    }</code></pre>
+
+      <h3>Concept — first successful retry</h3>
+      <pre><code>from tenacity import retry, stop_after_attempt
+
+attempts = {"n": 0}
+
+@retry(stop=stop_after_attempt(3))
+def unstable_read() -> str:
+    attempts["n"] += 1
+    if attempts["n"] &lt; 2:
+        raise RuntimeError("transient read failure")
+    return "data-ok"
+
+attempts["n"] = 0
+print(unstable_read(), "after", attempts["n"], "attempt(s)")
+# Expected: data-ok after 2 attempt(s)</code></pre>
+
+      <!-- B1 -->
+      <div class="exercise" id="b1">
+        <div class="ex-label">Exercise B1 — Install check</div>
+        <p>In a notebook cell, import the four core symbols and print each object’s module.</p>
+        <pre><code>from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+for name, obj in [
+    ("retry", retry),
+    ("stop_after_attempt", stop_after_attempt),
+    ("wait_exponential", wait_exponential),
+    ("retry_if_exception_type", retry_if_exception_type),
+]:
+    print(name, "->", obj.__module__)</code></pre>
+      </div>
+
+      <!-- B2 -->
+      <div class="exercise" id="b2">
+        <div class="ex-label">Exercise B2 — Manual loop vs tenacity</div>
+        <p>
+          Write a manual retry loop for <code class="inline">primary_lookup("MSKU001", attempts)</code>
+          that retries up to 3 times on <code class="inline">FlakyError</code>. Then rewrite it with
+          <code class="inline">@retry(stop=stop_after_attempt(3), reraise=True)</code>. Confirm both return
+          <code class="inline">in_transit</code> and <code class="inline">attempts["primary"] == 3</code>.
+        </p>
+      </div>
+
+      <!-- B3 -->
+      <div class="exercise" id="b3">
+        <div class="ex-label">Exercise B3 — Attempt counting semantics</div>
+        <p>
+          With <code class="inline">stop_after_attempt(3)</code>, does “3” mean 3 retries after the first
+          call, or 3 total calls? Prove it by printing the counter on every entry and forcing
+          perpetual failure. Document the answer in a one-line comment.
+        </p>
+        <pre><code># Hint: stop_after_attempt(N) = N total attempts (first + retries).
+@retry(stop=stop_after_attempt(3), reraise=True)
+def always_fail():
+    print("entered")
+    raise FlakyError("nope")</code></pre>
+      </div>
+
+      <!-- B4 -->
+      <div class="exercise" id="b4">
+        <div class="ex-label">Exercise B4 — Succeed on attempt 1</div>
+        <p>
+          Build a lookup that never raises. Wrap it in <code class="inline">@retry(stop=stop_after_attempt(5))</code>.
+          Assert the attempt counter stays at 1 — retries must not run on success.
+        </p>
+      </div>
+
+      <!-- B5 -->
+      <div class="exercise" id="b5">
+        <div class="ex-label">Exercise B5 — Nested attempts dict</div>
+        <p>
+          Pass a shared <code class="inline">attempts = {"primary": 0}</code> into
+          <code class="inline">primary_lookup</code>. Decorate an inner function
+          <code class="inline">_primary()</code> (pattern from the Day 2 demo). Return
+          <code class="inline">{"attempts": attempts, "result": ...}</code>.
+        </p>
+      </div>
+
+      <!-- B6 -->
+      <div class="exercise" id="b6">
+        <div class="ex-label">Exercise B6 — Container ID echo</div>
+        <p>
+          Parameterize the retried function so <code class="inline">container_id</code> is an argument.
+          Call it for <code class="inline">"MSKU123"</code> and <code class="inline">"MSKU789"</code>
+          with a fresh attempts dict each time. Confirm the id appears in the result.
+        </p>
+      </div>
+
+      <!-- B7 -->
+      <div class="exercise" id="b7">
+        <div class="ex-label">Exercise B7 — Fail after cap</div>
+        <p>
+          Change the simulator so primary never succeeds. Catch the exception after
+          <code class="inline">stop_after_attempt(2)</code> with <code class="inline">reraise=True</code>.
+          Print <code class="inline">type(exc).__name__</code> and the attempts count.
+        </p>
+      </div>
+
+      <!-- B8 -->
+      <div class="exercise" id="b8">
+        <div class="ex-label">Exercise B8 — RetryError vs reraise</div>
+        <p>
+          Call the same always-failing function once with default <code class="inline">reraise=False</code>
+          and once with <code class="inline">reraise=True</code>. Catch and print the exception type
+          each time. Which wraps in <code class="inline">tenacity.RetryError</code>?
+        </p>
+      </div>
+
+      <!-- B9 -->
+      <div class="exercise" id="b9">
+        <div class="ex-label">Exercise B9 — ASCII timeline</div>
+        <p>
+          Draw (in a markdown cell or comment block) an ASCII timeline for a function that fails twice
+          then succeeds under <code class="inline">stop_after_attempt(4)</code>. Label attempt numbers
+          and the final return.
+        </p>
+<pre><code>t --&gt;  [1 fail]  [2 fail]  [3 ok]  stop
+         ^         ^         ^
+       attempt   attempt   attempt</code></pre>
+      </div>
+
+      <!-- B10 -->
+      <div class="exercise" id="b10">
+        <div class="ex-label">Exercise B10 — Mini quiz cell</div>
+        <p>Answer True/False in code (assert your answers):</p>
+        <pre><code>quiz = {
+    "retries_replace_idempotency_keys": False,  # TODO: keep or flip
+    "stop_after_attempt_counts_first_call": True,
+    "tenacity_requires_network": False,
+}
+# Replace values if wrong, then:
+assert quiz["retries_replace_idempotency_keys"] is False
+assert quiz["stop_after_attempt_counts_first_call"] is True
+assert quiz["tenacity_requires_network"] is False
+print("B10 ok")</code></pre>
+      </div>
+    </section>
+
+    <!-- ========== INTERMEDIATE ========== -->
+    <section class="section" id="intermediate">
+      <h2><span class="level intermediate">Intermediate</span> Backoff, typed retries, attempt logging</h2>
+      <p>
+        Goal: only retry transient errors, space attempts with
+        <code class="inline">wait_exponential</code>, and log each sleep so operators see
+        what the agent is waiting on.
+      </p>
+
+      <h3>Concept — wait_exponential</h3>
+      <pre><code>import time
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+times: list[float] = []
+
+@retry(
+    stop=stop_after_attempt(4),
+    wait=wait_exponential(multiplier=0.05, min=0.05, max=0.2),
+)
+def call_with_backoff() -> str:
+    times.append(time.time())
+    if len(times) &lt; 3:
+        raise ConnectionError("503 service unavailable")
+    return "success"
+
+print(call_with_backoff())
+gaps = [round(times[i] - times[i - 1], 3) for i in range(1, len(times))]
+print("Wait gaps (s):", gaps)
+# Classroom tip: keep multiplier tiny so demos finish in &lt;1s.</code></pre>
+
+      <h3>Concept — retry_if_exception_type</h3>
+      <pre><code>from tenacity import retry_if_exception_type
+
+@retry(
+    reraise=True,
+    stop=stop_after_attempt(3),
+    retry=retry_if_exception_type(FlakyError),
+)
+def call_carrier(simulate: str) -> str:
+    if simulate == "timeout":
+        raise FlakyError("upstream timeout")
+    if simulate == "bad_id":
+        raise ValueError("invalid container id — do not retry")
+    return "ok"
+
+# ValueError must fail immediately (1 attempt). FlakyError may retry.</code></pre>
+
+      <h3>Concept — logging attempts with before_sleep</h3>
+      <pre><code>import logging
+from tenacity import before_sleep_log
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("logistics.retry")
+
+@retry(
+    reraise=True,
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=0.05, min=0.05, max=0.1),
+    retry=retry_if_exception_type(FlakyError),
+    before_sleep=before_sleep_log(log, logging.INFO),
+)
+def flaky_status(container_id: str) -> dict:
+    ...</code></pre>
+
+      <p>Custom callback (often clearer in notebooks than stdlib logging):</p>
+      <pre><code>def log_attempt(retry_state):
+    exc = retry_state.outcome.exception() if retry_state.outcome else None
+    print(
+        f"[retry] attempt={retry_state.attempt_number} "
+        f"next_wait={retry_state.next_action.sleep if retry_state.next_action else None} "
+        f"exc={type(exc).__name__ if exc else None}"
+    )
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=0.05, min=0.05, max=0.1),
+    before_sleep=log_attempt,
+    reraise=True,
+)
+def demo():
+    raise FlakyError("blip")</code></pre>
+
+      <!-- I1 -->
+      <div class="exercise" id="i1">
+        <div class="ex-label">Exercise I1 — Measure backoff gaps</div>
+        <p>
+          Use <code class="inline">wait_exponential(multiplier=0.1, min=0.1, max=0.4)</code> and
+          fail twice before success. Record timestamps; print gaps. Gaps should roughly double
+          until they hit <code class="inline">max</code>.
+        </p>
+      </div>
+
+      <!-- I2 -->
+      <div class="exercise" id="i2">
+        <div class="ex-label">Exercise I2 — Typed retry only</div>
+        <p>
+          Decorate a function that raises <code class="inline">FlakyError</code> or
+          <code class="inline">ValueError</code> based on an argument. With
+          <code class="inline">retry=retry_if_exception_type(FlakyError)</code>, prove
+          <code class="inline">ValueError</code> exits on attempt 1 and <code class="inline">FlakyError</code>
+          consumes the full attempt budget.
+        </p>
+      </div>
+
+      <!-- I3 -->
+      <div class="exercise" id="i3">
+        <div class="ex-label">Exercise I3 — Tuple of exception types</div>
+        <p>
+          Retry on <code class="inline">(FlakyError, TimeoutError, ConnectionError)</code>.
+          Raise each type on successive runs (reset a counter) and confirm all three are retried.
+          Raise <code class="inline">PermissionError</code> and confirm it is not.
+        </p>
+      </div>
+
+      <!-- I4 -->
+      <div class="exercise" id="i4">
+        <div class="ex-label">Exercise I4 — before_sleep print logger</div>
+        <p>
+          Implement <code class="inline">log_attempt(retry_state)</code> as above. Force 3 failures.
+          Your printed lines must show attempt numbers 1 and 2 (sleep happens before retries,
+          not after the final failure).
+        </p>
+      </div>
+
+      <!-- I5 -->
+      <div class="exercise" id="i5">
+        <div class="ex-label">Exercise I5 — before_sleep_log</div>
+        <p>
+          Wire <code class="inline">before_sleep_log(logger, logging.WARNING)</code>. Capture output
+          with a <code class="inline">logging.StreamHandler</code> writing to a
+          <code class="inline">io.StringIO</code>. Assert the buffer contains the word
+          <code class="inline">Retrying</code> or your function name after a flaky call.
+        </p>
+      </div>
+
+      <!-- I6 -->
+      <div class="exercise" id="i6">
+        <div class="ex-label">Exercise I6 — wait=None demo speed</div>
+        <p>
+          Compare wall time for <code class="inline">stop_after_attempt(5)</code> with
+          <code class="inline">wait_exponential(...)</code> vs no wait (default
+          <code class="inline">wait_none</code>). Use <code class="inline">time.perf_counter()</code>.
+          Classroom rule: keep waits ≤ 0.2s max for runtime-tested demos.
+        </p>
+      </div>
+
+      <!-- I7 -->
+      <div class="exercise" id="i7">
+        <div class="ex-label">Exercise I7 — Shared policy helper</div>
+        <p>
+          Write <code class="inline">def with_carrier_retry(fn)</code> decorated once with the
+          logistics policy (3 attempts, exponential wait, FlakyError only). Call it with two
+          different callables: shipment status and ETA probe. One policy, many tools.
+        </p>
+        <pre><code>@retry(
+    reraise=True,
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=0.05, min=0.05, max=0.2),
+    retry=retry_if_exception_type(FlakyError),
+)
+def with_carrier_retry(fn):
+    return fn()</code></pre>
+      </div>
+
+      <!-- I8 -->
+      <div class="exercise" id="i8">
+        <div class="ex-label">Exercise I8 — stop_after_delay</div>
+        <p>
+          Import <code class="inline">stop_after_delay</code>. Combine with a tiny wait so a
+          perpetual <code class="inline">FlakyError</code> stops by wall clock (~0.3s), not by
+          attempt count. Print how many attempts ran.
+        </p>
+        <pre><code>from tenacity import stop_after_delay
+# stop=stop_after_delay(0.3)</code></pre>
+      </div>
+
+      <!-- I9 -->
+      <div class="exercise" id="i9">
+        <div class="ex-label">Exercise I9 — shipment_events peek (offline data)</div>
+        <p>
+          Read the first event from <code class="inline">data/shipment_events.jsonl</code>
+          (path relative to <code class="inline">ConceptBuilding/</code>).
+          Wrap a parser that raises <code class="inline">FlakyError</code> on the first open, then succeeds.
+          Use tenacity so the file is eventually read. Print <code class="inline">container_id</code>
+          or whatever key exists in the JSON line.
+        </p>
+      </div>
+
+      <!-- I10 -->
+      <div class="exercise" id="i10">
+        <div class="ex-label">Exercise I10 — Do-not-retry matrix</div>
+        <p>Build a table in code mapping error → retry?</p>
+        <pre><code>matrix = {
+    "FlakyError": True,
+    "ConnectionError": True,
+    "TimeoutError": True,
+    "ValueError": False,
+    "PermissionError": False,
+    "KeyError": False,  # bad tool args — fix the call, don't spin
+}
+assert matrix["FlakyError"] and not matrix["ValueError"]
+print("I10 matrix ok")</code></pre>
+      </div>
+    </section>
+
+    <!-- ========== ADVANCED ========== -->
+    <section class="section" id="advanced">
+      <h2><span class="level advanced">Advanced</span> Primary → fallback + step/cost budgets</h2>
+      <p>
+        Goal: compose the full Day 2 reliability story — retry primary, fall back when exhausted,
+        and hard-stop the agent loop when step or spend budgets trip. Pure Python; offline.
+      </p>
+
+      <h3>Concept — primary then fallback</h3>
+      <pre><code>from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+class FlakyError(RuntimeError):
+    """Simulated transient upstream failure."""
+
+
+def primary_lookup(container_id: str, attempts: dict) -> dict:
+    attempts["primary"] += 1
+    if attempts["primary"] &lt; 3:
+        raise FlakyError("temporary upstream timeout")
+    return {
+        "provider": "primary",
+        "container_id": container_id,
+        "status": "in_transit",
+    }
+
+
+def fallback_lookup(container_id: str, attempts: dict) -> dict:
+    attempts["fallback"] += 1
+    return {
+        "provider": "fallback",
+        "container_id": container_id,
+        "status": "unknown_degraded",
+        "note": "Returned by fallback after primary retries failed.",
+    }
+
+
+def lookup_with_reliability(container_id: str) -> dict:
+    attempts = {"primary": 0, "fallback": 0}
+
+    @retry(
+        reraise=True,
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=0.05, min=0.05, max=0.2),
+        retry=retry_if_exception_type(FlakyError),
+    )
+    def _primary() -> dict:
+        return primary_lookup(container_id, attempts)
+
+    try:
+        result = _primary()
+        mode = "primary_after_retry"
+    except FlakyError:
+        result = fallback_lookup(container_id, attempts)
+        mode = "fallback"
+
+    return {"mode": mode, "attempts": attempts, "result": result}
+
+
+print(lookup_with_reliability("MSKU123"))
+# mode primary_after_retry, attempts primary=3, fallback=0</code></pre>
+
+      <h3>Concept — step &amp; cost budgets</h3>
+      <pre><code>MAX_STEPS = 3
+MAX_BUDGET_USD = 0.05
+
+def run_with_budgets(steps: list[dict]) -> dict:
+    spent = 0.0
+    completed = []
+    stop_reason = "completed"
+    for index, step in enumerate(steps, start=1):
+        if index &gt; MAX_STEPS:
+            stop_reason = "max_steps"
+            break
+        spent += float(step["cost_usd"])
+        if spent &gt; MAX_BUDGET_USD:
+            stop_reason = "max_budget_usd"
+            break
+        completed.append(step)
+    return {
+        "completed_steps": len(completed),
+        "spent_usd": round(spent, 4),
+        "stop_reason": stop_reason,
+        "limits": {"max_steps": MAX_STEPS, "max_budget_usd": MAX_BUDGET_USD},
+    }</code></pre>
+
+<pre><code> Agent loop (one turn)
+ -------------------------------------------------
+ | plan -&gt; tool call -&gt; observe -&gt; ...            |
+ |                                               |
+ | each tool call:                               |
+ |   1) budget gate (steps / USD)                |
+ |   2) tenacity retry on primary path           |
+ |   3) on exhaustion -&gt; fallback path           |
+ |   4) log attempts for the operator summary    |
+ -------------------------------------------------</code></pre>
+
+      <!-- A1 -->
+      <div class="exercise" id="a1">
+        <div class="ex-label">Exercise A1 — Port the Day 2 demo</div>
+        <p>
+          Copy <code class="inline">lookup_with_reliability</code> and
+          <code class="inline">run_with_budgets</code> into a notebook. Run
+          <code class="inline">lookup_with_reliability("MSKU123")</code>. Assert
+          <code class="inline">mode == "primary_after_retry"</code> and
+          <code class="inline">attempts == {"primary": 3, "fallback": 0}</code>.
+        </p>
+      </div>
+
+      <!-- A2 -->
+      <div class="exercise" id="a2">
+        <div class="ex-label">Exercise A2 — Force fallback</div>
+        <p>
+          Implement an <code class="inline">always_fail</code> primary with
+          <code class="inline">stop_after_attempt(2)</code>. On <code class="inline">FlakyError</code>,
+          call <code class="inline">fallback_lookup("MSKU789", ...)</code>. Assert
+          <code class="inline">mode == "fallback"</code>, <code class="inline">primary == 2</code>,
+          <code class="inline">fallback == 1</code>, and status
+          <code class="inline">unknown_degraded</code>.
+        </p>
+      </div>
+
+      <!-- A3 -->
+      <div class="exercise" id="a3">
+        <div class="ex-label">Exercise A3 — Model-path fallback sketch</div>
+        <p>
+          Simulate “model fallback” without calling an LLM: <code class="inline">primary_model()</code>
+          raises <code class="inline">FlakyError</code> three times;
+          <code class="inline">fallback_model()</code> returns a short degraded string
+          <code class="inline">"ETA unavailable — try later"</code>. Same control flow as path fallback.
+          Name the modes <code class="inline">primary_model</code> / <code class="inline">fallback_model</code>.
+        </p>
+      </div>
+
+      <!-- A4 -->
+      <div class="exercise" id="a4">
+        <div class="ex-label">Exercise A4 — Charge cost per attempt</div>
+        <p>
+          Extend the attempts dict with <code class="inline">"spent_usd": 0.0</code>. Each primary
+          attempt costs <code class="inline">0.01</code>; fallback costs <code class="inline">0.002</code>.
+          After <code class="inline">lookup_with_reliability</code>, assert spent equals
+          <code class="inline">0.03</code> on the success-after-retry path.
+        </p>
+      </div>
+
+      <!-- A5 -->
+      <div class="exercise" id="a5">
+        <div class="ex-label">Exercise A5 — Combine retry with run_with_budgets</div>
+        <p>
+          Build a fake plan of tool steps where each primary attempt is a step. If retries would
+          push past <code class="inline">MAX_STEPS</code>, abort before calling fallback and set
+          <code class="inline">stop_reason = "max_steps"</code>. Prove budgets win over “one more retry.”
+        </p>
+      </div>
+
+      <!-- A6 -->
+      <div class="exercise" id="a6">
+        <div class="ex-label">Exercise A6 — Budget stop reasons</div>
+        <p>Run the three fixtures from the Day 2 script and assert stop reasons:</p>
+        <pre><code>assert run_with_budgets([
+    {"tool": "lookup", "cost_usd": 0.01},
+    {"tool": "lookup", "cost_usd": 0.01},
+    {"tool": "lookup", "cost_usd": 0.01},
+])["stop_reason"] == "completed"
+
+assert run_with_budgets([
+    {"tool": "lookup", "cost_usd": 0.01},
+    {"tool": "lookup", "cost_usd": 0.01},
+    {"tool": "lookup", "cost_usd": 0.01},
+    {"tool": "write", "cost_usd": 0.01},
+])["stop_reason"] == "max_steps"
+
+assert run_with_budgets([
+    {"tool": "heavy", "cost_usd": 0.10},
+])["stop_reason"] == "max_budget_usd"</code></pre>
+      </div>
+
+      <!-- A7 -->
+      <div class="exercise" id="a7">
+        <div class="ex-label">Exercise A7 — Operator-facing summary</div>
+        <p>
+          Write <code class="inline">format_reliability_summary(payload: dict) -&gt; str</code> that prints
+          a concise operator line, e.g.
+          <code class="inline">MSKU123 | mode=primary_after_retry | attempts=p3/f0 | status=in_transit</code>.
+          Keep it one line — matches the Agentic Ops “operator-facing” rule.
+        </p>
+      </div>
+
+      <!-- A8 -->
+      <div class="exercise" id="a8">
+        <div class="ex-label">Exercise A8 — Hold release must not auto-retry</div>
+        <p>
+          Simulate <code class="inline">release_hold(shipment_id, idempotency_key)</code>. On first call
+          raise <code class="inline">FlakyError</code>. Show that wrapping it in blind
+          <code class="inline">@retry</code> is dangerous if the first call actually committed.
+          Instead: catch once, require a new idempotency key or learner approval flag
+          <code class="inline">approved=True</code> before a second attempt. Document the rule in a comment.
+        </p>
+      </div>
+
+      <!-- A9 -->
+      <div class="exercise" id="a9">
+        <div class="ex-label">Exercise A9 — JSON artifact like the lab</div>
+        <p>
+          Assemble a payload with keys
+          <code class="inline">retry_then_success</code>,
+          <code class="inline">retry_then_fallback</code>,
+          <code class="inline">budget_completed</code>,
+          <code class="inline">budget_max_steps</code>,
+          <code class="inline">budget_max_spend</code>.
+          Write it to
+          <code class="inline">outputs/reliability_notebook.json</code>
+          under your notebook cwd (create the folder). Print the path.
+        </p>
+      </div>
+
+      <!-- A10 -->
+      <div class="exercise" id="a10">
+        <div class="ex-label">Exercise A10 — Full offline integration</div>
+        <p>
+          Single cell that: (1) defines FlakyError + primary/fallback, (2) logs attempts via
+          <code class="inline">before_sleep</code>, (3) runs success and forced-fallback cases,
+          (4) runs all three budget scenarios, (5) prints a 5-line operator report. No network.
+          This is your Day 2 “retry + model fallback” dry run.
+        </p>
+<pre><code>=== reliability report ===
+success:  mode=... attempts=...
+fallback: mode=... attempts=...
+budget:   completed / max_steps / max_budget_usd
+==========================</code></pre>
+      </div>
+
+      <!-- A11 -->
+      <div class="exercise" id="a11">
+        <div class="ex-label">Exercise A11 — Optional jitter</div>
+        <p>
+          Import <code class="inline">wait_random_exponential</code> (June 2026 tenacity). Compare
+          five gap samples against plain <code class="inline">wait_exponential</code> with the same
+          min/max. Explain in one sentence when jitter helps (many agents sharing a rate limit).
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== REFERENCE ========== -->
+    <section class="section" id="reference">
+      <h2>Quick reference &amp; pitfalls</h2>
+      <table>
+        <thead><tr><th>Pattern</th><th>Snippet</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Minimal retry</td>
+            <td><code class="inline">@retry(stop=stop_after_attempt(3))</code></td>
+          </tr>
+          <tr>
+            <td>Backoff</td>
+            <td><code class="inline">wait=wait_exponential(multiplier=0.05, min=0.05, max=0.2)</code></td>
+          </tr>
+          <tr>
+            <td>Typed</td>
+            <td><code class="inline">retry=retry_if_exception_type(FlakyError)</code></td>
+          </tr>
+          <tr>
+            <td>Reraise last</td>
+            <td><code class="inline">reraise=True</code></td>
+          </tr>
+          <tr>
+            <td>Log sleeps</td>
+            <td><code class="inline">before_sleep=before_sleep_log(log, logging.INFO)</code></td>
+          </tr>
+          <tr>
+            <td>Fallback</td>
+            <td><code class="inline">try: primary() except FlakyError: fallback()</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout warn">
+        <strong>Pitfalls</strong>
+        Retrying non-idempotent writes · retrying validation errors · uncapped
+        <code class="inline">stop_never</code> in production · long classroom waits · forgetting
+        that each retry consumes step/cost budget · swallowing errors without operator summary.
+      </div>
+    </section>
+
+    <!-- ========== SHIP ========== -->
+    <section class="section" id="ship">
+      <h2>Ship checklist (Day 2 reliability)</h2>
+      <ul>
+        <li><code class="inline">FlakyError</code> simulator fails then succeeds under <code class="inline">@retry</code></li>
+        <li>Only transient types retried via <code class="inline">retry_if_exception_type</code></li>
+        <li><code class="inline">wait_exponential</code> capped for demos and for production</li>
+        <li>Primary exhaustion → fallback path (degraded status or cheaper model)</li>
+        <li>Attempts logged (<code class="inline">before_sleep</code> or custom)</li>
+        <li>Step and USD budgets hard-stop the loop</li>
+        <li>Write tools (hold release) stay approval + idempotency gated — not blind-retried</li>
+      </ul>
+      <div class="callout">
+        <strong>Next module</strong>
+        <a href="08_claude_agent_sdk.html">08 — Claude Agent SDK</a> (query vs client, tools, sessions, hooks).
+        Retries stay in <em>your</em> code; hooks stay deterministic.
+      </div>
+    </section>
+
+    <div class="nav-footer">
+      <a href="06_langgraph_checkpoint_hitl.html">← 06 LangGraph checkpoint &amp; HITL</a>
+      <a href="../index.html">Mastery index</a>
+      <a href="08_claude_agent_sdk.html">08 Claude Agent SDK →</a>
+    </div>
+  </div>
+</body>
+</html>

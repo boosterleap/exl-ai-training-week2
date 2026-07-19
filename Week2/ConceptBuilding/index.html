@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Week 2 Mastery Track — Libraries & Concepts</title>
+  <link rel="stylesheet" href="css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="eyebrow">EXL CampusHire · Week 2 · Instructor prep</div>
+      <h1>Agentic AI mastery track</h1>
+      <p class="lead">
+        Chronological, blog-style HTML modules from absolute beginner to classroom-ready mastery.
+        Each page has Beginner → Intermediate → Advanced sections with many small, notebook-ready
+        exercises. APIs and library patterns target June 2026. Lab fixtures live in
+        <code class="inline">ConceptBuilding/data/</code>.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">Open HTML in browser</span>
+        <span class="chip">Copy code into Jupyter</span>
+        <span class="chip">Paths relative to Week2/ConceptBuilding</span>
+        <span class="chip">Windows PowerShell + Ubuntu bash</span>
+        <span class="chip">Maps to week2_instructor_guide.html</span>
+      </div>
+    </header>
+
+    <section class="section">
+      <h2>How to use</h2>
+      <ol>
+        <li>From <code class="inline">Week2</code>: create/activate venv and
+          <code class="inline">uv pip install -r requirements.txt</code>
+          (Module 01 shows Windows and Ubuntu activation).</li>
+        <li>Install a Jupyter kernel (module 01), open a blank notebook, set working directory
+          to <code class="inline">Week2/ConceptBuilding</code> (or adjust paths).</li>
+        <li>Work modules in order. Do every exercise before advancing a level.</li>
+        <li>When a module needs API keys, copy <code class="inline">Week2/.env.example</code>
+          to <code class="inline">Week2/.env</code> — never commit secrets.</li>
+      </ol>
+      <div class="os-pair">
+        <div class="os-label windows">Windows PowerShell — .env once</div>
+        <pre class="os-windows"><code># cwd: Week2
+copy .env.example .env</code></pre>
+        <div class="os-label ubuntu">Ubuntu / bash — .env once</div>
+        <pre class="os-ubuntu"><code># cwd: Week2
+cp .env.example .env</code></pre>
+      </div>
+      <div class="callout">
+        <strong>Data already copied here</strong>
+        Policy markdown, shipment events, FNOL CSV, inventory, supplier KG, goldens, delay events,
+        claim narratives, workflow cases, and customer session threads are under
+        <code class="inline">ConceptBuilding/data/</code>.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Modules (chronological)</h2>
+      <div class="module-grid">
+        <a class="module-card" href="modules/01_uv_jupyter_env.html"><div class="num">01</div><h3>uv + Jupyter</h3><p>Learner environment, kernel, notebook paths.</p></a>
+        <a class="module-card" href="modules/02_dotenv_provider_budgets.html"><div class="num">02</div><h3>dotenv &amp; budgets</h3><p>LLM_PROVIDER, keys, step/token/spend knobs.</p></a>
+        <a class="module-card" href="modules/03_pydantic_contracts.html"><div class="num">03</div><h3>Pydantic</h3><p>Schemas, tool contracts, structured outputs.</p></a>
+        <a class="module-card" href="modules/04_provider_routing.html"><div class="num">04</div><h3>Provider routing</h3><p>One codebase: Anthropic vs OpenRouter.</p></a>
+        <a class="module-card" href="modules/05_langchain_core_providers.html"><div class="num">05</div><h3>LangChain core</h3><p>Messages, tools, OpenAI/Anthropic chat models.</p></a>
+        <a class="module-card" href="modules/06_langgraph_checkpoint_hitl.html"><div class="num">06</div><h3>LangGraph</h3><p>Graphs, checkpoints, HITL, memory, multi-agent.</p></a>
+        <a class="module-card" href="modules/07_tenacity_reliability.html"><div class="num">07</div><h3>Tenacity</h3><p>Retries, backoff, model fallback.</p></a>
+        <a class="module-card" href="modules/08_claude_agent_sdk.html"><div class="num">08</div><h3>Claude Agent SDK</h3><p>query vs client, tools, sessions, hooks.</p></a>
+        <a class="module-card" href="modules/09_mcp_servers_clients.html"><div class="num">09</div><h3>MCP</h3><p>In-process and Streamable HTTP MCP.</p></a>
+        <a class="module-card" href="modules/10_a2a_agent_cards.html"><div class="num">10</div><h3>A2A Agent Cards</h3><p>Identity, skills, auth, local handoff.</p></a>
+        <a class="module-card" href="modules/11_framework_landscape.html"><div class="num">11</div><h3>Framework landscape</h3><p>CrewAI, ADK, Agents SDK, managed runtimes.</p></a>
+        <a class="module-card" href="modules/12_chromadb.html"><div class="num">12</div><h3>ChromaDB</h3><p>Local persistent vector index.</p></a>
+        <a class="module-card" href="modules/13_sentence_transformers.html"><div class="num">13</div><h3>Sentence Transformers</h3><p>Embeddings and cross-encoder rerank.</p></a>
+        <a class="module-card" href="modules/14_llama_index_rag.html"><div class="num">14</div><h3>LlamaIndex</h3><p>Agentic RAG workflows with Chroma.</p></a>
+        <a class="module-card" href="modules/15_networkx_graphrag.html"><div class="num">15</div><h3>NetworkX GraphRAG</h3><p>Multi-hop supplier knowledge graphs.</p></a>
+        <a class="module-card" href="modules/16_diskcache_semantic.html"><div class="num">16</div><h3>diskcache</h3><p>Semantic / retrieval response cache.</p></a>
+        <a class="module-card" href="modules/17_github_actions_eval.html"><div class="num">17</div><h3>GitHub Actions eval</h3><p>Mocked trajectory CI, no API spend.</p></a>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Week 2 day mapping</h2>
+      <table>
+        <thead><tr><th>Day</th><th>Primary modules</th></tr></thead>
+        <tbody>
+          <tr><td>D1 foundations + tool agent</td><td>01–06, 08</td></tr>
+          <tr><td>D2 orchestration + MCP/A2A</td><td>06–11</td></tr>
+          <tr><td>D3 RAG + memory + cache</td><td>06, 12–16</td></tr>
+          <tr><td>D4 eval / CI preview</td><td>17 (+ later Presidio/LangSmith deep dives if added)</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</body>
+</html>

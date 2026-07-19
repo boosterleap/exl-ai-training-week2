@@ -1,0 +1,74 @@
+{
+  "narratives": [
+    {
+      "narrative_id": "NAR-001",
+      "claim_id": "CLM-424063",
+      "text": "Insured reports rear-end collision at a city intersection. Airbags deployed. No injuries reported. Photos and police report attached.",
+      "intake_queue": "fnol_intake",
+      "adjudication_hint": "standard_auto"
+    },
+    {
+      "narrative_id": "NAR-002",
+      "claim_id": "CLM-748422",
+      "text": "Water damage from burst pipe on second floor. Contents inventory incomplete. Temporary housing requested.",
+      "intake_queue": "property_intake",
+      "adjudication_hint": "needs_estimate"
+    },
+    {
+      "narrative_id": "NAR-003",
+      "claim_id": "CLM-255335",
+      "text": "Theft from locked vehicle overnight. Laptop and tools stolen. Prior theft claim within 12 months.",
+      "intake_queue": "fnol_intake",
+      "adjudication_hint": "fraud_review"
+    },
+    {
+      "narrative_id": "NAR-004",
+      "claim_id": "CLM-901122",
+      "text": "Windstorm damaged commercial roof. Temporary tarp in place. Business interruption claimed for three days.",
+      "intake_queue": "property_intake",
+      "adjudication_hint": "commercial_property"
+    },
+    {
+      "narrative_id": "NAR-005",
+      "claim_id": "CLM-333210",
+      "text": "Slip and fall in retail aisle. Customer seeking medical expenses. CCTV available.",
+      "intake_queue": "liability_intake",
+      "adjudication_hint": "liability_review"
+    },
+    {
+      "narrative_id": "NAR-006",
+      "claim_id": "CLM-667788",
+      "text": "Cargo shipment delayed due to weather. Partial spoilage reported for refrigerated goods.",
+      "intake_queue": "cargo_intake",
+      "adjudication_hint": "cargo_delay"
+    },
+    {
+      "narrative_id": "NAR-007",
+      "claim_id": "CLM-112233",
+      "text": "Cyber incident: ransomware on billing workstation. Systems restored from backup. No confirmed data exfiltration.",
+      "intake_queue": "cyber_intake",
+      "adjudication_hint": "cyber_triage"
+    },
+    {
+      "narrative_id": "NAR-008",
+      "claim_id": "CLM-445566",
+      "text": "Glass breakage at storefront after overnight vandalism. Alarm did not trigger. Suspect vehicle on nearby camera.",
+      "intake_queue": "property_intake",
+      "adjudication_hint": "standard_property"
+    },
+    {
+      "narrative_id": "NAR-009",
+      "claim_id": "CLM-778899",
+      "text": "Employee injury during loading dock operations. Workers compensation notice filed. Safety review requested.",
+      "intake_queue": "liability_intake",
+      "adjudication_hint": "wc_referral"
+    },
+    {
+      "narrative_id": "NAR-010",
+      "claim_id": "CLM-990011",
+      "text": "Hail damage to vehicle fleet parked outdoors. Multiple units affected. Repair estimates pending.",
+      "intake_queue": "fnol_intake",
+      "adjudication_hint": "fleet_batch"
+    }
+  ]
+}

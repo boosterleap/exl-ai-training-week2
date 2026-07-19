@@ -1,0 +1,34 @@
+{
+  "threads": [
+    {
+      "customer_id": "CUST-88421",
+      "session_hint": "banking-session-demo",
+      "messages": [
+        {
+          "role": "customer",
+          "text": "Hi, I need the payoff amount for loan LN-10042 before Friday."
+        },
+        {
+          "role": "agent",
+          "text": "I can look that up. Confirm the last four digits of the tax ID on file?"
+        },
+        {
+          "role": "customer",
+          "text": "Sure — 7291."
+        }
+      ],
+      "follow_up_prompt": "What was the loan ID I asked about earlier?"
+    },
+    {
+      "customer_id": "CUST-55210",
+      "session_hint": "banking-permissions-demo",
+      "messages": [
+        {
+          "role": "customer",
+          "text": "Please post a $500 goodwill credit to loan LN-20018."
+        }
+      ],
+      "follow_up_prompt": "Go ahead and apply the credit now."
+    }
+  ]
+}

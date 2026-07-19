@@ -1,0 +1,86 @@
+# Week 2 — single environment (install once from Week2 repo root)
+#   cd Week2
+#   uv venv
+#   uv pip install -r requirements.txt
+#
+# Must-have libraries only — mapped to instructor guide (AM / PM per day).
+# Re-run after git pull when this file is updated:
+#   uv pip install -r requirements.txt
+#
+# Prerequisites: Python 3.11+. Week 1 concepts assumed; this file is self-contained for Week 2 labs.
+
+# ── Core (all days) ──
+python-dotenv>=1.0
+pydantic>=2.0
+ipykernel>=6.29
+jupyterlab>=4.0
+
+# ── W2D1 AM — live LangGraph agent foundations ──
+langgraph>=1.0,<2.0
+langchain-core>=1.0,<2.0
+langchain-anthropic>=1.0,<2.0
+langchain-openai>=0.3
+anthropic>=0.40
+openai>=1.40
+
+# ── W2D1 PM — live Claude Agent SDK agent + typed MCP tools ──
+claude-agent-sdk>=0.1
+mcp[cli]>=1.0
+
+# ── W2D2 required framework primers ──
+crewai[anthropic]>=1.15,<1.16
+google-adk>=2.4,<3.0
+agent-framework>=1.0,<2.0
+azure-identity>=1.17
+
+# ── W2D2 AM — LangGraph checkpointing, SDK hooks, reliability ──
+langgraph-checkpoint-sqlite>=2.0
+tenacity>=9.0
+
+# ── W2D2 PM — MCP, A2A, and resumable workflow ──
+a2a-sdk>=1.1,<2.0
+sse-starlette>=2.0
+# (also uses mcp and langgraph — already above)
+
+# ── W2D3 AM — Agentic RAG, hybrid search, GraphRAG concept, ACL retrieval ──
+llama-index>=0.12
+llama-index-vector-stores-chroma>=0.4
+llama-index-embeddings-huggingface>=0.4
+llama-index-llms-anthropic>=0.6
+llama-index-llms-openai>=0.3
+llama-index-readers-file>=0.4
+pinecone>=9.1,<10.0
+pgvector>=0.5,<0.6
+psycopg[binary]>=3.3,<4.0
+chromadb>=0.5
+sentence-transformers>=3.0
+networkx>=3.0
+pypdf>=4.0
+pyarrow>=15.0
+
+# ── W2D3 PM — Session memory, semantic cache, event-driven hooks ──
+diskcache>=5.6
+fastapi>=0.115
+uvicorn>=0.30
+httpx>=0.27
+
+# ── W2D4 AM — Guardrails, secrets hygiene, reliability patterns ──
+presidio-analyzer>=2.2
+presidio-anonymizer>=2.2
+spacy>=3.8
+
+# ── W2D4 PM — LangSmith tracing, trajectory evals, eval-gated CI ──
+langsmith>=0.3
+pytest>=8.0
+ragas==0.2.14
+langchain-community>=0.3.27,<0.4
+datasets>=3.0
+
+# ── W2D5 AM — ROI instrumentation, FastAPI demo wrapper ──
+mlflow>=2.20
+
+# ── W2D5 PM — Governance pack, fairness check, capstone brief ──
+fairlearn>=0.10
+
+# After install (Day 4+ Presidio labs):
+#   uv run python -m spacy download en_core_web_sm

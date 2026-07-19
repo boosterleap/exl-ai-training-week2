@@ -1,0 +1,24 @@
+{
+  "version": "1.0",
+  "tiers": {
+    "low": {
+      "description": "Assistive, reversible, no material customer impact",
+      "required_controls": ["logging", "owner", "quality_check"]
+    },
+    "medium": {
+      "description": "Recommendation influences an operational decision",
+      "required_controls": ["logging", "human_review", "evidence", "rollback"]
+    },
+    "high": {
+      "description": "Regulated, safety, employment, credit, or consequential decision",
+      "required_controls": ["approval", "audit", "explainability", "appeal", "monitoring"]
+    }
+  },
+  "use_cases": [
+    {"id": "cx-faq", "name": "Customer FAQ assistant", "tier": "low", "autonomy": "assist"},
+    {"id": "shipment-hold", "name": "Release shipment hold", "tier": "medium", "autonomy": "approve"},
+    {"id": "claims-triage", "name": "Insurance claim triage", "tier": "high", "autonomy": "recommend"},
+    {"id": "credit-decision", "name": "Credit eligibility decision", "tier": "high", "autonomy": "human_decides"},
+    {"id": "coding-agent", "name": "Repository coding assistant", "tier": "medium", "autonomy": "review"}
+  ]
+}

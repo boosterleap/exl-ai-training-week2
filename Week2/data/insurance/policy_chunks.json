@@ -1,0 +1,235 @@
+{
+  "chunks": [
+    {
+      "chunk_id": "POL-AUTO-001_coverage#intro",
+      "policy_id": "POL-AUTO-001",
+      "source_file": "POL-AUTO-001_coverage.md",
+      "heading": "intro",
+      "text": "# POL-AUTO-001 Comprehensive Auto Coverage\n\nPolicy type: comprehensive auto\nEffective: 2026-01-01",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-AUTO-001_coverage#covered-perils",
+      "policy_id": "POL-AUTO-001",
+      "source_file": "POL-AUTO-001_coverage.md",
+      "heading": "Covered perils",
+      "text": "Comprehensive coverage pays for damage to the insured vehicle from non-collision events,\nincluding theft, vandalism, fire, hail, and falling objects.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-AUTO-001_coverage#rental-reimbursement",
+      "policy_id": "POL-AUTO-001",
+      "source_file": "POL-AUTO-001_coverage.md",
+      "heading": "Rental reimbursement",
+      "text": "If the insured vehicle is stolen or declared a total loss, the policy reimburses rental\ncar expenses up to USD 40 per day for 30 days when the driver reports theft within\n24 hours and cooperates with law enforcement.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-AUTO-001_coverage#out-of-state-use",
+      "policy_id": "POL-AUTO-001",
+      "source_file": "POL-AUTO-001_coverage.md",
+      "heading": "Out-of-state use",
+      "text": "Vehicles garaged in the home state remain covered while temporarily used in other US\nstates for up to 90 consecutive days. Permanent relocation requires notifying the\ncarrier within 10 days.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-AUTO-001_coverage#deductible",
+      "policy_id": "POL-AUTO-001",
+      "source_file": "POL-AUTO-001_coverage.md",
+      "heading": "Deductible",
+      "text": "Comprehensive claims are subject to a USD 500 deductible unless a waiver rider applies.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-AUTO-001_exclusions#intro",
+      "policy_id": "POL-AUTO-001",
+      "source_file": "POL-AUTO-001_exclusions.md",
+      "heading": "intro",
+      "text": "# POL-AUTO-001 Exclusions and Limits\n\nPolicy type: comprehensive auto\nRelated policy: POL-AUTO-001",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-AUTO-001_exclusions#general-exclusions",
+      "policy_id": "POL-AUTO-001",
+      "source_file": "POL-AUTO-001_exclusions.md",
+      "heading": "General exclusions",
+      "text": "The policy does not cover intentional damage, racing, or commercial ride-share use\nwithout a commercial rider.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-AUTO-001_exclusions#rental-car-limits",
+      "policy_id": "POL-AUTO-001",
+      "source_file": "POL-AUTO-001_exclusions.md",
+      "heading": "Rental car limits",
+      "text": "Rental reimbursement does not apply when the vehicle is available for repair within\n72 hours, or when the driver lives outside the rated garaging state without an\nout-of-state rider on file.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-AUTO-001_exclusions#theft-reporting",
+      "policy_id": "POL-AUTO-001",
+      "source_file": "POL-AUTO-001_exclusions.md",
+      "heading": "Theft reporting",
+      "text": "Theft claims require a police report number. Delay beyond 24 hours may reduce rental\nreimbursement to 15 days.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-HEALTH-020_emergency#intro",
+      "policy_id": "POL-HEALTH-020",
+      "source_file": "POL-HEALTH-020_emergency.md",
+      "heading": "intro",
+      "text": "# POL-HEALTH-020 Emergency Services\n\nPolicy type: group health\nRelated policy: POL-HEALTH-020",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-HEALTH-020_emergency#emergency-definition",
+      "policy_id": "POL-HEALTH-020",
+      "source_file": "POL-HEALTH-020_emergency.md",
+      "heading": "Emergency definition",
+      "text": "Emergency services are covered when a prudent layperson would believe delay would\nseriously jeopardize health, including severe chest pain and major trauma.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-HEALTH-020_emergency#post-stabilization",
+      "policy_id": "POL-HEALTH-020",
+      "source_file": "POL-HEALTH-020_emergency.md",
+      "heading": "Post-stabilization",
+      "text": "After stabilization, non-emergency services at out-of-network facilities may require\ntransfer or prior auth for continued inpatient days beyond 48 hours.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-HEALTH-020_prior_auth#intro",
+      "policy_id": "POL-HEALTH-020",
+      "source_file": "POL-HEALTH-020_prior_auth.md",
+      "heading": "intro",
+      "text": "# POL-HEALTH-020 Prior Authorization\n\nPolicy type: group health\nEffective: 2026-01-01",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-HEALTH-020_prior_auth#imaging-services",
+      "policy_id": "POL-HEALTH-020",
+      "source_file": "POL-HEALTH-020_prior_auth.md",
+      "heading": "Imaging services",
+      "text": "MRI and CT scans require prior authorization when ordered outside an emergency visit.\nEmergency imaging is covered without prior auth when documented within 48 hours.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-HEALTH-020_prior_auth#specialty-referrals",
+      "policy_id": "POL-HEALTH-020",
+      "source_file": "POL-HEALTH-020_prior_auth.md",
+      "heading": "Specialty referrals",
+      "text": "Specialist visits require PCP referral except for OB/GYN and behavioral health per\nstate mandate addendum POL-HEALTH-020-BH.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-HEALTH-020_prior_auth#turnaround",
+      "policy_id": "POL-HEALTH-020",
+      "source_file": "POL-HEALTH-020_prior_auth.md",
+      "heading": "Turnaround",
+      "text": "Standard prior auth decisions publish within 72 hours; urgent requests within 24 hours.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-HOME-010_flood_rider#intro",
+      "policy_id": "POL-HOME-010",
+      "source_file": "POL-HOME-010_flood_rider.md",
+      "heading": "intro",
+      "text": "# POL-HOME-FLOOD Flood Rider\n\nPolicy type: homeowners rider\nParent policy: POL-HOME-010",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-HOME-010_flood_rider#scope",
+      "policy_id": "POL-HOME-010",
+      "source_file": "POL-HOME-010_flood_rider.md",
+      "heading": "Scope",
+      "text": "Covers flood as defined by FEMA, including storm surge, when the rider is active and\nthe property is in an enrolled flood zone.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-HOME-010_flood_rider#not-covered",
+      "policy_id": "POL-HOME-010",
+      "source_file": "POL-HOME-010_flood_rider.md",
+      "heading": "Not covered",
+      "text": "Sewer backup without simultaneous flood event remains excluded unless POL-HOME-SEWER\nrider is attached.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-HOME-010_water#intro",
+      "policy_id": "POL-HOME-010",
+      "source_file": "POL-HOME-010_water.md",
+      "heading": "intro",
+      "text": "# POL-HOME-010 Water Damage Coverage\n\nPolicy type: homeowners\nEffective: 2026-01-01",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-HOME-010_water#burst-pipe-coverage",
+      "policy_id": "POL-HOME-010",
+      "source_file": "POL-HOME-010_water.md",
+      "heading": "Burst pipe coverage",
+      "text": "Sudden and accidental discharge from plumbing systems, including burst pipes, is\ncovered up to USD 10,000 after the USD 1,000 deductible.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-HOME-010_water#gradual-seepage-exclusion",
+      "policy_id": "POL-HOME-010",
+      "source_file": "POL-HOME-010_water.md",
+      "heading": "Gradual seepage exclusion",
+      "text": "Gradual seepage, maintenance neglect, and flood (defined separately) are excluded.\nFlood coverage requires POL-HOME-FLOOD rider.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    },
+    {
+      "chunk_id": "POL-HOME-010_water#documentation",
+      "policy_id": "POL-HOME-010",
+      "source_file": "POL-HOME-010_water.md",
+      "heading": "Documentation",
+      "text": "Claims must include photos, plumber invoice, and date-of-loss within 14 days.",
+      "lane": "insurance",
+      "indexed_at": "2026-07-16",
+      "version": "v1"
+    }
+  ],
+  "count": 23
+}

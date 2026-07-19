@@ -1,0 +1,21 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local secrets and lab outputs
+.env
+**/outputs/
+**/__pycache__/
+*.db
+*.parquet
+data/chroma_persist/
+ConceptBuilding/data/chroma_concept_building_lab/
+ConceptBuilding/**/__pycache__/
+ConceptBuilding/**/.cache/

@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>15 · NetworkX GraphRAG — supplier knowledge graph</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">← Mastery index</a>
+      <span>
+        <a href="14_llama_index_rag.html">← 14 LlamaIndex</a>
+        <a href="16_diskcache_semantic.html">16 diskcache →</a>
+      </span>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">Module 15 · Day 3 AM · GraphRAG concept</div>
+      <h1>NetworkX GraphRAG — multi-hop supplier KG</h1>
+      <p class="lead">
+        Learn relationship-aware retrieval with an in-memory directed knowledge graph.
+        You will load <code class="inline">data/supplier_kg.json</code>, traverse
+        supplier → warehouse → SKU hops with NetworkX, and understand how graph paths
+        combine with vector hits — without Neo4j or any paid graph database.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">networkx · June 2026</span>
+        <span class="chip">nx.DiGraph</span>
+        <span class="chip">NOT Neo4j Aura</span>
+        <span class="chip">~3–5× cost vs flat RAG</span>
+        <span class="chip">Fixture: data/supplier_kg.json</span>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="Table of contents">
+      <h2>On this page</h2>
+      <ol>
+        <li><a href="#why">Why GraphRAG (and when not)</a></li>
+        <li><a href="#fixture">The supplier KG fixture</a></li>
+        <li><a href="#beginner">Beginner — DiGraph, nodes, relation edges</a></li>
+        <li><a href="#intermediate">Intermediate — hops, paths, neighbors</a></li>
+        <li><a href="#advanced">Advanced — hybrid GraphRAG assembly</a></li>
+        <li><a href="#checklist">Classroom checklist</a></li>
+      </ol>
+    </nav>
+
+    <!-- ========== WHY ========== -->
+    <section class="section" id="why">
+      <h2>Why GraphRAG (and when not)</h2>
+      <p>
+        Flat vector RAG answers “what documents are similar to this question?”
+        GraphRAG answers “how are these entities related across one or more hops?”
+        In supply-chain ops that difference matters: a learner asking
+        <em>“Which warehouse sits between EuroParts and the hydraulic pump?”</em>
+        needs edges, not just chunk similarity.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Layer</th>
+            <th>Job</th>
+            <th>Tool in this lab</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Vector index</td>
+            <td>Find candidate entities / docs by meaning</td>
+            <td>Pinecone / SentenceTransformers (primary); Chroma alternative in module 12</td>
+          </tr>
+          <tr>
+            <td>Knowledge graph</td>
+            <td>Traverse typed relations for multi-hop context</td>
+            <td><strong>NetworkX DiGraph</strong> (this module)</td>
+          </tr>
+          <tr>
+            <td>Answer assembly</td>
+            <td>Merge vector hits + path facts into grounded text</td>
+            <td>Your agent / notebook glue</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn">
+        <strong>Cost note (~3–5×)</strong>
+        GraphRAG is typically about 3–5× more expensive than flat vector RAG:
+        more retrieval steps, more tokens of path context, and often an extra LLM
+        call to decide which entities to expand. Use it when relationships matter
+        (supplier → warehouse → SKU). Skip it for FAQ-style single-hop questions.
+      </div>
+
+      <div class="callout">
+        <strong>Why NetworkX, not Neo4j?</strong>
+        Day 3 implements the graph path at classroom depth. An in-memory
+        <code class="inline">nx.DiGraph</code> loads from JSON in milliseconds,
+        needs no Aura credentials, and exposes the same mental model
+        (nodes, typed edges, shortest path, predecessors / successors).
+        Production teams may later swap the store for Neo4j / Neptune — the
+        traversal ideas stay the same.
+      </div>
+    </section>
+
+    <!-- ========== FIXTURE ========== -->
+    <section class="section" id="fixture">
+      <h2>The supplier KG fixture</h2>
+      <p>
+        Working directory for copy-paste cells: <code class="inline">Week2/ConceptBuilding</code>.
+        The graph lives at <code class="inline">data/supplier_kg.json</code>
+        (same content as <code class="inline">Week2/data/supply/supplier_kg.json</code>).
+      </p>
+
+      <h3>Nodes (6)</h3>
+      <table>
+        <thead>
+          <tr><th>id</th><th>type</th><th>name</th><th>notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code class="inline">SUP-001</code></td><td>supplier</td><td>NorthStar Components</td><td>US-MW</td></tr>
+          <tr><td><code class="inline">SUP-002</code></td><td>supplier</td><td>EuroParts GmbH</td><td>EU</td></tr>
+          <tr><td><code class="inline">SUP-003</code></td><td>supplier</td><td>Pacific Backup Supply</td><td>US-W · backup role</td></tr>
+          <tr><td><code class="inline">SKU-1002</code></td><td>sku</td><td>Brake Pad Kit</td><td>automotive</td></tr>
+          <tr><td><code class="inline">SKU-2044</code></td><td>sku</td><td>Hydraulic Pump</td><td>industrial</td></tr>
+          <tr><td><code class="inline">WH-EU-01</code></td><td>warehouse</td><td>Frankfurt Hub</td><td>EU</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Edges (5) — each carries a <code class="inline">relation</code></h3>
+      <table>
+        <thead>
+          <tr><th>source</th><th>target</th><th>relation</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>SUP-001</td><td>SKU-1002</td><td><code class="inline">supplies</code></td></tr>
+          <tr><td>SUP-002</td><td>SKU-2044</td><td><code class="inline">supplies</code></td></tr>
+          <tr><td>SUP-003</td><td>SKU-1002</td><td><code class="inline">backup_supplier_for</code></td></tr>
+          <tr><td>SUP-002</td><td>WH-EU-01</td><td><code class="inline">ships_via</code></td></tr>
+          <tr><td>WH-EU-01</td><td>SKU-2044</td><td><code class="inline">stores</code></td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        Sketch for SKU-2044 (the classroom demo path):
+      </p>
+<pre><code>SUP-002 (EuroParts)
+   │ supplies          │ ships_via
+   ▼                   ▼
+SKU-2044 ◄── stores ── WH-EU-01 (Frankfurt Hub)</code></pre>
+    </section>
+
+    <!-- ========== BEGINNER ========== -->
+    <section class="section" id="beginner">
+      <h2>
+        Beginner — DiGraph, nodes, relation edges
+        <span class="level beginner">Beginner</span>
+      </h2>
+      <p>
+        Goal: load JSON into a directed graph and prove that edge attributes
+        (especially <code class="inline">relation</code>) survive the load.
+        NetworkX June 2026 API used here is stable:
+        <code class="inline">nx.DiGraph</code>,
+        <code class="inline">add_node</code>,
+        <code class="inline">add_edge</code>,
+        attribute access via <code class="inline">G.nodes[id]</code> and
+        <code class="inline">G[u][v]["relation"]</code>.
+      </p>
+
+      <h3>1. Import and load the fixture</h3>
+<pre><code>import json
+from pathlib import Path
+import networkx as nx
+
+# Working dir: Week2/ConceptBuilding
+kg_path = Path("data/supplier_kg.json")
+payload = json.loads(kg_path.read_text(encoding="utf-8"))
+
+print(payload.keys())          # dict_keys(['nodes', 'edges'])
+print(len(payload["nodes"]))   # 6
+print(len(payload["edges"]))   # 5</code></pre>
+
+      <h3>2. Build a DiGraph (direction matters)</h3>
+      <p>
+        Use <code class="inline">DiGraph</code>, not undirected
+        <code class="inline">Graph</code>. Supply edges point
+        supplier → SKU / warehouse; reversing them would invent false facts.
+      </p>
+<pre><code>G = nx.DiGraph()
+
+for node in payload["nodes"]:
+    # id is the graph key; remaining fields become node attributes
+    G.add_node(node["id"], **{k: v for k, v in node.items() if k != "id"})
+
+for edge in payload["edges"]:
+    G.add_edge(
+        edge["source"],
+        edge["target"],
+        relation=edge["relation"],
+    )
+
+print("nodes", G.number_of_nodes())   # 6
+print("edges", G.number_of_edges())   # 5
+print("is_directed", G.is_directed()) # True</code></pre>
+
+      <h3>3. Inspect node and edge attributes</h3>
+<pre><code># Node attributes
+print(G.nodes["SUP-002"])
+# {'type': 'supplier', 'name': 'EuroParts GmbH', 'region': 'EU'}
+
+# Edge attribute: the relation string
+print(G["SUP-002"]["SKU-2044"]["relation"])  # supplies
+print(G["SUP-003"]["SKU-1002"]["relation"])  # backup_supplier_for
+
+# List every typed edge
+for u, v, data in G.edges(data=True):
+    print(f"{u} -[{data['relation']}]-> {v}")</code></pre>
+
+      <div class="callout">
+        <strong>Operator tip</strong>
+        Always store business meaning on the edge
+        (<code class="inline">relation=...</code>). Counting neighbors without
+        filtering by relation will mix primary suppliers with backup suppliers
+        and confuse the answer.
+      </div>
+
+      <div class="exercise" id="ex1">
+        <div class="ex-label">Exercise B1 · Load &amp; count</div>
+        <p>
+          Load <code class="inline">data/supplier_kg.json</code> into an
+          <code class="inline">nx.DiGraph</code>. Print node count, edge count,
+          and a sorted list of all node ids. Confirm you get 6 nodes and 5 edges.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex2">
+        <div class="ex-label">Exercise B2 · Relation inventory</div>
+        <p>
+          Collect the set of unique <code class="inline">relation</code> values
+          on all edges. Expected:
+          <code class="inline">{'backup_supplier_for', 'ships_via', 'stores', 'supplies'}</code>.
+          Then print every edge whose relation is
+          <code class="inline">supplies</code>.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex3">
+        <div class="ex-label">Exercise B3 · Filter nodes by type</div>
+        <p>
+          Write a helper
+          <code class="inline">nodes_of_type(G, type_name) -&gt; list[str]</code>
+          that returns ids where
+          <code class="inline">G.nodes[n]["type"] == type_name</code>.
+          Call it for <code class="inline">"supplier"</code>,
+          <code class="inline">"sku"</code>, and
+          <code class="inline">"warehouse"</code>. How many of each?
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== INTERMEDIATE ========== -->
+    <section class="section" id="intermediate">
+      <h2>
+        Intermediate — hops, paths, neighbors
+        <span class="level intermediate">Intermediate</span>
+      </h2>
+      <p>
+        Goal: answer multi-hop questions with
+        <code class="inline">predecessors</code>,
+        <code class="inline">successors</code>, and
+        <code class="inline">nx.shortest_path</code>.
+        These three calls are the core of
+        <code class="inline">W2D3/W2D3AM/d3amt3c01_networkx_traversal.py</code>. The next steps
+        add SentenceTransformer vector-seeded expansion and an Anthropic API cited answer.
+      </p>
+
+      <h3>4. Predecessors and successors</h3>
+      <p>
+        In a DiGraph, direction is absolute:
+      </p>
+      <ul>
+        <li><code class="inline">G.predecessors(n)</code> — nodes with an edge <em>into</em> <code class="inline">n</code></li>
+        <li><code class="inline">G.successors(n)</code> — nodes with an edge <em>out of</em> <code class="inline">n</code></li>
+      </ul>
+<pre><code># Who points at the hydraulic pump?
+list(G.predecessors("SKU-2044"))
+# ['SUP-002', 'WH-EU-01']
+
+# What does EuroParts point at?
+list(G.successors("SUP-002"))
+# ['SKU-2044', 'WH-EU-01']
+
+# Filter predecessors that are suppliers
+suppliers_for_sku = [
+    n for n in G.predecessors("SKU-2044")
+    if G.nodes[n].get("type") == "supplier"
+]
+print(suppliers_for_sku)  # ['SUP-002']</code></pre>
+
+      <h3>5. Relation-aware neighbor queries</h3>
+<pre><code>def neighbors_with_relation(G, node, relation, direction="out"):
+    """Return neighbor ids connected by a specific relation string."""
+    if direction == "out":
+        return [
+            v for _, v, data in G.out_edges(node, data=True)
+            if data.get("relation") == relation
+        ]
+    return [
+        u for u, _, data in G.in_edges(node, data=True)
+        if data.get("relation") == relation
+    ]
+
+print(neighbors_with_relation(G, "SKU-1002", "backup_supplier_for", "in"))
+# ['SUP-003']
+
+print(neighbors_with_relation(G, "SUP-002", "ships_via", "out"))
+# ['WH-EU-01']</code></pre>
+
+      <h3>6. Shortest path between entities</h3>
+      <p>
+        <code class="inline">nx.shortest_path(G, source, target)</code> returns a
+        list of node ids along the fewest hops (unweighted). Catch
+        <code class="inline">nx.NetworkXNoPath</code> when no directed path exists.
+      </p>
+<pre><code># EuroParts → Frankfurt Hub is a single ships_via hop
+nx.shortest_path(G, "SUP-002", "WH-EU-01")
+# ['SUP-002', 'WH-EU-01']
+
+# EuroParts can also reach the SKU via the warehouse:
+# SUP-002 → WH-EU-01 → SKU-2044
+nx.shortest_path(G, "SUP-002", "SKU-2044")
+# ['SUP-002', 'SKU-2044']   # direct supplies edge is shorter
+
+# No path the other way (DiGraph!)
+try:
+    nx.shortest_path(G, "SKU-2044", "SUP-002")
+except nx.NetworkXNoPath:
+    print("no reverse path — direction encodes business fact")</code></pre>
+
+      <h3>7. Classroom multi-hop query (SKU-2044)</h3>
+      <p>
+        Pattern used in the day-3 demo: find suppliers, backup suppliers,
+        warehouses reachable from those suppliers, then sample shortest paths.
+      </p>
+<pre><code>sku = "SKU-2044"
+
+suppliers = [
+    n for n in G.predecessors(sku)
+    if G.nodes[n].get("type") == "supplier"
+]
+
+backup = [
+    n for n in G.nodes
+    if G.nodes[n].get("type") == "supplier"
+    and G.has_edge(n, sku)
+    and G[n][sku].get("relation") == "backup_supplier_for"
+]
+
+warehouses = []
+for supplier in suppliers:
+    for wh in G.successors(supplier):
+        if G.nodes[wh].get("type") == "warehouse":
+            warehouses.append(wh)
+
+paths = []
+for supplier in suppliers:
+    for wh in warehouses:
+        try:
+            paths.append(nx.shortest_path(G, supplier, wh))
+        except nx.NetworkXNoPath:
+            pass
+
+print("suppliers", suppliers)     # ['SUP-002']
+print("backup", backup)           # [] for SKU-2044
+print("warehouses", warehouses)   # ['WH-EU-01']
+print("paths", paths)             # [['SUP-002', 'WH-EU-01']]</code></pre>
+
+      <div class="exercise" id="ex4">
+        <div class="ex-label">Exercise I1 · Predecessors of SKU-1002</div>
+        <p>
+          List all predecessors of <code class="inline">SKU-1002</code>.
+          Split them into primary suppliers
+          (<code class="inline">relation == "supplies"</code>) vs backup
+          (<code class="inline">relation == "backup_supplier_for"</code>).
+          You should find NorthStar (primary) and Pacific Backup (backup).
+        </p>
+      </div>
+
+      <div class="exercise" id="ex5">
+        <div class="ex-label">Exercise I2 · Shortest path table</div>
+        <p>
+          For each pair below, compute
+          <code class="inline">nx.shortest_path</code> or catch
+          <code class="inline">NetworkXNoPath</code>:
+        </p>
+        <ul>
+          <li><code class="inline">SUP-002 → WH-EU-01</code></li>
+          <li><code class="inline">WH-EU-01 → SKU-2044</code></li>
+          <li><code class="inline">SUP-001 → SKU-2044</code> (expect no path)</li>
+          <li><code class="inline">SUP-003 → SKU-1002</code></li>
+        </ul>
+        <p>Print a small table of source, target, path-or-<code class="inline">None</code>.</p>
+      </div>
+
+      <div class="exercise" id="ex6">
+        <div class="ex-label">Exercise I3 · Path with relation labels</div>
+        <p>
+          Write
+          <code class="inline">describe_path(G, path) -&gt; str</code>
+          that turns
+          <code class="inline">["SUP-002", "WH-EU-01", "SKU-2044"]</code>
+          into something like
+          <code class="inline">SUP-002 -[ships_via]-&gt; WH-EU-01 -[stores]-&gt; SKU-2044</code>.
+          Hint: for consecutive ids <code class="inline">(u, v)</code> read
+          <code class="inline">G[u][v]["relation"]</code>.
+          Run it on <code class="inline">nx.shortest_path(G, "SUP-002", "SKU-2044")</code>
+          and also on the longer explicit hop
+          <code class="inline">["SUP-002", "WH-EU-01", "SKU-2044"]</code>.
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== ADVANCED ========== -->
+    <section class="section" id="advanced">
+      <h2>
+        Advanced — hybrid GraphRAG assembly
+        <span class="level advanced">Advanced</span>
+      </h2>
+      <p>
+        Goal: treat the graph as a <em>second retrieval channel</em> that enriches
+        vector hits. The self-contained exercises may simulate seeds, while the rebuilt teaching
+        path uses <code class="inline">d3amt3c02_vector_seeded_expansion.py</code> and
+        <code class="inline">d3amt3c03_graphrag_answer.py</code>.
+      </p>
+
+      <h3>8. Conceptual hybrid pipeline</h3>
+<pre><code>┌─────────────────┐     ┌──────────────────┐
+│ Vector search   │     │ Graph traversal  │
+│ (similarity)    │     │ (typed hops)     │
+└────────┬────────┘     └────────┬─────────┘
+         │                       │
+         └──────────┬────────────┘
+                    ▼
+           Combined grounded answer
+           (entities + path facts + citations)</code></pre>
+
+      <ol>
+        <li><strong>Entity seed</strong> — vector (or keyword) hit names a SKU / supplier id.</li>
+        <li><strong>Expand</strong> — predecessors / successors / shortest_path pull related nodes.</li>
+        <li><strong>Filter</strong> — keep only edges whose <code class="inline">relation</code> is allowed for this question.</li>
+        <li><strong>Assemble</strong> — pass path strings + node attrs into the LLM context (or a deterministic template for the lab).</li>
+      </ol>
+
+      <h3>9. Simulate vector hits, then expand</h3>
+<pre><code># Pretend a retriever returned these chunk hits (ids extracted by NER / metadata)
+vector_hits = [
+    {"chunk_id": "doc-77", "score": 0.81, "entity_id": "SKU-2044"},
+    {"chunk_id": "doc-12", "score": 0.74, "entity_id": "SUP-002"},
+]
+
+def expand_entity(G, entity_id, max_hops=2):
+    """Collect 1-hop context; optionally sample shortest paths to related warehouses."""
+    if entity_id not in G:
+        return {"entity": entity_id, "error": "not_in_kg"}
+
+    node = dict(G.nodes[entity_id])
+    preds = list(G.predecessors(entity_id))
+    succs = list(G.successors(entity_id))
+    edges_out = [
+        {"to": v, "relation": d["relation"]}
+        for _, v, d in G.out_edges(entity_id, data=True)
+    ]
+    edges_in = [
+        {"from": u, "relation": d["relation"]}
+        for u, _, d in G.in_edges(entity_id, data=True)
+    ]
+
+    path_snippets = []
+    if node.get("type") == "sku":
+        for pred in preds:
+            if G.nodes[pred].get("type") == "supplier":
+                for wh in G.successors(pred):
+                    if G.nodes[wh].get("type") == "warehouse":
+                        try:
+                            path_snippets.append(nx.shortest_path(G, pred, wh))
+                        except nx.NetworkXNoPath:
+                            continue
+
+    return {
+        "entity": entity_id,
+        "node": node,
+        "predecessors": preds,
+        "successors": succs,
+        "edges_in": edges_in,
+        "edges_out": edges_out,
+        "path_snippets": path_snippets[:max_hops],
+    }
+
+expansions = [expand_entity(G, hit["entity_id"]) for hit in vector_hits]
+for row in expansions:
+    print(row["entity"], "→ paths", row["path_snippets"])</code></pre>
+
+      <h3>10. Deterministic answer template (no LLM required)</h3>
+<pre><code>def graphrag_answer(G, sku: str) -> dict:
+    """Traverse supplier → warehouse context for a SKU (concept depth)."""
+    if sku not in G:
+        raise ValueError(f"SKU not found in KG: {sku}")
+
+    suppliers = [
+        n for n in G.predecessors(sku)
+        if G.nodes[n].get("type") == "supplier"
+    ]
+    backup = [
+        n for n in G.nodes
+        if G.nodes[n].get("type") == "supplier"
+        and G.has_edge(n, sku)
+        and G[n][sku].get("relation") == "backup_supplier_for"
+    ]
+    warehouses = []
+    for supplier in suppliers:
+        for wh in G.successors(supplier):
+            if G.nodes[wh].get("type") == "warehouse":
+                warehouses.append(wh)
+
+    path_examples = []
+    for supplier in suppliers[:2]:
+        for wh in warehouses[:2]:
+            try:
+                path_examples.append(nx.shortest_path(G, supplier, wh))
+            except nx.NetworkXNoPath:
+                continue
+
+    return {
+        "sku": sku,
+        "suppliers": [G.nodes[n] for n in suppliers],
+        "backup_suppliers": [G.nodes[n] for n in backup],
+        "warehouses": [G.nodes[n] for n in warehouses],
+        "paths": path_examples,
+        "lesson": (
+            "Graph traversal adds relationship context; "
+            "use when hops matter (~3-5x cost)."
+        ),
+    }
+
+result = graphrag_answer(G, "SKU-2044")
+print(result["suppliers"])
+print(result["warehouses"])
+print(result["paths"])
+print(result["lesson"])</code></pre>
+
+      <h3>11. When GraphRAG is worth the 3–5× cost</h3>
+      <table>
+        <thead>
+          <tr><th>Question shape</th><th>Flat vector RAG?</th><th>GraphRAG?</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>“What does the brake-pad policy say about returns?”</td>
+            <td>Yes — single doc hop</td>
+            <td>Overkill</td>
+          </tr>
+          <tr>
+            <td>“Who supplies SKU-2044 and via which warehouse?”</td>
+            <td>Fragile / incomplete</td>
+            <td><strong>Justified</strong></td>
+          </tr>
+          <tr>
+            <td>“List backup suppliers if NorthStar fails for SKU-1002”</td>
+            <td>May miss typed relation</td>
+            <td><strong>Justified</strong></td>
+          </tr>
+          <tr>
+            <td>“Summarize last week’s delay emails”</td>
+            <td>Yes</td>
+            <td>No graph needed</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn">
+        <strong>Do not invent graph facts</strong>
+        If a path does not exist in NetworkX, say so. Never fabricate a
+        <code class="inline">ships_via</code> or <code class="inline">backup_supplier_for</code>
+        edge to satisfy the prompt. Same rule as claim / loan / shipment tools:
+        use domain data only.
+      </div>
+
+      <div class="exercise" id="ex7">
+        <div class="ex-label">Exercise A1 · Hybrid merge</div>
+        <p>
+          Given simulated vector hits
+          <code class="inline">[{"entity_id": "SKU-1002", "score": 0.9}]</code>,
+          expand with graph neighbors. Build a single dict:
+        </p>
+<pre><code>{
+  "seed": "SKU-1002",
+  "vector_score": 0.9,
+  "primary_suppliers": [...],   # relation supplies
+  "backup_suppliers": [...],    # relation backup_supplier_for
+  "graph_cost_note": "3-5x vs flat RAG — used because backup relation matters"
+}</code></pre>
+        <p>Print names (not only ids) for both supplier lists.</p>
+      </div>
+
+      <div class="exercise" id="ex8">
+        <div class="ex-label">Exercise A2 · Full graphrag_answer for both SKUs</div>
+        <p>
+          Run <code class="inline">graphrag_answer(G, sku)</code> for
+          <code class="inline">SKU-2044</code> and
+          <code class="inline">SKU-1002</code>. Compare:
+          which SKU has a warehouse hop? Which has a backup supplier?
+          Write two operator-facing summary sentences (no LLM required).
+        </p>
+      </div>
+
+      <div class="exercise" id="ex9">
+        <div class="ex-label">Exercise A3 · Cost gate</div>
+        <p>
+          Write
+          <code class="inline">should_use_graphrag(question: str) -&gt; bool</code>
+          with a simple heuristic (keywords like
+          <code class="inline">supplier</code>, <code class="inline">warehouse</code>,
+          <code class="inline">backup</code>, <code class="inline">ships via</code>,
+          <code class="inline">multi-hop</code>). Test on:
+        </p>
+        <ul>
+          <li>“Who is the backup supplier for the brake pad kit?” → True</li>
+          <li>“Summarize the flood rider exclusion paragraph” → False</li>
+          <li>“Which warehouse does EuroParts ship through for SKU-2044?” → True</li>
+        </ul>
+        <p>
+          Bonus: print an estimated relative cost string
+          <code class="inline">"~1x flat"</code> vs
+          <code class="inline">"~3-5x GraphRAG"</code> based on the boolean.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex10">
+        <div class="ex-label">Exercise A4 · Optional stretch — ego subgraph</div>
+        <p>
+          Using <code class="inline">nx.ego_graph(G, "SUP-002", radius=2, undirected=False)</code>
+          (or manual BFS on successors only), list all nodes within 2 directed hops
+          of EuroParts. Confirm <code class="inline">SKU-2044</code> and
+          <code class="inline">WH-EU-01</code> appear, and that US suppliers do not.
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== CHECKLIST ========== -->
+    <section class="section" id="checklist">
+      <h2>Classroom checklist</h2>
+      <ul>
+        <li>Loaded <code class="inline">data/supplier_kg.json</code> into <code class="inline">nx.DiGraph</code>.</li>
+        <li>Every edge stores a <code class="inline">relation</code> attribute.</li>
+        <li>Used <code class="inline">predecessors</code> / <code class="inline">successors</code> with type filters.</li>
+        <li>Computed <code class="inline">nx.shortest_path</code> and handled <code class="inline">NetworkXNoPath</code>.</li>
+        <li>Explained hybrid assembly: vector seed → graph expand → grounded answer.</li>
+        <li>Can state the cost tradeoff: ~3–5× vs flat RAG; use only when hops matter.</li>
+        <li>Know this lab is NetworkX in-memory — <strong>not</strong> Neo4j Aura.</li>
+      </ul>
+
+      <div class="callout">
+        <strong>Maps to day materials</strong>
+        Concept notebook: <code class="inline">W2D3/W2D3AM/_CONCEPTS.ipynb</code>, section 3.
+        Runnable chain:
+        <code class="inline">d3amt3c01_networkx_traversal.py</code> →
+        <code class="inline">d3amt3c02_vector_seeded_expansion.py</code> →
+        <code class="inline">d3amt3c03_graphrag_answer.py</code>.
+        Next mastery module: semantic / retrieval caching with diskcache.
+      </div>
+
+      <h3>Quick reference (June 2026 NetworkX)</h3>
+      <table>
+        <thead>
+          <tr><th>Call</th><th>Purpose in GraphRAG</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code class="inline">nx.DiGraph()</code></td><td>Directed KG; preserves supply direction</td></tr>
+          <tr><td><code class="inline">G.add_node(id, **attrs)</code></td><td>Entity with type / name / region</td></tr>
+          <tr><td><code class="inline">G.add_edge(u, v, relation=...)</code></td><td>Typed relationship</td></tr>
+          <tr><td><code class="inline">G.predecessors(n)</code></td><td>Who points at this entity</td></tr>
+          <tr><td><code class="inline">G.successors(n)</code></td><td>What this entity points at</td></tr>
+          <tr><td><code class="inline">nx.shortest_path(G, s, t)</code></td><td>Fewest-hop explanation path</td></tr>
+          <tr><td><code class="inline">G.edges(data=True)</code></td><td>Inspect all relations</td></tr>
+          <tr><td><code class="inline">G.has_edge(u, v)</code></td><td>Guard before reading relation</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer class="nav-footer">
+      <a href="14_llama_index_rag.html">← 14 · LlamaIndex RAG</a>
+      <a href="../index.html">Index</a>
+      <a href="16_diskcache_semantic.html">16 · diskcache semantic →</a>
+    </footer>
+  </div>
+</body>
+</html>

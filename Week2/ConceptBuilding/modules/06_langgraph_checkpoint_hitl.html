@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>06 — LangGraph, checkpoints &amp; HITL | Week 2 Mastery</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">Index</a>
+      <a href="05_langchain_core_providers.html">Prev: 05 LangChain core</a>
+      <a href="07_tenacity_reliability.html">Next: 07 Tenacity</a>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">Module 06 · June 2026 APIs · Offline-first</div>
+      <h1>LangGraph + langgraph-checkpoint-sqlite</h1>
+      <p class="lead">
+        Build stateful graphs with <code class="inline">StateGraph</code>, pause for human
+        approval with <code class="inline">interrupt_before</code>, resume via
+        <code class="inline">update_state</code> + <code class="inline">invoke(None)</code>,
+        choose <code class="inline">MemorySaver</code> vs durable
+        <code class="inline">SqliteSaver</code>, sketch multi-agent supervisor flows, and wire
+        Day 3 retrieve &rarr; grade &rarr; generate RAG graphs. Copy cells into a Jupyter
+        notebook whose cwd is <code class="inline">Week2/ConceptBuilding</code>.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">langgraph</span>
+        <span class="chip strong">langgraph-checkpoint-sqlite</span>
+        <span class="chip">thread_id</span>
+        <span class="chip">HITL resume</span>
+        <span class="chip">data/*.json fixtures</span>
+      </div>
+    </header>
+
+    <nav class="toc">
+      <h2>On this page</h2>
+      <ol>
+        <li><a href="#setup">Setup &amp; mental model</a></li>
+        <li><a href="#beginner">Beginner — graphs, state, edges</a></li>
+        <li><a href="#intermediate">Intermediate — underwriting, SQLite, HITL resume</a></li>
+        <li><a href="#advanced">Advanced — multi-agent, memory vs SQLite, RAG graph</a></li>
+        <li><a href="#reference">June 2026 quick reference</a></li>
+      </ol>
+    </nav>
+
+    <!-- ========== SETUP ========== -->
+    <section class="section" id="setup">
+      <h2>Setup &amp; mental model</h2>
+      <p>
+        LangGraph turns an agent loop into an explicit graph: <strong>nodes</strong> mutate a
+        shared <code class="inline">TypedDict</code> state; <strong>edges</strong> choose the
+        next node. A <strong>checkpointer</strong> stores snapshots keyed by
+        <code class="inline">thread_id</code> so you can pause (HITL) and resume later.
+      </p>
+
+<pre><code class="language-py"># ASCII map — underwriting-style flow (Day 2 AM pattern)
+#
+#   START
+#     |
+#     v
+#  [intake] ----&gt; [risk_check] ----+----&gt; [auto_approve] -------&gt; END
+#                                  |
+#                                  +----&gt; [request_documents] --&gt; END
+#                                  |
+#                                  +----&gt; [human_approve] ------&gt; END
+#                                            ^
+#                                            |
+#                         interrupt_before=["human_approve"]
+#                         resume: update_state(...); invoke(None, config)
+</code></pre>
+
+      <div class="callout">
+        <strong>Packages (Week2 requirements)</strong>
+        <code class="inline">langgraph</code>,
+        <code class="inline">langgraph-checkpoint-sqlite</code>.
+        Verify from <code class="inline">Week2</code>:
+        <code class="inline">uv run python -c "from langgraph.graph import StateGraph, START, END; from langgraph.checkpoint.sqlite import SqliteSaver; from langgraph.checkpoint.memory import MemorySaver; print('ok')"</code>
+      </div>
+
+      <div class="callout warn">
+        <strong>Working directory</strong>
+        Set the notebook kernel cwd to <code class="inline">Week2/ConceptBuilding</code> so
+        <code class="inline">data/workflow_cases_15.json</code> and
+        <code class="inline">data/claim_narratives_10.json</code> resolve. Never invent claim,
+        loan, policy, or shipment records — load fixtures.
+      </div>
+
+      <h3>Core imports (June 2026)</h3>
+<pre><code class="language-py">from __future__ import annotations
+
+import json
+import sqlite3
+from pathlib import Path
+from typing import Literal, TypedDict
+
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.graph import END, START, StateGraph
+
+DATA = Path("data")
+CASES = DATA / "workflow_cases_15.json"
+NARRATIVES = DATA / "claim_narratives_10.json"
+</code></pre>
+    </section>
+
+    <!-- ========== BEGINNER ========== -->
+    <section class="section" id="beginner">
+      <h2><span class="level beginner">Beginner</span> Graphs, TypedDict state, compile &amp; invoke</h2>
+      <p>
+        Goal: define state, register nodes, wire <code class="inline">START</code> /
+        <code class="inline">END</code>, run <code class="inline">compile()</code> +
+        <code class="inline">invoke()</code> with no LLM and no network.
+      </p>
+
+      <h3>Lesson B1 — TypedDict state + one node</h3>
+      <p>
+        Nodes return a <em>partial</em> dict. LangGraph merges keys into the shared state.
+        Always include every field in the initial <code class="inline">invoke</code> payload
+        (empty strings / lists are fine).
+      </p>
+<pre><code class="language-py">class AgentState(TypedDict):
+    order_id: str
+    status: str
+
+
+def lookup_node(state: AgentState) -&gt; dict:
+    return {"status": f"looked up {state['order_id']}"}
+
+
+builder = StateGraph(AgentState)
+builder.add_node("lookup", lookup_node)
+builder.add_edge(START, "lookup")
+builder.add_edge("lookup", END)
+graph = builder.compile()
+
+print(graph.invoke({"order_id": "8f2e4c", "status": ""}))
+# -&gt; {'order_id': '8f2e4c', 'status': 'looked up 8f2e4c'}
+</code></pre>
+
+      <div class="exercise" id="ex-b01">
+        <div class="ex-label">Exercise B01 · Warm-up invoke</div>
+        <p>
+          Change <code class="inline">order_id</code> to <code class="inline">"UW-DEMO"</code>
+          and assert the returned <code class="inline">status</code> contains that id.
+        </p>
+<pre><code class="language-py">out = graph.invoke({"order_id": "UW-DEMO", "status": ""})
+assert "UW-DEMO" in out["status"]
+print("B01 OK", out)
+</code></pre>
+      </div>
+
+      <div class="exercise" id="ex-b02">
+        <div class="ex-label">Exercise B02 · Second node</div>
+        <p>
+          Add node <code class="inline">tag</code> that sets
+          <code class="inline">status</code> to <code class="inline">f"{state['status']} | tagged"</code>.
+          Edges: <code class="inline">START -&gt; lookup -&gt; tag -&gt; END</code>.
+        </p>
+<pre><code class="language-py"># Your turn: add_node("tag", ...), add_edge("lookup", "tag"), add_edge("tag", END)
+</code></pre>
+      </div>
+
+      <h3>Lesson B2 — Fixed edges vs conditional edges</h3>
+<pre><code class="language-py"># Fixed:      add_edge("a", "b")
+# Conditional: add_conditional_edges("gate", router_fn)
+#              router_fn(state) returns the *name* of the next node
+#
+#   START --&gt; [gate] --+--&gt; [send]   --&gt; END
+#                      |
+#                      +--&gt; [revise] --&gt; END
+</code></pre>
+<pre><code class="language-py">class HitlState(TypedDict):
+    approved: bool | None
+    path: str
+
+
+def gate(state: HitlState) -&gt; dict:
+    return {}
+
+
+def send(state: HitlState) -&gt; dict:
+    return {"path": "sent"}
+
+
+def revise(state: HitlState) -&gt; dict:
+    return {"path": "revise"}
+
+
+def should_send(state: HitlState) -&gt; Literal["send", "revise"]:
+    return "send" if state.get("approved") is True else "revise"
+
+
+b = StateGraph(HitlState)
+b.add_node("gate", gate)
+b.add_node("send", send)
+b.add_node("revise", revise)
+b.add_edge(START, "gate")
+b.add_conditional_edges(
+    "gate",
+    should_send,
+    {"send": "send", "revise": "revise"},  # optional explicit map
+)
+b.add_edge("send", END)
+b.add_edge("revise", END)
+g = b.compile()
+
+print("approved=True  -&gt;", g.invoke({"approved": True, "path": ""}))
+print("approved=None  -&gt;", g.invoke({"approved": None, "path": ""}))
+</code></pre>
+
+      <div class="exercise" id="ex-b03">
+        <div class="ex-label">Exercise B03 · Router truth table</div>
+        <p>
+          Call <code class="inline">g.invoke</code> three times with
+          <code class="inline">approved</code> in <code class="inline">{True, False, None}</code>.
+          Print a table of <code class="inline">approved -&gt; path</code>. Only
+          <code class="inline">True</code> should yield <code class="inline">sent</code>.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-b04">
+        <div class="ex-label">Exercise B04 · Explicit path map</div>
+        <p>
+          Rewrite <code class="inline">should_send</code> to return
+          <code class="inline">"ok"</code> / <code class="inline">"fix"</code> and pass a
+          mapping dict <code class="inline">{"ok": "send", "fix": "revise"}</code> to
+          <code class="inline">add_conditional_edges</code>. Re-run B03 checks.
+        </p>
+      </div>
+
+      <h3>Lesson B3 — Event traces (operator-facing)</h3>
+      <p>
+        Classroom graphs append small dicts to <code class="inline">event_trace</code> so
+        operators can see which nodes ran — no LLM required.
+      </p>
+<pre><code class="language-py">class TraceState(TypedDict):
+    value: int
+    event_trace: list[dict]
+
+
+def bump(state: TraceState) -&gt; dict:
+    return {
+        "value": state["value"] + 1,
+        "event_trace": [*state.get("event_trace", []), {"node": "bump", "value": state["value"] + 1}],
+    }
+
+
+tb = StateGraph(TraceState)
+tb.add_node("bump", bump)
+tb.add_edge(START, "bump")
+tb.add_edge("bump", END)
+tapp = tb.compile()
+print(tapp.invoke({"value": 0, "event_trace": []}))
+</code></pre>
+
+      <div class="exercise" id="ex-b05">
+        <div class="ex-label">Exercise B05 · Two-step trace</div>
+        <p>
+          Add nodes <code class="inline">bump</code> then <code class="inline">double</code>
+          (<code class="inline">value *= 2</code>). Assert final
+          <code class="inline">value == 2</code> when starting from 0, and that
+          <code class="inline">event_trace</code> has length 2 with node names in order.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-b06">
+        <div class="ex-label">Exercise B06 · Mermaid text (optional viz)</div>
+        <p>
+          Print <code class="inline">g.get_graph().draw_mermaid()</code> for the gate/send/revise
+          graph. If PNG export fails offline, text Mermaid is enough.
+        </p>
+<pre><code class="language-py">print(g.get_graph().draw_mermaid())
+</code></pre>
+      </div>
+
+      <h3>Lesson B4 — Load offline fixtures</h3>
+<pre><code class="language-py">payload = json.loads(CASES.read_text(encoding="utf-8"))
+cases = payload["cases"]
+print("case count:", len(cases))
+print("first:", cases[0]["case_id"], cases[0]["recommended_action"])
+
+nar = json.loads(NARRATIVES.read_text(encoding="utf-8"))["narratives"]
+print("narrative count:", len(nar))
+print("first:", nar[0]["narrative_id"], nar[0]["intake_queue"])
+</code></pre>
+
+      <div class="exercise" id="ex-b07">
+        <div class="ex-label">Exercise B07 · Count recommended actions</div>
+        <p>
+          From <code class="inline">workflow_cases_15.json</code>, count how many cases have
+          each <code class="inline">recommended_action</code>
+          (<code class="inline">auto_approve</code>, <code class="inline">request_documents</code>,
+          <code class="inline">refer_underwriter</code>). Print a dict of counts. Expect 15 cases total.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-b08">
+        <div class="ex-label">Exercise B08 · Lookup helper</div>
+        <p>
+          Write <code class="inline">load_case(case_id: str) -&gt; dict</code> that raises
+          <code class="inline">ValueError</code> if missing. Test with
+          <code class="inline">UW-002</code> and a fake id.
+        </p>
+<pre><code class="language-py">def load_case(case_id: str) -&gt; dict:
+    for case in json.loads(CASES.read_text(encoding="utf-8"))["cases"]:
+        if case["case_id"] == case_id:
+            return case
+    raise ValueError(f"Case not found: {case_id}")
+
+
+assert load_case("UW-002")["applicant"] == "Blue Harbor Logistics"
+try:
+    load_case("UW-999")
+except ValueError as exc:
+    print("expected miss:", exc)
+</code></pre>
+      </div>
+
+      <div class="exercise" id="ex-b09">
+        <div class="ex-label">Exercise B09 · Mini underwriting linear graph</div>
+        <p>
+          Build <code class="inline">START -&gt; intake -&gt; END</code> where
+          <code class="inline">intake</code> loads <code class="inline">UW-005</code> via
+          <code class="inline">load_case</code> and stores <code class="inline">case</code> +
+          <code class="inline">recommended_action</code> in state. Invoke and print the action
+          (<code class="inline">auto_approve</code>.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-b10">
+        <div class="ex-label">Exercise B10 · Conditional underwriting stub</div>
+        <p>
+          Extend B09: after intake, route with
+          <code class="inline">add_conditional_edges</code> to nodes
+          <code class="inline">auto_finish</code> or <code class="inline">refer</code> based on
+          <code class="inline">recommended_action == "refer_underwriter"</code>. Run
+          <code class="inline">UW-002</code> (auto) and <code class="inline">UW-001</code> (refer).
+          Record <code class="inline">final_route</code> on each path.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-b11">
+        <div class="ex-label">Exercise B11 · Batch invoke all 15 cases</div>
+        <p>
+          Reuse the B10 graph (no checkpointer). Loop every
+          <code class="inline">case_id</code>, invoke, collect
+          <code class="inline">(case_id, final_route)</code>. Assert you get 15 rows and that
+          every <code class="inline">refer_underwriter</code> case lands on the refer path.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-b12">
+        <div class="ex-label">Exercise B12 · Narrative queue histogram</div>
+        <p>
+          From <code class="inline">claim_narratives_10.json</code>, count narratives per
+          <code class="inline">intake_queue</code>. Which queue has the most?
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== INTERMEDIATE ========== -->
+    <section class="section" id="intermediate">
+      <h2><span class="level intermediate">Intermediate</span> Underwriting graph, SQLite checkpointer, HITL resume</h2>
+      <p>
+        Goal: mirror Day 2 AM — intake &rarr; risk_check &rarr; routed endings, then add
+        durable checkpoints and the official resume pattern
+        <code class="inline">update_state</code> then <code class="inline">invoke(None, config)</code>.
+      </p>
+
+      <h3>Lesson I1 — Full underwriting flow (no interrupt yet)</h3>
+<pre><code class="language-py"># ASCII — Day 2 AM underwriting_flow
+#
+# START -&gt; intake -&gt; risk_check -+-&gt; auto_approve -------&gt; END
+#                               +-&gt; request_documents --&gt; END
+#                               +-&gt; human_approve ------&gt; END
+
+
+class FlowState(TypedDict):
+    case_id: str
+    case: dict
+    recommended_action: str
+    route: str
+    event_trace: list[dict]
+
+
+def intake(state: FlowState) -&gt; dict:
+    case = load_case(state["case_id"])
+    return {
+        "case": case,
+        "event_trace": [
+            *state.get("event_trace", []),
+            {"node": "intake", "applicant": case["applicant"], "docs": case["documents_complete"]},
+        ],
+    }
+
+
+def risk_check(state: FlowState) -&gt; dict:
+    action = state["case"]["recommended_action"]
+    return {
+        "recommended_action": action,
+        "event_trace": [
+            *state.get("event_trace", []),
+            {"node": "risk_check", "risk_flags": state["case"]["risk_flags"], "recommended_action": action},
+        ],
+    }
+
+
+def route_decision(
+    state: FlowState,
+) -&gt; Literal["auto_approve", "request_documents", "human_approve"]:
+    action = state["recommended_action"]
+    if action == "auto_approve":
+        return "auto_approve"
+    if action == "request_documents":
+        return "request_documents"
+    return "human_approve"
+
+
+def auto_approve(state: FlowState) -&gt; dict:
+    return {
+        "route": "auto_approved",
+        "event_trace": [*state.get("event_trace", []), {"node": "auto_approve", "route": "auto_approved"}],
+    }
+
+
+def request_documents(state: FlowState) -&gt; dict:
+    return {
+        "route": "docs_requested",
+        "event_trace": [*state.get("event_trace", []), {"node": "request_documents", "route": "docs_requested"}],
+    }
+
+
+def human_approve(state: FlowState) -&gt; dict:
+    return {
+        "route": "pending_human_approval",
+        "event_trace": [
+            *state.get("event_trace", []),
+            {"node": "human_approve", "route": "pending_human_approval", "hitl": True},
+        ],
+    }
+
+
+def build_underwriting():
+    graph = StateGraph(FlowState)
+    graph.add_node("intake", intake)
+    graph.add_node("risk_check", risk_check)
+    graph.add_node("auto_approve", auto_approve)
+    graph.add_node("request_documents", request_documents)
+    graph.add_node("human_approve", human_approve)
+    graph.add_edge(START, "intake")
+    graph.add_edge("intake", "risk_check")
+    graph.add_conditional_edges("risk_check", route_decision)
+    graph.add_edge("auto_approve", END)
+    graph.add_edge("request_documents", END)
+    graph.add_edge("human_approve", END)
+    return graph.compile()
+
+
+uw = build_underwriting()
+print(uw.invoke({
+    "case_id": "UW-003",
+    "case": {},
+    "recommended_action": "",
+    "route": "",
+    "event_trace": [],
+})["route"])
+# -&gt; docs_requested
+</code></pre>
+
+      <div class="exercise" id="ex-i01">
+        <div class="ex-label">Exercise I01 · Three golden cases</div>
+        <p>
+          Invoke for <code class="inline">UW-002</code>, <code class="inline">UW-003</code>,
+          <code class="inline">UW-001</code>. Assert routes
+          <code class="inline">auto_approved</code>, <code class="inline">docs_requested</code>,
+          <code class="inline">pending_human_approval</code> respectively.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-i02">
+        <div class="ex-label">Exercise I02 · Trace length</div>
+        <p>
+          For <code class="inline">UW-001</code>, assert
+          <code class="inline">event_trace</code> node order is
+          <code class="inline">intake, risk_check, human_approve</code>.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-i03">
+        <div class="ex-label">Exercise I03 · Risk-flag filter</div>
+        <p>
+          Without changing the graph, list all case_ids where
+          <code class="inline">"prior_claims"</code> is in
+          <code class="inline">risk_flags</code>. Then run the graph on each and print routes.
+        </p>
+      </div>
+
+      <h3>Lesson I2 — SqliteSaver + thread_id</h3>
+      <p>
+        Durable checkpoints need a SQLite connection (keep it open for the process lifetime)
+        and a config with <code class="inline">configurable.thread_id</code>. Same thread id =
+        same conversation / case resume handle.
+      </p>
+<pre><code class="language-py"># ASCII — checkpoint identity
+#
+#  config = {"configurable": {"thread_id": "uw-hitl-demo"}}
+#                 |
+#                 v
+#        +------------------+
+#        | checkpoints.db   |  &lt;-- SqliteSaver(connection)
+#        |  thread snapshots|
+#        +------------------+
+
+
+class HitlUwState(TypedDict):
+    case_id: str
+    case: dict
+    recommended_action: str
+    approved: bool | None
+    final_route: str
+    event_trace: list[dict]
+
+
+def hitl_intake(state: HitlUwState) -&gt; dict:
+    case = load_case(state["case_id"])
+    return {
+        "case": case,
+        "recommended_action": case["recommended_action"],
+        "event_trace": [*state.get("event_trace", []), {"node": "intake", "case_id": case["case_id"]}],
+    }
+
+
+def route_after_intake(state: HitlUwState) -&gt; Literal["auto_finish", "human_approve"]:
+    if state["recommended_action"] == "refer_underwriter":
+        return "human_approve"
+    return "auto_finish"
+
+
+def auto_finish(state: HitlUwState) -&gt; dict:
+    route = state["recommended_action"]
+    return {
+        "final_route": route,
+        "event_trace": [*state.get("event_trace", []), {"node": "auto_finish", "final_route": route}],
+    }
+
+
+def human_approve_node(state: HitlUwState) -&gt; dict:
+    approved = bool(state.get("approved"))
+    route = "human_approved" if approved else "human_rejected"
+    return {
+        "final_route": route,
+        "event_trace": [
+            *state.get("event_trace", []),
+            {"node": "human_approve", "approved": approved, "final_route": route},
+        ],
+    }
+
+
+def build_hitl_graph(checkpointer: SqliteSaver):
+    graph = StateGraph(HitlUwState)
+    graph.add_node("intake", hitl_intake)
+    graph.add_node("auto_finish", auto_finish)
+    graph.add_node("human_approve", human_approve_node)
+    graph.add_edge(START, "intake")
+    graph.add_conditional_edges("intake", route_after_intake)
+    graph.add_edge("auto_finish", END)
+    graph.add_edge("human_approve", END)
+    return graph.compile(
+        checkpointer=checkpointer,
+        interrupt_before=["human_approve"],
+    )
+
+
+Path("outputs").mkdir(exist_ok=True)
+conn = sqlite3.connect("outputs/checkpoints_mastery.db", check_same_thread=False)
+saver = SqliteSaver(conn)
+app = build_hitl_graph(saver)
+config = {"configurable": {"thread_id": "uw-hitl-demo"}}
+</code></pre>
+
+      <div class="callout">
+        <strong>interrupt_before</strong>
+        The graph runs until it would enter <code class="inline">human_approve</code>, then
+        pauses. <code class="inline">app.get_state(config).next</code> shows the pending node
+        tuple. Non-referral cases never hit the interrupt.
+      </div>
+
+      <h3>Lesson I3 — Pause, then resume with update_state + invoke(None)</h3>
+<pre><code class="language-py"># --- first call: start thread (may pause) ---
+start_state = {
+    "case_id": "UW-001",
+    "case": {},
+    "recommended_action": "",
+    "approved": None,
+    "final_route": "",
+    "event_trace": [],
+}
+paused = app.invoke(start_state, config=config)
+snap = app.get_state(config)
+print("after start next=", snap.next)          # ('human_approve',) when referral
+print("values keys=", list(snap.values.keys()))
+
+# --- operator decision: patch state, then resume with None ---
+app.update_state(config, {"approved": True})
+result = app.invoke(None, config=config)       # None = continue from checkpoint
+snap2 = app.get_state(config)
+print("after resume next=", snap2.next)        # () when finished
+print("final_route=", snap2.values.get("final_route"))
+</code></pre>
+
+<pre><code class="language-py"># ASCII — HITL resume protocol (June 2026)
+#
+#  invoke(initial, config)  --&gt;  pause before human_approve
+#           |
+#           v
+#  get_state(config).next == ("human_approve",)
+#           |
+#           v
+#  update_state(config, {"approved": True|False})
+#           |
+#           v
+#  invoke(None, config)     --&gt;  run human_approve -&gt; END
+</code></pre>
+
+      <div class="exercise" id="ex-i04">
+        <div class="ex-label">Exercise I04 · Pause UW-001</div>
+        <p>
+          Use a fresh <code class="inline">thread_id</code> (e.g.
+          <code class="inline">"ex-i04"</code>). Start <code class="inline">UW-001</code>.
+          Assert <code class="inline">"human_approve" in snap.next</code> and that
+          <code class="inline">final_route</code> is still empty.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-i05">
+        <div class="ex-label">Exercise I05 · Approve resume</div>
+        <p>
+          Continue I04: <code class="inline">update_state(..., {"approved": True})</code> then
+          <code class="inline">invoke(None, config)</code>. Assert
+          <code class="inline">final_route == "human_approved"</code> and
+          <code class="inline">snap.next == ()</code>.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-i06">
+        <div class="ex-label">Exercise I06 · Reject resume</div>
+        <p>
+          New thread <code class="inline">"ex-i06"</code>, same case, set
+          <code class="inline">approved: False</code> on resume. Assert
+          <code class="inline">human_rejected</code>.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-i07">
+        <div class="ex-label">Exercise I07 · Auto path never interrupts</div>
+        <p>
+          Thread <code class="inline">"ex-i07"</code>, case <code class="inline">UW-006</code>
+          (auto_approve). After one <code class="inline">invoke</code>, assert
+          <code class="inline">next == ()</code> and
+          <code class="inline">final_route == "auto_approve"</code> without calling
+          <code class="inline">update_state</code>.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-i08">
+        <div class="ex-label">Exercise I08 · Durable across reconnect</div>
+        <p>
+          Pause <code class="inline">UW-007</code> on thread <code class="inline">"ex-i08"</code>.
+          Close the connection, reopen the same DB file with a new
+          <code class="inline">SqliteSaver</code>, rebuild the graph, call
+          <code class="inline">get_state</code>. Assert the interrupt is still pending, then
+          approve and finish. This is why SQLite beats in-memory for operators.
+        </p>
+<pre><code class="language-py"># sketch
+conn.close()
+conn2 = sqlite3.connect("outputs/checkpoints_mastery.db", check_same_thread=False)
+app2 = build_hitl_graph(SqliteSaver(conn2))
+cfg = {"configurable": {"thread_id": "ex-i08"}}
+assert "human_approve" in app2.get_state(cfg).next
+app2.update_state(cfg, {"approved": True})
+app2.invoke(None, config=cfg)
+print("I08 OK", app2.get_state(cfg).values["final_route"])
+</code></pre>
+      </div>
+
+      <div class="exercise" id="ex-i09">
+        <div class="ex-label">Exercise I09 · Batch referrals only</div>
+        <p>
+          For every case with <code class="inline">refer_underwriter</code>, start a unique
+          thread, pause, auto-approve on resume. Collect all
+          <code class="inline">final_route</code> values — all must be
+          <code class="inline">human_approved</code>.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-i10">
+        <div class="ex-label">Exercise I10 · Operator snapshot dump</div>
+        <p>
+          After a pause (any referral), write
+          <code class="inline">outputs/snapshot_&lt;thread&gt;.json</code> with
+          <code class="inline">thread_id</code>, <code class="inline">next</code>, and
+          <code class="inline">values</code> (use <code class="inline">default=str</code>).
+          This mirrors classroom <code class="inline">d2amt6c02_hitl_resume.py</code> outputs.
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== ADVANCED ========== -->
+    <section class="section" id="advanced">
+      <h2><span class="level advanced">Advanced</span> Multi-agent, MemorySaver vs SQLite, retrieve&rarr;grade&rarr;generate</h2>
+
+      <h3>Lesson A1 — Multi-agent supervisor &rarr; intake &rarr; adjudication</h3>
+      <p>
+        Day 2 PM pattern on <code class="inline">data/claim_narratives_10.json</code>.
+        Shared <code class="inline">TypedDict</code> state; intake owns
+        <code class="inline">claim_id</code> / <code class="inline">intake_queue</code>;
+        adjudication must not overwrite those fields.
+      </p>
+<pre><code class="language-py"># ASCII — multi-agent claim flow
+#
+#   START
+#     |
+#     v
+# [supervisor]  loads narrative text, assigns work
+#     |
+#     v
+#   [intake]     sets claim_id + intake_queue  (owned fields)
+#     |
+#     v
+# [adjudication] sets adjudication only; READ-ONLY on intake fields
+#     |
+#     v
+#    END
+
+
+def load_narrative(narrative_id: str) -&gt; dict:
+    for row in json.loads(NARRATIVES.read_text(encoding="utf-8"))["narratives"]:
+        if row["narrative_id"] == narrative_id:
+            return row
+    raise ValueError(f"Narrative not found: {narrative_id}")
+
+
+class ClaimState(TypedDict):
+    narrative_id: str
+    text: str
+    claim_id: str
+    intake_queue: str
+    adjudication: str
+    supervisor_notes: str
+    event_trace: list[dict]
+
+
+def supervisor(state: ClaimState) -&gt; dict:
+    narrative = load_narrative(state["narrative_id"])
+    return {
+        "text": narrative["text"],
+        "supervisor_notes": "Route to intake, then adjudication.",
+        "event_trace": [
+            *state.get("event_trace", []),
+            {"agent": "supervisor", "action": "assign_intake"},
+        ],
+    }
+
+
+def intake_worker(state: ClaimState) -&gt; dict:
+    narrative = load_narrative(state["narrative_id"])
+    return {
+        "claim_id": narrative["claim_id"],
+        "intake_queue": narrative["intake_queue"],
+        "event_trace": [
+            *state.get("event_trace", []),
+            {
+                "agent": "intake",
+                "claim_id": narrative["claim_id"],
+                "intake_queue": narrative["intake_queue"],
+            },
+        ],
+    }
+
+
+def adjudication_worker(state: ClaimState) -&gt; dict:
+    """Propose adjudication using intake outputs only.
+
+    Guardrail: do not mutate claim_id or intake_queue owned by intake.
+    """
+    narrative = load_narrative(state["narrative_id"])
+    return {
+        "adjudication": narrative["adjudication_hint"],
+        "event_trace": [
+            *state.get("event_trace", []),
+            {
+                "agent": "adjudication",
+                "adjudication": narrative["adjudication_hint"],
+                "guardrail": "read_only_on_intake_fields",
+                "seen_claim_id": state.get("claim_id", ""),
+                "seen_intake_queue": state.get("intake_queue", ""),
+            },
+        ],
+    }
+
+
+def build_multi_agent():
+    graph = StateGraph(ClaimState)
+    graph.add_node("supervisor", supervisor)
+    graph.add_node("intake", intake_worker)
+    graph.add_node("adjudication", adjudication_worker)
+    graph.add_edge(START, "supervisor")
+    graph.add_edge("supervisor", "intake")
+    graph.add_edge("intake", "adjudication")
+    graph.add_edge("adjudication", END)
+    return graph.compile()
+
+
+ma = build_multi_agent()
+print(ma.invoke({
+    "narrative_id": "NAR-001",
+    "text": "",
+    "claim_id": "",
+    "intake_queue": "",
+    "adjudication": "",
+    "supervisor_notes": "",
+    "event_trace": [],
+}))
+</code></pre>
+
+      <div class="exercise" id="ex-a01">
+        <div class="ex-label">Exercise A01 · NAR-003 fraud path</div>
+        <p>
+          Run <code class="inline">NAR-003</code>. Assert
+          <code class="inline">intake_queue == "fnol_intake"</code> and
+          <code class="inline">adjudication == "fraud_review"</code>. Confirm
+          <code class="inline">event_trace</code> agents are
+          supervisor &rarr; intake &rarr; adjudication.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-a02">
+        <div class="ex-label">Exercise A02 · Guardrail unit test</div>
+        <p>
+          Call <code class="inline">adjudication_worker</code> on a hand-built state that
+          already has <code class="inline">claim_id</code> / <code class="inline">intake_queue</code>.
+          Assert the returned dict does <em>not</em> contain those keys (only
+          <code class="inline">adjudication</code> + <code class="inline">event_trace</code>).
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-a03">
+        <div class="ex-label">Exercise A03 · All 10 narratives</div>
+        <p>
+          Batch-invoke all narratives; build a table of
+          <code class="inline">narrative_id, claim_id, intake_queue, adjudication</code>.
+          Write JSON to <code class="inline">outputs/multi_agent_batch.json</code>.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-a04">
+        <div class="ex-label">Exercise A04 · Conditional supervisor (stretch)</div>
+        <p>
+          Add a router after supervisor: if text contains
+          <code class="inline">"ransomware"</code> (case-insensitive), jump straight to a
+          <code class="inline">cyber_fast_track</code> node that sets adjudication to
+          <code class="inline">cyber_triage</code> and skips intake mutation of queues —
+          otherwise keep intake &rarr; adjudication. Test with
+          <code class="inline">NAR-007</code> vs <code class="inline">NAR-001</code>.
+        </p>
+      </div>
+
+      <h3>Lesson A2 — MemorySaver vs durable SqliteSaver</h3>
+      <table>
+        <thead>
+          <tr><th>Checkpointer</th><th>Import</th><th>Survives process exit?</th><th>Best for</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">MemorySaver</code></td>
+            <td><code class="inline">langgraph.checkpoint.memory</code></td>
+            <td>No (RAM only)</td>
+            <td>Notebook demos, unit tests, session store while kernel lives</td>
+          </tr>
+          <tr>
+            <td><code class="inline">SqliteSaver</code></td>
+            <td><code class="inline">langgraph.checkpoint.sqlite</code></td>
+            <td>Yes (DB file)</td>
+            <td>Operator HITL, multi-day resume, classroom labs</td>
+          </tr>
+        </tbody>
+      </table>
+<pre><code class="language-py"># MemorySaver — same APIs, ephemeral session store
+mem = MemorySaver()
+mem_app = build_hitl_graph(mem)  # type: ignore[arg-type]  # same BaseCheckpointSaver protocol
+cfg_mem = {"configurable": {"thread_id": "mem-demo"}}
+mem_app.invoke(start_state | {"case_id": "UW-001"}, config=cfg_mem)
+# Kernel restart = lost thread. Swap to SqliteSaver for durability.
+</code></pre>
+
+      <div class="callout warn">
+        <strong>Session store tip</strong>
+        Treat <code class="inline">thread_id</code> as the customer/case session key.
+        MemorySaver is fine for a live Jupyter “session store”; promote the same graph to
+        SqliteSaver when the operator must leave and come back tomorrow.
+      </div>
+
+      <div class="exercise" id="ex-a05">
+        <div class="ex-label">Exercise A05 · Prove MemorySaver is ephemeral</div>
+        <p>
+          Pause a referral with <code class="inline">MemorySaver</code>. Drop the
+          <code class="inline">mem</code> / <code class="inline">mem_app</code> references,
+          create a <em>new</em> <code class="inline">MemorySaver()</code> + graph with the
+          same <code class="inline">thread_id</code>. Show that
+          <code class="inline">get_state(...).values</code> no longer has the case (empty /
+          missing interrupt). Contrast with I08’s SQLite reconnect.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-a06">
+        <div class="ex-label">Exercise A06 · Dual-backend helper</div>
+        <p>
+          Write <code class="inline">open_checkpointer(kind: Literal["memory","sqlite"], path=...)</code>
+          returning a checkpointer. Compile the HITL graph twice and run
+          <code class="inline">UW-002</code> on both — both should auto-finish with the same
+          <code class="inline">final_route</code>.
+        </p>
+      </div>
+
+      <h3>Lesson A3 — Day 3 RAG: retrieve &rarr; grade &rarr; generate</h3>
+      <p>
+        Offline stub of the Day 3 PM graph. Real labs call Chroma / policy tools; here we
+        grade with simple keyword evidence so the graph runs without an API key.
+      </p>
+<pre><code class="language-py"># ASCII — Day 3 PM rag_graph
+#
+# START -&gt; [retrieve] -&gt; [grade] -&gt; [generate] -&gt; END
+#
+# retrieve: pull "documents" (here: policy snippets / narrative text)
+# grade:    set sufficient_evidence bool
+# generate: compose answer + citation ids
+
+
+POLICY_SNIPPETS = {
+    "auto": "Collision coverage applies when the insured vehicle is struck by another vehicle.",
+    "water": "Sudden pipe bursts may be covered; flood requires a flood rider.",
+    "cyber": "Ransomware restoration from backup may be covered under cyber endorsements.",
+}
+
+
+class RagState(TypedDict):
+    question: str
+    retrieval: dict
+    answer: str
+    citations: list[dict]
+    sufficient_evidence: bool
+    event_trace: list[dict]
+
+
+def retrieve_node(state: RagState) -&gt; dict:
+    q = state["question"].lower()
+    hits = []
+    for doc_id, text in POLICY_SNIPPETS.items():
+        if any(tok in q for tok in doc_id.split()) or any(
+            w in text.lower() for w in q.split() if len(w) &gt; 4
+        ):
+            hits.append({"doc_id": doc_id, "text": text})
+    if not hits:
+        # fallback: return all snippets so grade can still run
+        hits = [{"doc_id": k, "text": v} for k, v in POLICY_SNIPPETS.items()]
+    retrieval = {"steps": [{"retriever": "keyword", "hits": len(hits)}], "docs": hits}
+    return {
+        "retrieval": retrieval,
+        "event_trace": [*state.get("event_trace", []), {"node": "retrieve", "hits": len(hits)}],
+    }
+
+
+def grade_node(state: RagState) -&gt; dict:
+    docs = state["retrieval"].get("docs", [])
+    q = state["question"].lower()
+    sufficient = any(
+        any(w in d["text"].lower() for w in q.split() if len(w) &gt; 4) for d in docs
+    )
+    return {
+        "sufficient_evidence": sufficient,
+        "event_trace": [
+            *state.get("event_trace", []),
+            {"node": "grade", "sufficient": sufficient, "n_docs": len(docs)},
+        ],
+    }
+
+
+def generate_node(state: RagState) -&gt; dict:
+    docs = state["retrieval"].get("docs", [])
+    if not state.get("sufficient_evidence"):
+        answer = "Insufficient evidence in retrieved policies; escalate to human adjuster."
+        citations: list[dict] = []
+    else:
+        top = docs[0]
+        answer = f"Based on {top['doc_id']}: {top['text']}"
+        citations = [{"doc_id": top["doc_id"], "quote": top["text"][:80]}]
+    return {
+        "answer": answer,
+        "citations": citations,
+        "event_trace": [
+            *state.get("event_trace", []),
+            {"node": "generate", "citations": len(citations)},
+        ],
+    }
+
+
+def build_rag_graph():
+    graph = StateGraph(RagState)
+    graph.add_node("retrieve", retrieve_node)
+    graph.add_node("grade", grade_node)
+    graph.add_node("generate", generate_node)
+    graph.add_edge(START, "retrieve")
+    graph.add_edge("retrieve", "grade")
+    graph.add_edge("grade", "generate")
+    graph.add_edge("generate", END)
+    return graph.compile()
+
+
+rag = build_rag_graph()
+print(rag.invoke({
+    "question": "Does collision coverage apply after a rear-end crash?",
+    "retrieval": {},
+    "answer": "",
+    "citations": [],
+    "sufficient_evidence": False,
+    "event_trace": [],
+}))
+</code></pre>
+
+      <div class="exercise" id="ex-a07">
+        <div class="ex-label">Exercise A07 · RAG event order</div>
+        <p>
+          Assert <code class="inline">event_trace</code> node names equal
+          <code class="inline">["retrieve", "grade", "generate"]</code> for the collision
+          question above.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-a08">
+        <div class="ex-label">Exercise A08 · Narrative-grounded questions</div>
+        <p>
+          For <code class="inline">NAR-001</code> and <code class="inline">NAR-007</code>, build
+          a question from the narrative text (first sentence) and run the RAG graph. Print
+          <code class="inline">sufficient_evidence</code> and citation count. No invented
+          claim facts — only fixture text + POLICY_SNIPPETS.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-a09">
+        <div class="ex-label">Exercise A09 · Conditional regenerate (stretch)</div>
+        <p>
+          Change the graph so if <code class="inline">grade</code> finds insufficient evidence,
+          route to a <code class="inline">escalate</code> node (sets a fixed escalate answer)
+          instead of <code class="inline">generate</code>. Use
+          <code class="inline">add_conditional_edges</code> after grade. Test with a nonsense
+          question like <code class="inline">"zzzqqq"</code>.
+        </p>
+      </div>
+
+      <div class="exercise" id="ex-a10">
+        <div class="ex-label">Exercise A10 · Capstone: underwriting + HITL + RAG note</div>
+        <p>
+          Pipeline (still offline):
+        </p>
+        <ol>
+          <li>Load <code class="inline">UW-001</code> through the SqliteSaver HITL graph; pause.</li>
+          <li>Before resume, run the RAG graph with question
+            <code class="inline">"coastal flood zone underwriting referral"</code>; store the
+            answer string in a local variable (not necessarily in graph state).</li>
+          <li>Approve the HITL thread; assert <code class="inline">human_approved</code>.</li>
+          <li>Write
+            <code class="inline">outputs/capstone_uw001.json</code> with
+            <code class="inline">final_route</code>, <code class="inline">rag_answer</code>, and
+            <code class="inline">case_id</code>.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ========== REFERENCE ========== -->
+    <section class="section" id="reference">
+      <h2>June 2026 quick reference</h2>
+      <table>
+        <thead><tr><th>API</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td><code class="inline">StateGraph(State)</code></td><td>Builder bound to TypedDict schema</td></tr>
+          <tr><td><code class="inline">add_node(name, fn)</code></td><td>Register node; fn returns partial state dict</td></tr>
+          <tr><td><code class="inline">add_edge(a, b)</code></td><td>Fixed transition; use START / END sentinels</td></tr>
+          <tr><td><code class="inline">add_conditional_edges(src, router, map?)</code></td><td>Dynamic next node from router return value</td></tr>
+          <tr><td><code class="inline">compile(checkpointer=, interrupt_before=)</code></td><td>Build runnable; optional pause list</td></tr>
+          <tr><td><code class="inline">invoke(state, config=)</code></td><td>Run until END or interrupt</td></tr>
+          <tr><td><code class="inline">invoke(None, config=)</code></td><td>Resume from last checkpoint for thread_id</td></tr>
+          <tr><td><code class="inline">update_state(config, values)</code></td><td>Human / operator patch before resume</td></tr>
+          <tr><td><code class="inline">get_state(config)</code></td><td>Inspect .values and .next</td></tr>
+          <tr><td><code class="inline">MemorySaver()</code></td><td>In-process session store</td></tr>
+          <tr><td><code class="inline">SqliteSaver(connection)</code></td><td>Durable SQLite checkpoints</td></tr>
+          <tr><td><code class="inline">config["configurable"]["thread_id"]</code></td><td>Session / case identity key</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Maps to Week 2 labs</h3>
+      <ul>
+        <li>Day 2 AM — <code class="inline">d2amt6c01_checkpoint_only.py</code>, <code class="inline">d2amt6c02_hitl_resume.py</code></li>
+        <li>Day 2 PM — <code class="inline">d2pmt1c02_supervisor_claim.py</code> (supervisor &rarr; intake &rarr; adjudication)</li>
+        <li>Day 3 PM — <code class="inline">d3pmt1c02_checkpointed_session.py</code> and <code class="inline">d3pmt6c02_integrated_assistant.py</code> (durable session and integrated grounded flow)</li>
+        <li>Fixtures — <code class="inline">data/workflow_cases_15.json</code>,
+          <code class="inline">data/claim_narratives_10.json</code></li>
+      </ul>
+
+      <div class="callout">
+        <strong>Classroom rule</strong>
+        Goodwill credits and hold releases are write operations elsewhere in Week 2 — they need
+        learner approval and an idempotency key. This module’s HITL pattern is the same mental
+        model: pause, decide, resume with an explicit state patch.
+      </div>
+    </section>
+
+    <nav class="nav-footer">
+      <a href="05_langchain_core_providers.html">Prev: 05 LangChain core</a>
+      <a href="../index.html">Index</a>
+      <a href="07_tenacity_reliability.html">Next: 07 Tenacity reliability</a>
+    </nav>
+  </div>
+</body>
+</html>

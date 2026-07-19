@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>16 — diskcache semantic / response cache · Week 2 Mastery</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">Mastery index</a>
+      <a href="15_networkx_graphrag.html">Prev: NetworkX</a>
+      <a href="17_github_actions_eval.html">Next: GitHub Actions eval</a>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">EXL CampusHire · Week 2 · Day 3 PM · Module 16</div>
+      <h1>diskcache — semantic / response cache for retrieval-heavy agents</h1>
+      <p class="lead">
+        Retrieval agents pay for every cold question: embed, search, grade, sometimes regenerate.
+        When operators ask the same policy question twice, you should not re-run that pipeline.
+        This module teaches a durable local cache with <code class="inline">diskcache</code>,
+        sha256 keys over normalized questions, cold vs warm benchmarks, separate bench namespaces,
+        optional TTL, and the Day 3 PM <code class="inline">GroundedAnswer</code> caching pattern.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">Maps to d3pmt5c01-c03</span>
+        <span class="chip">diskcache Cache API · June 2026</span>
+        <span class="chip">Offline-first · no API spend</span>
+        <span class="chip">Insurance RAG lane</span>
+      </div>
+    </header>
+
+    <nav class="toc">
+      <h2>On this page</h2>
+      <ol>
+        <li><a href="#why">Why a response cache beats re-retrieving</a></li>
+        <li><a href="#beginner">Beginner — Cache basics, keys, get/set</a></li>
+        <li><a href="#intermediate">Intermediate — Normalization, namespaces, GroundedAnswer</a></li>
+        <li><a href="#advanced">Advanced — Cold/warm bench, TTL, invalidation, budgets</a></li>
+        <li><a href="#lab-map">Lab map back to W2D3PM</a></li>
+      </ol>
+    </nav>
+
+    <section class="section" id="why">
+      <h2>Why cache retrieval answers?</h2>
+      <p>
+        Day 3 PM builds exact and semantic cache behavior, benchmarks scope invalidation, then
+        carries the result into a provider-backed Pinecone/Anthropic assistant and typed operator decision.
+        That path is correct but expensive on repeats. A <em>semantic response cache</em> stores
+        the finished payload under a key derived from the question text so the second ask is a
+        disk lookup, not another retrieval round.
+      </p>
+      <div class="callout">
+        <strong>Cold path vs warm path</strong>
+        Cold: Question → Retrieve / grade / generate (slow). Warm: Question → cache hit →
+        cached <code class="inline">GroundedAnswer</code> with <code class="inline">cache_hit=True</code> (fast).
+        The first successful answer is written into the store so later identical questions hit warm.
+      </div>
+      <p>
+        This is <em>not</em> vector similarity search. Keys are exact after normalization
+        (lowercase + whitespace collapse), then hashed with sha256. Near-duplicates with different
+        wording miss the cache — that is intentional and safer for policy answers.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Piece</th><th>Day 3 PM location</th><th>Role</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">cache_key()</code></td>
+            <td><code class="inline">W2D3/W2D3PM/d3pmt5c02_semantic_cache.py</code></td>
+            <td>Normalize question → sha256 hex</td>
+          </tr>
+          <tr>
+            <td><code class="inline">open_cache()</code></td>
+            <td><code class="inline">d3pmt5c01_exact_cache.py</code></td>
+            <td>DiskCache exact-answer store with permission and corpus scope</td>
+          </tr>
+          <tr>
+            <td><code class="inline">open_bench_cache()</code></td>
+            <td><code class="inline">d3pmt5c03_cache_benchmark.py</code></td>
+            <td>Separate benchmark cache proving ACL/corpus/embedding invalidation</td>
+          </tr>
+          <tr>
+            <td>Semantic score / benchmark</td>
+            <td><code class="inline">d3pmt5c02_semantic_cache.py</code> and <code class="inline">d3pmt5c03_cache_benchmark.py</code></td>
+            <td>SentenceTransformer scoped similarity plus measured cache lookup/invalidation</td>
+          </tr>
+          <tr>
+            <td><code class="inline">GroundedAnswer.cache_hit</code></td>
+            <td><code class="inline">d3pmt6c02_integrated_assistant.py</code> / <code class="inline">d3pmt6c03_operator_cli.py</code></td>
+            <td>Typed operator-visible cache status with citations and lineage</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ========== BEGINNER ========== -->
+    <section class="section" id="beginner">
+      <h2><span class="level beginner">Beginner</span> Cache basics — open, set, get, persist</h2>
+      <p>
+        <code class="inline">diskcache.Cache</code> is a directory-backed key/value store.
+        Values can be Python dicts (pickled). Keys are usually strings. Open a cache on a folder,
+        write with <code class="inline">cache[key] = value</code>, read with
+        <code class="inline">cache[key]</code> or membership <code class="inline">key in cache</code>.
+      </p>
+      <div class="callout warn">
+        <strong>Working directory</strong>
+        Exercises below assume your notebook or shell cwd is <code class="inline">Week2/ConceptBuilding</code>.
+        Adjust paths if you run from <code class="inline">Week2</code> instead.
+      </div>
+
+      <h3>Install check</h3>
+      <p>
+        From Week2 root (same venv as the rest of the mastery track):
+      </p>
+<pre><code>uv run python -c "import diskcache; print(diskcache.__version__)"</code></pre>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B1 — Open a Cache directory</div>
+        <p>
+          Create a scratch cache under <code class="inline">_scratch/b1_cache</code> and print its directory.
+          Always close when done in long sessions (context manager is fine).
+        </p>
+<pre><code>from pathlib import Path
+import diskcache
+
+cache_dir = Path("_scratch/b1_cache")
+cache_dir.mkdir(parents=True, exist_ok=True)
+
+with diskcache.Cache(str(cache_dir)) as cache:
+    print("directory:", cache.directory)
+    print("size:", len(cache))</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B2 — Set and get a dict payload</div>
+        <p>
+          Store a tiny fake retrieval result and read it back. Confirm the round-trip is identical.
+        </p>
+<pre><code>from pathlib import Path
+import diskcache
+
+cache = diskcache.Cache(str(Path("_scratch/b2_cache")))
+payload = {
+    "question": "Is rental covered after theft?",
+    "answer": "See policy excerpt.",
+    "citations": [{"chunk_id": "c1", "heading": "Rental reimbursement"}],
+    "cache_hit": False,
+}
+cache["demo"] = payload
+loaded = cache["demo"]
+assert loaded["citations"][0]["chunk_id"] == "c1"
+print(loaded)
+cache.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B3 — Membership test before get</div>
+        <p>
+          Prefer <code class="inline">key in cache</code> over catching <code class="inline">KeyError</code>
+          for the ask path — the same pattern used by the prefixed cache examples.
+        </p>
+<pre><code>from pathlib import Path
+import diskcache
+
+cache = diskcache.Cache(str(Path("_scratch/b3_cache")))
+key = "q-001"
+if key in cache:
+    print("hit", cache[key])
+else:
+    print("miss — would retrieve now")
+    cache[key] = {"rounds": 2}
+print("after write:", key in cache)
+cache.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B4 — Persistence across reopen</div>
+        <p>
+          Close the cache, open the same directory again, and prove the value survived process exit.
+        </p>
+<pre><code>from pathlib import Path
+import diskcache
+
+path = Path("_scratch/b4_cache")
+c1 = diskcache.Cache(str(path))
+c1["persist"] = {"ok": True}
+c1.close()
+
+c2 = diskcache.Cache(str(path))
+print(c2["persist"])
+c2.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B5 — Count entries and iterate keys</div>
+        <p>
+          List keys after inserting three questions. Useful for classroom demos of cache growth.
+        </p>
+<pre><code>from pathlib import Path
+import diskcache
+
+cache = diskcache.Cache(str(Path("_scratch/b5_cache")))
+for i, q in enumerate(["theft rental", "burst pipe", "MRI prior auth"], start=1):
+    cache[f"G-00{i}"] = {"question": q}
+print("len:", len(cache))
+print("keys:", list(cache.iterkeys()))
+cache.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B6 — Delete one key and clear all</div>
+        <p>
+          Practice surgical delete vs full clear. Lab benches often <code class="inline">clear()</code>
+          the bench store at the start of a run.
+        </p>
+<pre><code>from pathlib import Path
+import diskcache
+
+cache = diskcache.Cache(str(Path("_scratch/b6_cache")))
+cache["a"] = 1
+cache["b"] = 2
+del cache["a"]
+assert "a" not in cache
+cache.clear()
+assert len(cache) == 0
+print("cleared")
+cache.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B7 — Simulate expensive work only on miss</div>
+        <p>
+          Fake a 50ms retrieval with <code class="inline">time.sleep</code>. First call pays; second call should skip sleep.
+        </p>
+<pre><code>from pathlib import Path
+import time
+import diskcache
+
+cache = diskcache.Cache(str(Path("_scratch/b7_cache")))
+cache.clear()
+
+def retrieve(q: str) -> dict:
+    key = q
+    if key in cache:
+        out = dict(cache[key])
+        out["cache_hit"] = True
+        return out
+    time.sleep(0.05)
+    payload = {"question": q, "answer": "stub", "cache_hit": False}
+    cache[key] = payload
+    return payload
+
+t0 = time.perf_counter()
+print(retrieve("G-001"), "ms", round((time.perf_counter() - t0) * 1000, 1))
+t1 = time.perf_counter()
+print(retrieve("G-001"), "ms", round((time.perf_counter() - t1) * 1000, 1))
+cache.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B8 — Inspect on-disk files</div>
+        <p>
+          After writing a few values, list the cache directory. You should see diskcache control
+          files (not one JSON file per key). Operators should treat the folder as opaque.
+        </p>
+<pre><code>from pathlib import Path
+import diskcache
+
+d = Path("_scratch/b8_cache")
+cache = diskcache.Cache(str(d))
+cache["peek"] = {"n": 1}
+cache.close()
+for p in sorted(d.iterdir()):
+    print(p.name, p.stat().st_size, "bytes")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise B9 — Safe get with default</div>
+        <p>
+          Use <code class="inline">cache.get(key, default=None)</code> when a miss should not raise.
+        </p>
+<pre><code>from pathlib import Path
+import diskcache
+
+cache = diskcache.Cache(str(Path("_scratch/b9_cache")))
+print(cache.get("missing", default={"cache_hit": False, "answer": None}))
+cache.close()</code></pre>
+      </div>
+
+      <div class="callout">
+        <strong>Beginner takeaway</strong>
+        Treat <code class="inline">diskcache.Cache</code> like a durable dict on disk. Open a folder,
+        set payloads, check membership, close. Persistence is why classroom restarts keep warm hits.
+      </div>
+    </section>
+
+    <!-- ========== INTERMEDIATE ========== -->
+    <section class="section" id="intermediate">
+      <h2><span class="level intermediate">Intermediate</span> Keys, namespaces, GroundedAnswer pattern</h2>
+      <p>
+        Production ask paths never use the raw question string as the key. Day 3 PM normalizes
+        whitespace and case, then hashes with sha256 so keys are fixed-length and filesystem-safe.
+        Answer traffic and benchmark traffic use <em>separate directories</em> so
+        <code class="inline">cache-bench</code> clears cannot wipe learner answers.
+      </p>
+
+      <h3>Normalization + sha256 (lab pattern)</h3>
+<pre><code>from hashlib import sha256
+
+def cache_key(question: str) -> str:
+    """Normalize and hash a question for semantic cache lookup."""
+    normalized = " ".join(question.lower().split())
+    return sha256(normalized.encode("utf-8")).hexdigest()</code></pre>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I1 — Implement cache_key</div>
+        <p>
+          Copy the function above and prove that padding and case differences collide to one key.
+        </p>
+<pre><code>from hashlib import sha256
+
+def cache_key(question: str) -> str:
+    normalized = " ".join(question.lower().split())
+    return sha256(normalized.encode("utf-8")).hexdigest()
+
+a = cache_key("  After Theft, is rental car covered?  ")
+b = cache_key("after theft, is rental car covered?")
+c = cache_key("After theft is rental car covered?")  # different punctuation spacing
+print(a == b)   # True
+print(a == c)   # False — wording/punct still matters after normalize
+print(a[:16], "...")</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I2 — Why hash instead of raw text keys?</div>
+        <p>
+          Print key lengths for a short vs long question. Hashes stay 64 hex chars; raw text can be huge or awkward.
+        </p>
+<pre><code>from hashlib import sha256
+
+def cache_key(question: str) -> str:
+    normalized = " ".join(question.lower().split())
+    return sha256(normalized.encode("utf-8")).hexdigest()
+
+short = "MRI?"
+long = ("Are emergency MRI scans covered without prior auth? " * 20).strip()
+print(len(short), "->", len(cache_key(short)))
+print(len(long), "->", len(cache_key(long)))</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I3 — Separate answer vs bench namespaces</div>
+        <p>
+          Open two caches under different folders — mirrors
+          <code class="inline">semantic_cache</code> vs <code class="inline">cache_bench_store</code>.
+          Clear the bench store and confirm the answer store is untouched.
+        </p>
+<pre><code>from pathlib import Path
+import diskcache
+
+answers = diskcache.Cache(str(Path("_scratch/semantic_cache")))
+bench = diskcache.Cache(str(Path("_scratch/cache_bench_store")))
+
+answers["live"] = {"answer": "do not delete me"}
+bench["probe"] = {"rounds": 1}
+bench.clear()
+
+print("bench empty?", len(bench) == 0)
+print("answers still has live?", "live" in answers)
+answers.close()
+bench.close()</code></pre>
+      </div>
+
+      <div class="callout warn">
+        <strong>Do not share one Cache for bench and ask</strong>
+        <code class="inline">d3pmt5c03_cache_benchmark.py</code> uses a dedicated benchmark store
+        on the bench store at start. If that were the answer cache, every demo would erase warm hits
+        operators just earned.
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I4 — GroundedAnswer-shaped payload</div>
+        <p>
+          Store a dict that matches the Day 3 schema fields (lane, question, answer, citations,
+          retrieval_steps, session_id, cache_hit, sufficient_evidence). This is what
+          <code class="inline">cmd_ask</code> caches via <code class="inline">answer.model_dump()</code>.
+        </p>
+<pre><code>from pathlib import Path
+from hashlib import sha256
+import diskcache
+
+def cache_key(question: str) -> str:
+    normalized = " ".join(question.lower().split())
+    return sha256(normalized.encode("utf-8")).hexdigest()
+
+question = "After theft, is rental car covered if the driver lives out of state?"
+payload = {
+    "lane": "insurance",
+    "question": question,
+    "answer": "Based on 2 policy excerpt(s), the relevant clauses are: Rental; Territory.",
+    "citations": [
+        {
+            "chunk_id": "auto-rental-01",
+            "source_file": "auto_policy.md",
+            "heading": "Rental reimbursement",
+            "excerpt": "Rental coverage applies after theft of a covered auto...",
+        }
+    ],
+    "retrieval_steps": [{"round": 1, "action": "retrieve"}],
+    "session_id": None,
+    "cache_hit": False,
+    "sufficient_evidence": True,
+}
+
+cache = diskcache.Cache(str(Path("_scratch/semantic_cache")))
+key = cache_key(question)
+cache[key] = payload
+print("stored under", key[:12], "...")
+cache.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I5 — Ask path: hit sets cache_hit True</div>
+        <p>
+          Replicate the lab guard: on hit, require <code class="inline">citations</code> present;
+          set <code class="inline">cache_hit=True</code> on the returned copy without mutating a stale idea of truth.
+        </p>
+<pre><code>from pathlib import Path
+from hashlib import sha256
+import diskcache
+
+def cache_key(question: str) -> str:
+    normalized = " ".join(question.lower().split())
+    return sha256(normalized.encode("utf-8")).hexdigest()
+
+cache = diskcache.Cache(str(Path("_scratch/semantic_cache")))
+question = "After theft, is rental car covered if the driver lives out of state?"
+key = cache_key(question)
+
+def ask(question: str, no_cache: bool = False) -> dict:
+    key = cache_key(question)
+    if not no_cache and key in cache:
+        payload = cache[key]
+        if isinstance(payload, dict) and payload.get("citations") is not None:
+            payload = dict(payload)
+            payload["cache_hit"] = True
+            return payload
+        # incomplete/stale — fall through and rebuild
+    # pretend retrieve+generate
+    fresh = {
+        "lane": "insurance",
+        "question": question,
+        "answer": "fresh build",
+        "citations": [],
+        "retrieval_steps": [],
+        "session_id": None,
+        "cache_hit": False,
+        "sufficient_evidence": False,
+    }
+    cache[key] = fresh
+    return fresh
+
+print("1:", ask(question)["cache_hit"])
+print("2:", ask(question)["cache_hit"])
+print("bypass:", ask(question, no_cache=True)["cache_hit"])
+cache.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I6 — Reject incomplete cache entries</div>
+        <p>
+          Write a broken entry missing <code class="inline">citations</code>. Your ask helper should
+          ignore it and rebuild (the same rule used by the prefixed cache examples).
+        </p>
+<pre><code>from pathlib import Path
+from hashlib import sha256
+import diskcache
+
+def cache_key(question: str) -> str:
+    normalized = " ".join(question.lower().split())
+    return sha256(normalized.encode("utf-8")).hexdigest()
+
+cache = diskcache.Cache(str(Path("_scratch/i6_cache")))
+q = "burst pipe water damage?"
+key = cache_key(q)
+cache[key] = {"question": q, "answer": "orphan", "cache_hit": False}  # no citations
+
+def ask(question: str) -> dict:
+    key = cache_key(question)
+    if key in cache:
+        payload = cache[key]
+        if isinstance(payload, dict) and payload.get("citations") is not None:
+            payload = dict(payload)
+            payload["cache_hit"] = True
+            return payload
+    fresh = {
+        "question": question,
+        "answer": "rebuilt",
+        "citations": [{"chunk_id": "home-water-02", "heading": "Water damage"}],
+        "cache_hit": False,
+    }
+    cache[key] = fresh
+    return fresh
+
+print(ask(q))
+print("second hit?", ask(q)["cache_hit"])
+cache.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I7 — Optional --no-cache flag</div>
+        <p>
+          Wire a boolean that skips lookup but still writes the fresh result (or skips write —
+          choose one and document it). Lab CLI uses <code class="inline">--no-cache</code> to force retrieve.
+        </p>
+<pre><code>from pathlib import Path
+from hashlib import sha256
+import diskcache
+
+def cache_key(question: str) -> str:
+    normalized = " ".join(question.lower().split())
+    return sha256(normalized.encode("utf-8")).hexdigest()
+
+cache = diskcache.Cache(str(Path("_scratch/i7_cache")))
+cache.clear()
+q = "MRI prior auth?"
+key = cache_key(q)
+cache[key] = {"question": q, "answer": "cached", "citations": [], "cache_hit": False}
+
+def ask(question: str, no_cache: bool = False) -> dict:
+    key = cache_key(question)
+    if not no_cache and key in cache:
+        hit = dict(cache[key])
+        hit["cache_hit"] = True
+        return hit
+    fresh = {"question": question, "answer": "live", "citations": [], "cache_hit": False}
+    cache[key] = fresh
+    return fresh
+
+print(ask(q, no_cache=False)["answer"])  # cached
+print(ask(q, no_cache=True)["answer"])   # live
+cache.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I8 — Write grounded JSON beside the cache</div>
+        <p>
+          Lab still writes <code class="inline">grounded_*.json</code> for assessment even on cache hits.
+          Mirror that: on hit, dump JSON to <code class="inline">_scratch/outputs/</code>.
+        </p>
+<pre><code>from pathlib import Path
+from hashlib import sha256
+import json
+import diskcache
+
+def cache_key(question: str) -> str:
+    normalized = " ".join(question.lower().split())
+    return sha256(normalized.encode("utf-8")).hexdigest()
+
+out = Path("_scratch/outputs")
+out.mkdir(parents=True, exist_ok=True)
+cache = diskcache.Cache(str(Path("_scratch/semantic_cache")))
+
+q = "After theft, is rental car covered if the driver lives out of state?"
+key = cache_key(q)
+payload = dict(cache[key]) if key in cache else {
+    "lane": "insurance",
+    "question": q,
+    "answer": "seed",
+    "citations": [],
+    "cache_hit": False,
+    "sufficient_evidence": True,
+}
+if key in cache:
+    payload["cache_hit"] = True
+else:
+    cache[key] = payload
+
+path = out / "grounded_G-001.json"
+path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+print("Wrote", path, "cache_hit=", payload["cache_hit"])
+cache.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise I9 — Session-aware answers vs cache keys</div>
+        <p>
+          Durable session facts can change the composed answer text. Discuss: should
+          <code class="inline">session_id</code> be part of the key? For the default lab ask path,
+          the key is question-only. If you cache session-flavored answers, include session in the key
+          or you will serve the wrong customer facts.
+        </p>
+<pre><code>from hashlib import sha256
+
+def cache_key(question: str, session_id: str | None = None) -> str:
+    normalized = " ".join(question.lower().split())
+    if session_id:
+        normalized = f"{session_id}::{normalized}"
+    return sha256(normalized.encode("utf-8")).hexdigest()
+
+q = "Does garaging state change rental coverage?"
+print(cache_key(q)[:12])
+print(cache_key(q, "sess_cust_204_a")[:12])
+print(cache_key(q, "sess_cust_204_b")[:12])</code></pre>
+      </div>
+
+      <div class="callout">
+        <strong>Intermediate takeaway</strong>
+        Normalize → sha256 → store full <code class="inline">GroundedAnswer</code> dumps.
+        Keep bench and answer directories separate. Validate cached payloads before trusting a hit.
+      </div>
+    </section>
+
+    <!-- ========== ADVANCED ========== -->
+    <section class="section" id="advanced">
+      <h2><span class="level advanced">Advanced</span> Cold vs warm bench, TTL, invalidation, budgets</h2>
+      <p>
+        Day 3 PM assessment expects a cache benchmark with hits &gt; 0 and faster cached lookup than
+        cold retrieval. You will rebuild that microbench locally, then add TTL and invalidation
+        knobs operators need when policies change.
+      </p>
+
+      <h3>Lab bench sketch</h3>
+      <ol>
+        <li>Open <code class="inline">open_bench_cache()</code>, <code class="inline">clear()</code>.</li>
+        <li>Cold: run retrieve on a repeated question list (lab uses goldens × 34 ≈ 102 queries).</li>
+        <li>Warm store once per unique question.</li>
+        <li>Warm: loop again; count hits and time lookups only.</li>
+        <li>Write <code class="inline">cache_bench.json</code> with cold_ms, warm_ms, speedup_x.</li>
+      </ol>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A1 — Mini cold vs warm bench</div>
+        <p>
+          Use a fake retrieve with sleep. Separate bench directory. Report speedup.
+        </p>
+<pre><code>from pathlib import Path
+from hashlib import sha256
+import time
+import json
+import diskcache
+
+def cache_key(question: str) -> str:
+    normalized = " ".join(question.lower().split())
+    return sha256(normalized.encode("utf-8")).hexdigest()
+
+QUESTIONS = {
+    "G-001": "After theft, is rental car covered if the driver lives out of state?",
+    "G-002": "Is burst pipe water damage covered under homeowners?",
+    "G-005": "Are emergency MRI scans covered without prior auth?",
+}
+
+def fake_retrieve(question: str) -> dict:
+    time.sleep(0.01)
+    return {"question": question, "steps": [1, 2]}
+
+bench = diskcache.Cache(str(Path("_scratch/cache_bench_store")))
+bench.clear()
+queries = list(QUESTIONS.values()) * 10  # 30 queries
+
+t0 = time.perf_counter()
+for q in queries:
+    fake_retrieve(q)
+cold_ms = (time.perf_counter() - t0) * 1000
+
+for q in QUESTIONS.values():
+    key = cache_key(q)
+    retrieval = fake_retrieve(q)
+    bench[key] = {"question": q, "rounds": len(retrieval["steps"])}
+
+t1 = time.perf_counter()
+hits = 0
+for q in queries:
+    key = cache_key(q)
+    if key in bench:
+        hits += 1
+        _ = bench[key]
+warm_ms = (time.perf_counter() - t1) * 1000
+
+payload = {
+    "queries": len(queries),
+    "cold_retrieval_ms": round(cold_ms, 2),
+    "cached_lookup_ms": round(warm_ms, 2),
+    "cache_hits": hits,
+    "speedup_x": round(cold_ms / warm_ms, 2) if warm_ms else None,
+    "lesson": "Semantic cache removes repeat retrieval work on identical questions.",
+}
+out = Path("_scratch/outputs")
+out.mkdir(parents=True, exist_ok=True)
+path = out / "cache_bench.json"
+path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+print(payload)
+print("Wrote", path)
+bench.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A2 — Prove bench clear does not touch answers</div>
+        <p>
+          Seed both stores, run a bench clear, assert answer key remains.
+        </p>
+<pre><code>from pathlib import Path
+import diskcache
+
+answers = diskcache.Cache(str(Path("_scratch/semantic_cache")))
+bench = diskcache.Cache(str(Path("_scratch/cache_bench_store")))
+answers["operator"] = {"answer": "stable"}
+bench["tmp"] = {"rounds": 9}
+# start of cache-bench
+bench.clear()
+assert "operator" in answers
+assert len(bench) == 0
+print("namespaces isolated: OK")
+answers.close()
+bench.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A3 — Optional TTL with expire</div>
+        <p>
+          <code class="inline">diskcache</code> supports per-set expire seconds. Policy updates may
+          need short TTL; immutable goldens may use no expire. Lab default is no TTL — add it as an operator knob.
+        </p>
+<pre><code>from pathlib import Path
+import time
+import diskcache
+
+cache = diskcache.Cache(str(Path("_scratch/a3_ttl")))
+cache.clear()
+cache.set("short", {"answer": "stale soon"}, expire=1)  # seconds
+print("immediate", "short" in cache)
+time.sleep(1.2)
+print("after TTL", "short" in cache)  # False when expired
+cache.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A4 — Cache.set vs __setitem__</div>
+        <p>
+          Prefer <code class="inline">cache.set(key, value, expire=...)</code> when TTL is optional;
+          keep <code class="inline">cache[key] = value</code> for immortal answer entries.
+        </p>
+<pre><code>from pathlib import Path
+import diskcache
+
+cache = diskcache.Cache(str(Path("_scratch/a4_set")))
+cache.clear()
+TTL = None  # or 3600
+
+def store(key: str, value: dict, ttl: int | None = TTL) -> None:
+    if ttl is None:
+        cache[key] = value
+    else:
+        cache.set(key, value, expire=ttl)
+
+store("immortal", {"v": 1})
+store("hourly", {"v": 2}, ttl=3600)
+print(list(cache.iterkeys()))
+cache.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A5 — Invalidate by policy version prefix</div>
+        <p>
+          When markdown policies bump, old citations can be wrong. Namespace keys with a version
+          string so a deploy flips the prefix and old entries naturally miss.
+        </p>
+<pre><code>from hashlib import sha256
+
+POLICY_VERSION = "2026-06-policies-v3"
+
+def cache_key(question: str, version: str = POLICY_VERSION) -> str:
+    normalized = " ".join(question.lower().split())
+    material = f"{version}::{normalized}"
+    return sha256(material.encode("utf-8")).hexdigest()
+
+q = "Is burst pipe water damage covered under homeowners?"
+old = cache_key(q, "2026-05-policies-v2")
+new = cache_key(q, "2026-06-policies-v3")
+print(old == new)  # False — warm cache cold-starts after version bump</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A6 — Budget interaction</div>
+        <p>
+          Cache hits should not consume retrieval rounds from <code class="inline">RAG_MAX_ROUNDS</code>.
+          Track a simple counter: only increment on miss.
+        </p>
+<pre><code>from pathlib import Path
+from hashlib import sha256
+import diskcache
+
+def cache_key(question: str) -> str:
+    normalized = " ".join(question.lower().split())
+    return sha256(normalized.encode("utf-8")).hexdigest()
+
+RAG_MAX_ROUNDS = 3
+retrieval_calls = 0
+cache = diskcache.Cache(str(Path("_scratch/a6_budget")))
+cache.clear()
+
+def ask(q: str) -> dict:
+    global retrieval_calls
+    key = cache_key(q)
+    if key in cache:
+        hit = dict(cache[key])
+        hit["cache_hit"] = True
+        hit["retrieval_calls_so_far"] = retrieval_calls
+        return hit
+    retrieval_calls += 1  # pays budget
+    rounds = min(2, RAG_MAX_ROUNDS)
+    payload = {"question": q, "rounds": rounds, "cache_hit": False}
+    cache[key] = payload
+    payload = dict(payload)
+    payload["retrieval_calls_so_far"] = retrieval_calls
+    return payload
+
+qs = ["theft rental?", "theft rental?", "burst pipe?"]
+for q in qs:
+    print(ask(q))
+print("retrieval_calls", retrieval_calls)  # expect 2
+cache.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A7 — Hit rate report for classroom</div>
+        <p>
+          After a mixed workload, print hits, misses, hit_rate. Assessment cares that hits &gt; 0.
+        </p>
+<pre><code>from pathlib import Path
+from hashlib import sha256
+import diskcache
+
+def cache_key(question: str) -> str:
+    normalized = " ".join(question.lower().split())
+    return sha256(normalized.encode("utf-8")).hexdigest()
+
+cache = diskcache.Cache(str(Path("_scratch/a7_hits")))
+cache.clear()
+stream = [
+    "q1", "q2", "q1", "q3", "q2", "q1", "q4", "q2",
+]
+hits = misses = 0
+for q in stream:
+    key = cache_key(q)
+    if key in cache:
+        hits += 1
+        _ = cache[key]
+    else:
+        misses += 1
+        cache[key] = {"question": q}
+total = hits + misses
+print({
+    "hits": hits,
+    "misses": misses,
+    "hit_rate": round(hits / total, 3),
+})
+cache.close()</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A8 — Run the real lab bench (stretch)</div>
+        <p>
+          From <code class="inline">Week2</code> root, with Day 3 dependencies, shipped policy
+          chunks, Pinecone, and Anthropic ready:
+        </p>
+<pre><code>uv run python W2D3\W2D3PM\d3pmt5c01_exact_cache.py
+uv run python W2D3\W2D3PM\d3pmt5c02_semantic_cache.py
+uv run python W2D3\W2D3PM\d3pmt5c03_cache_benchmark.py
+uv run python W2D3\W2D3PM\d3pmt6c02_integrated_assistant.py --question "Will rental be covered after theft?" --principal claims_adjuster --execute
+uv run python W2D3\W2D3PM\d3pmt6c03_operator_cli.py --question "Will rental be covered after theft?" --principal claims_adjuster --execute</code></pre>
+        <p>
+          Second ask should print <code class="inline">cache_hit=True</code>. Inspect
+          the generated <code class="inline">d3pmt5c01_exact_cache.json</code>,
+          <code class="inline">d3pmt5c02_semantic_cache.json</code>, and
+          <code class="inline">d3pmt5c03_cache_benchmark.json</code> evidence.
+        </p>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise A9 — What not to cache</div>
+        <p>
+          List three payloads that should stay uncached or use short TTL. Write a gate function.
+        </p>
+<pre><code>def should_cache(payload: dict) -> bool:
+    """Only cache grounded answers with evidence."""
+    if not payload.get("sufficient_evidence", False):
+        return False
+    if not payload.get("citations"):
+        return False
+    if payload.get("lane") not in {"insurance", "banking", "logistics"}:
+        return False
+    return True
+
+good = {"lane": "insurance", "citations": [{}], "sufficient_evidence": True}
+bad = {"lane": "insurance", "citations": [], "sufficient_evidence": False}
+print(should_cache(good), should_cache(bad))</code></pre>
+      </div>
+
+      <div class="callout warn">
+        <strong>Operator caution</strong>
+        Caching wrong answers is worse than slow answers. Prefer exact normalized keys, validate
+        citations on read, version keys when policies change, and keep benches in their own store.
+      </div>
+
+      <div class="callout">
+        <strong>Advanced takeaway</strong>
+        Cold/warm benches prove value; TTL and version prefixes manage freshness; budgets only
+        charge misses; <code class="inline">GroundedAnswer.cache_hit</code> makes the win visible in JSON.
+      </div>
+    </section>
+
+    <section class="section" id="lab-map">
+      <h2>Lab map — W2D3PM</h2>
+      <table>
+        <thead>
+          <tr><th>You practiced</th><th>Ship in lab</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cache open / set / get</td>
+            <td><code class="inline">open_cache()</code> in <code class="inline">tools.py</code></td>
+          </tr>
+          <tr>
+            <td>sha256 normalized keys</td>
+            <td><code class="inline">cache_key()</code></td>
+          </tr>
+          <tr>
+            <td>Separate bench namespace</td>
+            <td><code class="inline">open_bench_cache()</code> + <code class="inline">cache.clear()</code></td>
+          </tr>
+          <tr>
+            <td>GroundedAnswer caching</td>
+            <td>The integrated c02 answer path stores <code class="inline">model_dump()</code></td>
+          </tr>
+          <tr>
+            <td>Cold vs warm timing</td>
+            <td><code class="inline">d3pmt5c03_cache_benchmark.py</code> → scoped cache benchmark JSON</td>
+          </tr>
+          <tr>
+            <td>Optional TTL</td>
+            <td>Extension via <code class="inline">cache.set(..., expire=)</code> (not required for pass)</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Concept notebook pointer: <code class="inline">Week2/W2D3/W2D3PM/_CONCEPTS.ipynb</code>, section 5
+        (semantic cache section). Next module moves from local cost control to mocked CI eval trajectories.
+      </p>
+    </section>
+
+    <nav class="nav-footer">
+      <a href="15_networkx_graphrag.html">← Prev: 15 NetworkX GraphRAG</a>
+      <a href="../index.html">Mastery index</a>
+      <a href="17_github_actions_eval.html">Next: 17 GitHub Actions eval →</a>
+    </nav>
+  </div>
+</body>
+</html>

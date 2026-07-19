@@ -1,0 +1,2071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>01 — uv + Jupyter env · Week 2 Mastery</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+
+    <nav class="topnav">
+      <a href="../index.html">&larr; Mastery index</a>
+      <a href="02_dotenv_provider_budgets.html">Next: dotenv &amp; budgets &rarr;</a>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">Module 01 · Week 2 instructor prep · June 2026</div>
+      <h1>uv + Jupyter / ipykernel for the learner environment</h1>
+      <p class="lead">
+        This module is the foundation under every Week 2 lab. One shared virtual environment,
+        one named Jupyter kernel (<code class="inline">exl-week2</code>), and predictable working
+        directories so session notebooks, W2Dx artifacts, and the ConceptBuilding mastery exercises all
+        import the same stack. Follow Beginner &rarr; Intermediate &rarr; Advanced on Windows
+        PowerShell or Ubuntu bash before Day 1 PM ship work.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">Windows PowerShell or Ubuntu bash</span>
+        <span class="chip">cwd: Week2 or Week2/ConceptBuilding</span>
+        <span class="chip">Kernel: exl-week2</span>
+        <span class="chip">Maps to instructor guide D1 bridge</span>
+      </div>
+    </header>
+
+    <nav class="toc" id="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#why-this-matters">Why this underpins all Week 2 labs</a></li>
+        <li><a href="#beginner">Beginner — install uv, venv, requirements</a></li>
+        <li><a href="#intermediate">Intermediate — ipykernel, editors, notebook cwd</a></li>
+        <li><a href="#advanced">Advanced — multi-kernel, pinning, troubleshooting</a></li>
+        <li><a href="#day-mapping">Env checks mapped to Days 1–5</a></li>
+        <li><a href="#path-cookbook">Path cookbook (Week2 vs ConceptBuilding)</a></li>
+        <li><a href="#classroom-checklist">Classroom readiness checklist</a></li>
+      </ol>
+    </nav>
+
+    <!-- ============================================================ -->
+    <section class="section" id="why-this-matters">
+      <h2>Why this underpins all Week 2 labs</h2>
+      <p>
+        The instructor delivery guide
+        (<code class="inline">guide/week2_instructor_guide.html</code>) assumes a single learner
+        codebase extended daily: Claude Agent SDK, LangGraph, MCP, Chroma, LangSmith (free tier),
+        and Presidio. Cohort differences are not separate folders — they are a
+        <code class="inline">LLM_PROVIDER</code> flag in the repo-root <code class="inline">.env</code>.
+        That architecture only works if every notebook and script runs inside the same Python
+        environment.
+      </p>
+      <p>
+        The Week 2 session manifest states the setup once from the <code class="inline">Week2</code>
+        root: create a venv, install <code class="inline">requirements.txt</code>, then register the
+        kernel with display name <strong>Python (EXL Week 2)</strong>. Afternoon labs
+        (<code class="inline">uv run python main.py triage "..."</code>, MCP servers, RAG indexes)
+        reuse that same env. If a learner opens a notebook with the wrong kernel, they will see
+        <code class="inline">ImportError</code> for packages that are already installed — the most
+        common Day 1 support ticket.
+      </p>
+      <div class="callout">
+        <strong>Instructor intent</strong>
+        Spend the first Day 1 AM bridge (or the PM 16:00 bridge) confirming: (1) uv available,
+        (2) <code class="inline">Week2\.venv</code> exists, (3) kernel selected, (4) a one-line
+        <code class="inline">import langgraph, pydantic, dotenv</code> succeeds. Everything later
+        in the mastery track (modules 02–17) and every W2D1–W2D5 lab assumes this gate is green.
+      </div>
+      <table>
+        <thead>
+          <tr><th>Day (guide)</th><th>What breaks without this env</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>D1 foundations + tool agent</td>
+            <td>Concept notebooks, typed tools, Agent SDK triage CLI, provider routing</td>
+          </tr>
+          <tr>
+            <td>D2 orchestration + MCP/A2A</td>
+            <td>Checkpoint SQLite, MCP server process, tenacity retries</td>
+          </tr>
+          <tr>
+            <td>D3 RAG + memory + cache</td>
+            <td>Chroma, sentence-transformers, LlamaIndex, diskcache paths</td>
+          </tr>
+          <tr>
+            <td>D4 eval / CI preview</td>
+            <td>Trajectory fixtures, GitHub Actions local dry-run, LangSmith keys via dotenv</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout warn">
+        <strong>Path convention used in this page</strong>
+        Exercises state the expected current working directory explicitly:
+        <code class="inline">Week2</code> (repo week root) or <code class="inline">Week2\ConceptBuilding</code>
+        (mastery data + HTML). Adjust if your clone lives elsewhere, but keep relative paths
+        consistent. Repo root for git is typically <code class="inline">EXL-CampusHire</code>;
+        Week 2 install always happens from the <code class="inline">Week2</code> folder.
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="beginner">
+      <h2><span class="level beginner">Beginner</span> Install uv, create the Week2 venv, prove imports</h2>
+      <p>
+        Goal: a learner can install uv, create <code class="inline">Week2\.venv</code>, activate it
+        on Windows PowerShell or Ubuntu bash, install from <code class="inline">requirements.txt</code>, and verify
+        core packages import. Also understand why the cohort uses uv instead of plain pip alone.
+      </p>
+
+      <h3>What is uv?</h3>
+      <p>
+        uv is a fast Python package and environment manager from Astral. For Week 2 classroom use
+        we treat it as: (1) a reliable way to create a local venv, and (2) a drop-in replacement for
+        <code class="inline">pip install</code> that is dramatically faster when twenty learners
+        install the same large stack (LangGraph, LlamaIndex, Chroma, transformers) at once.
+        You still get a standard <code class="inline">.venv</code> directory that VS Code, Cursor,
+        and Jupyter understand.
+      </p>
+
+      <h3>Why uv vs pip (classroom rationale)</h3>
+      <table>
+        <thead>
+          <tr><th>Concern</th><th>pip + venv alone</th><th>uv (Week 2 choice)</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cold install of Week2 requirements</td>
+            <td>Often 5–15+ minutes on campus Wi-Fi</td>
+            <td>Typically much faster; less waiting during Day 1 bridge</td>
+          </tr>
+          <tr>
+            <td>Reproducible commands</td>
+            <td>Works, but learners mix <code class="inline">pip</code> / <code class="inline">python -m pip</code></td>
+            <td>Document one pattern: <code class="inline">uv venv</code> + <code class="inline">uv pip install</code></td>
+          </tr>
+          <tr>
+            <td>Running scripts without activating</td>
+            <td>Must activate or use full path</td>
+            <td><code class="inline">uv run python ...</code> uses the project venv automatically</td>
+          </tr>
+          <tr>
+            <td>Compatibility</td>
+            <td>Baseline everyone knows</td>
+            <td>Still creates a normal venv; pip-compatible install flags</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Teaching tip</strong>
+        Say out loud: "uv does not replace Python; it manages environments and installs packages
+        into them." Learners who already know venv + pip transfer immediately.
+      </div>
+
+      <h3>Prerequisites</h3>
+      <ul>
+        <li>Windows 10/11 with PowerShell 5.1+ or PowerShell 7+, <em>or</em> Ubuntu / bash (WSL or native Linux)</li>
+        <li>Python 3.11 or newer on PATH (check with <code class="inline">python --version</code> or <code class="inline">python3 --version</code>)</li>
+        <li>Git clone of <code class="inline">EXL-CampusHire</code> available locally</li>
+        <li>Network access to PyPI (or campus mirror configured by IT)</li>
+      </ul>
+
+      <!-- B1 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise B1 — Confirm Python 3.11+</div>
+        <p>
+          <strong>cwd:</strong> any. Confirm Python 3.11+ is available before installing uv.
+          If this fails, fix Python first — do not proceed.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: any
+python --version
+# Expect: Python 3.11.x or 3.12.x (3.13 may work; labs target 3.11+)
+where.exe python
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: any
+python3 --version
+# Expect: Python 3.11.x or 3.12.x (3.13 may work; labs target 3.11+)
+command -v python3
+</code></pre>
+</div>
+      </div>
+
+      <!-- B2 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise B2 — Install uv</div>
+        <p>
+          <strong>cwd:</strong> any. Install uv using the official installer for your OS
+          (June 2026). Then confirm the binary is on PATH in a <em>new</em> shell if needed.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: any
+# Official uv install (Windows). Prefer a new PowerShell window after install.
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+uv --version
+# Expect a version string such as: uv 0.6.x (or newer as of June 2026)
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: any
+# Official uv install (Linux/macOS). Restart shell or source your profile after install.
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# then: source $HOME/.local/bin/env   (or open a new terminal)
+
+uv --version
+# Expect a version string such as: uv 0.6.x (or newer as of June 2026)
+</code></pre>
+</div>
+        <div class="callout warn">
+          <strong>PATH not found?</strong>
+          Close and reopen the shell, or ensure
+          <code class="inline">%USERPROFILE%\.local\bin</code> (Windows) /
+          <code class="inline">~/.local/bin</code> (Ubuntu) (or the path printed by the installer)
+          is on your user PATH. Re-run <code class="inline">uv --version</code>.
+        </div>
+      </div>
+
+      <!-- B3 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise B3 — Create the project venv</div>
+        <p>
+          <strong>cwd:</strong> navigate to the Week2 folder (parent of W2D1–W2D5 and ConceptBuilding).
+          Create a project virtual environment with uv. Default folder name is
+          <code class="inline">.venv</code>.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2  (example: D:\Ambilio\EXL-CampusHire\Week2)
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+Get-Location
+# Confirm you see ...\Week2
+
+uv venv
+# Creates Week2\.venv with a Python interpreter
+
+Test-Path .\.venv\Scripts\python.exe
+# Expect: True
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2  (example: ~/EXL-CampusHire/Week2)
+cd ~/EXL-CampusHire/Week2
+pwd
+# Confirm you see .../Week2
+
+uv venv
+# Creates Week2/.venv with a Python interpreter
+
+test -x .venv/bin/python && echo ok
+# Expect: ok
+</code></pre>
+</div>
+      </div>
+
+      <!-- B4 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise B4 — Activate the venv</div>
+        <p>
+          <strong>cwd:</strong> Week2. Activate the venv on Windows PowerShell or Ubuntu bash. On Windows the activation
+          script is <code class="inline">.\.venv\Scripts\Activate.ps1</code>; on Ubuntu it is
+          <code class="inline">source .venv/bin/activate</code>. Your prompt should
+          show <code class="inline">(.venv)</code>.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+# If execution policy blocks Activate.ps1 for the current user session:
+# Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+.\.venv\Scripts\Activate.ps1
+
+# Confirm activation
+$env:VIRTUAL_ENV
+# Expect a path ending in Week2\.venv
+
+python -c "import sys; print(sys.executable)"
+# Expect: ...\Week2\.venv\Scripts\python.exe
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+# not needed on Linux (ExecutionPolicy is Windows-only)
+
+source .venv/bin/activate
+
+# Confirm activation
+echo "$VIRTUAL_ENV"
+# Expect a path ending in Week2/.venv
+
+python -c "import sys; print(sys.executable)"
+# Expect: .../Week2/.venv/bin/python
+</code></pre>
+</div>
+        <div class="callout warn">
+          <strong>Execution policy</strong>
+          Campus machines sometimes block scripts on Windows. Prefer
+          <code class="inline">Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass</code>
+          (session only) over changing machine-wide policy. On Ubuntu/bash this does not apply.
+          Alternatively skip activate and use
+          <code class="inline">uv run</code> / full path to <code class="inline">.venv\Scripts\python.exe</code>
+          (Windows) or <code class="inline">.venv/bin/python</code> (Ubuntu).
+        </div>
+      </div>
+
+      <!-- B5 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise B5 — Install requirements.txt</div>
+        <p>
+          <strong>cwd:</strong> Week2 (venv activated or using uv). Install all Week 2 packages from
+          <code class="inline">requirements.txt</code>. Prefer the documented uv form so installs
+          match the instructor guide and session manifest.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+# Recommended (fast, uses the project .venv):
+uv pip install -r requirements.txt
+
+# Equivalent if venv is already activated:
+# python -m pip install -r requirements.txt
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+# Recommended (fast, uses the project .venv):
+uv pip install -r requirements.txt
+
+# Equivalent if venv is already activated:
+# python -m pip install -r requirements.txt
+</code></pre>
+</div>
+        <div class="callout">
+          <strong>What you are installing</strong>
+          Core: python-dotenv, pydantic, ipykernel, jupyterlab. Agent stack: langgraph,
+          langchain-*, anthropic/openai, claude-agent-sdk, mcp. Later days: chroma,
+          sentence-transformers, llama-index, tenacity, diskcache, and related packages.
+          Re-run this command after a <code class="inline">git pull</code> when requirements change.
+        </div>
+      </div>
+
+      <!-- B6 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise B6 — Smoke-import checks</div>
+        <p>
+          <strong>cwd:</strong> Week2. Prove the environment with smoke-import checks. These imports
+          map to Day 1–3 lab surfaces; failing here means stop and fix the venv before opening notebooks.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv run python -c "import dotenv, pydantic, ipykernel; print('core-ok')"
+uv run python -c "import langgraph, langchain_core; print('graph-ok')"
+uv run python -c "import anthropic, openai; print('providers-ok')"
+uv run python -c "import mcp; print('mcp-ok')"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+uv run python -c "import dotenv, pydantic, ipykernel; print('core-ok')"
+uv run python -c "import langgraph, langchain_core; print('graph-ok')"
+uv run python -c "import anthropic, openai; print('providers-ok')"
+uv run python -c "import mcp; print('mcp-ok')"
+</code></pre>
+</div>
+      </div>
+
+      <!-- B7 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise B7 — Compare uv run vs python</div>
+        <p>
+          <strong>cwd:</strong> Week2. Compare <code class="inline">uv run</code> vs activated
+          <code class="inline">python</code>. Both should print the same interpreter path under
+          <code class="inline">Week2\.venv</code>.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv run python -c "import sys; print('uv-run:', sys.executable)"
+
+.\.venv\Scripts\Activate.ps1
+python -c "import sys; print('activated:', sys.executable)"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+uv run python -c "import sys; print('uv-run:', sys.executable)"
+
+source .venv/bin/activate
+python -c "import sys; print('activated:', sys.executable)"
+</code></pre>
+</div>
+      </div>
+
+      <!-- B8 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise B8 — List packages and ipykernel</div>
+        <p>
+          <strong>cwd:</strong> Week2. List installed top-level packages and confirm
+          <code class="inline">ipykernel</code> is present (needed for Intermediate).
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv pip list | Select-String -Pattern "ipykernel|jupyterlab|langgraph|pydantic|python-dotenv"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+uv pip list | grep -E 'ipykernel|jupyterlab|langgraph|pydantic|python-dotenv'
+</code></pre>
+</div>
+      </div>
+
+      <!-- B9 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise B9 — Document uv vs pip</div>
+        <p>
+          <strong>cwd:</strong> Week2. Document why uv vs pip in one learner-facing sentence, then
+          run a timing-friendly reinstall dry check: freeze a short package query. This is a
+          teaching exercise — capture the output for office-hours scripts.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+# Show where pip would install if someone used the wrong Python:
+python -c "import sys; print(sys.prefix)"
+
+# Show uv's view of the same environment:
+uv pip show ipykernel
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+# Show where pip would install if someone used the wrong Python:
+python -c "import sys; print(sys.prefix)"
+
+# Show uv's view of the same environment:
+uv pip show ipykernel
+</code></pre>
+</div>
+        <p>
+          Learner talking point: <em>pip installs into whichever Python is active; uv pip targets
+          the project venv when run from Week2 with <code class="inline">.venv</code> present,
+          which reduces "I installed it but Jupyter cannot see it" mistakes.</em>
+        </p>
+      </div>
+
+      <!-- B10 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise B10 — Deactivate and re-activate</div>
+        <p>
+          <strong>cwd:</strong> Week2. Deactivate and re-activate to practice the daily ritual used
+          in the instructor guide PM bridge ("repo pull, env check").
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+.\.venv\Scripts\Activate.ps1
+deactivate
+# Prompt should lose (.venv)
+
+.\.venv\Scripts\Activate.ps1
+python -c "print('ready for labs')"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+source .venv/bin/activate
+deactivate
+# Prompt should lose (.venv)
+
+source .venv/bin/activate
+python -c "print('ready for labs')"
+</code></pre>
+</div>
+      </div>
+
+      <!-- B11 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise B11 — Verify requirements.txt exists</div>
+        <p>
+          <strong>cwd:</strong> Week2. Verify <code class="inline">requirements.txt</code> exists
+          and skim the header comments so learners know to re-install after pulls.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+Test-Path .\requirements.txt
+Get-Content .\requirements.txt -TotalCount 20
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+test -f requirements.txt && echo True
+head -n 20 requirements.txt
+</code></pre>
+</div>
+      </div>
+
+      <!-- B12 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise B12 — Confirm venv location</div>
+        <p>
+          <strong>cwd:</strong> Week2\ConceptBuilding (optional navigation check). Confirm you can leave Week2
+          and return without breaking the venv location — the venv always lives under Week2, not under ConceptBuilding.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — start cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+.\.venv\Scripts\Activate.ps1
+
+Set-Location .\ConceptBuilding
+Get-Location
+# Still activated; interpreter path unchanged:
+python -c "import sys; print(sys.executable)"
+# Expect: ...\Week2\.venv\Scripts\python.exe  (NOT ...\ConceptBuilding\.venv\...)
+
+Set-Location ..
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — start cwd: Week2
+cd ~/EXL-CampusHire/Week2
+source .venv/bin/activate
+
+cd ConceptBuilding
+pwd
+# Still activated; interpreter path unchanged:
+python -c "import sys; print(sys.executable)"
+# Expect: .../Week2/.venv/bin/python  (NOT .../ConceptBuilding/.venv/...)
+
+cd ..
+</code></pre>
+</div>
+        <div class="callout warn">
+          <strong>Do not create a second venv inside ConceptBuilding</strong>
+          Mastery HTML and data live under <code class="inline">Week2\ConceptBuilding</code>, but the single
+          learner environment is always <code class="inline">Week2\.venv</code>. A nested venv causes
+          split brains across notebooks and CLI labs.
+        </div>
+      </div>
+
+      <!-- B13 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise B13 — Confirm .venv is gitignored</div>
+        <p>
+          <strong>cwd:</strong> Week2. Confirm git sees <code class="inline">.venv</code> as ignored
+          (should not be committed). Learners sometimes force-add it and break classmates' paths.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2  (repo root may be EXL-CampusHire)
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+# From Week2:
+git check-ignore -v .venv 2>$null
+# If check-ignore prints a rule, .venv is ignored (good).
+
+# Also safe: ensure you never stage it
+git status --short .venv
+# Expect empty output
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2  (repo root may be EXL-CampusHire)
+cd ~/EXL-CampusHire/Week2
+
+# From Week2:
+git check-ignore -v .venv 2>/dev/null
+# If check-ignore prints a rule, .venv is ignored (good).
+
+# Also safe: ensure you never stage it
+git status --short .venv
+# Expect empty output
+</code></pre>
+</div>
+      </div>
+
+      <!-- B14 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise B14 — Print learner badge line</div>
+        <p>
+          <strong>cwd:</strong> Week2. Print a learner "badge" line instructors can screenshot during
+          the 11:00 revision — proves Python version + venv in one glance.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv run python -c "import sys,platform; print('EXL-Week2', sys.version.split()[0], platform.system(), sys.executable)"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+uv run python -c "import sys,platform; print('EXL-Week2', sys.version.split()[0], platform.system(), sys.executable)"
+</code></pre>
+</div>
+      </div>
+
+      <h3>Beginner checkpoint</h3>
+      <ul>
+        <li><code class="inline">uv --version</code> works</li>
+        <li><code class="inline">Week2\.venv\Scripts\python.exe</code> (Windows) or <code class="inline">Week2/.venv/bin/python</code> (Ubuntu) exists</li>
+        <li><code class="inline">uv pip install -r requirements.txt</code> completed without error</li>
+        <li>Smoke imports for dotenv, pydantic, langgraph, mcp succeed</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="intermediate">
+      <h2><span class="level intermediate">Intermediate</span> Register the kernel, pick it in editors, fix notebook cwd</h2>
+      <p>
+        Goal: register <code class="inline">exl-week2</code>, select it in VS Code / Cursor / JupyterLab,
+        set notebook working directory so relative paths to <code class="inline">ConceptBuilding\data</code>
+        (or <code class="inline">data</code> from a notebook inside ConceptBuilding) resolve correctly, and
+        run a first cell that reads fixture files used across mastery modules and labs.
+      </p>
+
+      <h3>Why a named kernel?</h3>
+      <p>
+        Jupyter discovers interpreters via kernelspecs. Installing ipykernel with
+        <code class="inline">--name=exl-week2</code> creates a stable label instructors can say aloud:
+        "Select Python (EXL Week 2)." Without this, learners pick a global Python 3.12 that lacks
+        Week 2 packages — or an old Week 1 env — and burn 20 minutes on false ImportErrors.
+      </p>
+      <div class="callout">
+        <strong>Canonical command (session manifest)</strong>
+        From Week2 root, after requirements install:
+        <code class="inline">uv run python -m ipykernel install --user --name=exl-week2 --display-name="Python (EXL Week 2)"</code>
+      </div>
+
+      <!-- I1 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise I1 — Register ipykernel</div>
+        <p>
+          <strong>cwd:</strong> Week2. Register the Jupyter kernelspec for this venv.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv run python -m ipykernel install --user --name=exl-week2 --display-name="Python (EXL Week 2)"
+# Expect a message like: Installed kernelspec exl-week2 in ...\kernels\exl-week2
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+uv run python -m ipykernel install --user --name=exl-week2 --display-name="Python (EXL Week 2)"
+# Expect a message like: Installed kernelspec exl-week2 in .../kernels/exl-week2
+</code></pre>
+</div>
+      </div>
+
+      <!-- I2 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise I2 — List kernelspecs</div>
+        <p>
+          <strong>cwd:</strong> any. List kernelspecs and confirm <code class="inline">exl-week2</code>
+          appears. Note the resource path for later troubleshooting.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: any (Week2 recommended)
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv run jupyter kernelspec list
+# Look for: exl-week2    C:\Users\&lt;you&gt;\AppData\Roaming\jupyter\kernels\exl-week2
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: any (Week2 recommended)
+cd ~/EXL-CampusHire/Week2
+
+uv run jupyter kernelspec list
+# Look for: exl-week2    ~/.local/share/jupyter/kernels/exl-week2
+</code></pre>
+</div>
+      </div>
+
+      <!-- I3 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise I3 — Inspect kernelspec JSON</div>
+        <p>
+          <strong>cwd:</strong> Week2. Inspect the kernelspec JSON to verify it points at
+          <code class="inline">Week2\.venv\Scripts\python.exe</code> (Windows) or
+          <code class="inline">Week2/.venv/bin/python</code> (Ubuntu).
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+$ks = Join-Path $env:APPDATA "jupyter\kernels\exl-week2\kernel.json"
+Test-Path $ks
+Get-Content $ks
+# argv[0] should be the absolute path to Week2\.venv\Scripts\python.exe
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+ks="$HOME/.local/share/jupyter/kernels/exl-week2/kernel.json"
+test -f "$ks" && echo True
+cat "$ks"
+# argv[0] should be the absolute path to Week2/.venv/bin/python
+</code></pre>
+</div>
+        <div class="callout warn">
+          <strong>Wrong argv path</strong>
+          If <code class="inline">kernel.json</code> points at a deleted or different venv, regenerate
+          the kernel (Advanced A5). Do not hand-edit unless you know the absolute path.
+        </div>
+      </div>
+
+      <!-- I4 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise I4 — Select kernel in Cursor</div>
+        <p>
+          Select the kernel in <strong>VS Code or Cursor</strong>. This is UI work; use the shell
+          block only to create a scratch notebook path you can open.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2\ConceptBuilding
+Set-Location D:\Ambilio\EXL-CampusHire\Week2\ConceptBuilding
+
+# Create an empty notebook shell if you do not already have one open:
+if (-not (Test-Path .\scratch_env_check.ipynb)) {
+  @'
+{
+ "cells": [],
+ "metadata": { "kernelspec": { "display_name": "Python (EXL Week 2)", "language": "python", "name": "exl-week2" } },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+'@ | Set-Content -Encoding utf8 .\scratch_env_check.ipynb
+}
+
+# Then in Cursor/VS Code:
+# 1) Open scratch_env_check.ipynb
+# 2) Click kernel picker (top right) -> Select Another Kernel -> Jupyter Kernel
+# 3) Choose "Python (EXL Week 2)" / exl-week2
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2/ConceptBuilding
+cd ~/EXL-CampusHire/Week2/ConceptBuilding
+
+# Create an empty notebook shell if you do not already have one open:
+if [ ! -f scratch_env_check.ipynb ]; then
+  cat &gt; scratch_env_check.ipynb &lt;&lt;'EOF'
+{
+ "cells": [],
+ "metadata": { "kernelspec": { "display_name": "Python (EXL Week 2)", "language": "python", "name": "exl-week2" } },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+EOF
+fi
+
+# Then in Cursor/VS Code:
+# 1) Open scratch_env_check.ipynb
+# 2) Click kernel picker (top right) -> Select Another Kernel -> Jupyter Kernel
+# 3) Choose "Python (EXL Week 2)" / exl-week2
+</code></pre>
+</div>
+      </div>
+
+      <!-- I5 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise I5 — Select kernel in JupyterLab</div>
+        <p>
+          Select the kernel in <strong>JupyterLab</strong> (optional but listed in requirements).
+          Launch from Week2 so the file browser starts near labs.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv run jupyter lab
+# Browser opens JupyterLab.
+# File -> New -> Notebook -> select kernel "Python (EXL Week 2)"
+# Or Kernel -> Change Kernel...
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+uv run jupyter lab
+# Browser opens JupyterLab.
+# File -> New -> Notebook -> select kernel "Python (EXL Week 2)"
+# Or Kernel -> Change Kernel...
+</code></pre>
+</div>
+      </div>
+
+      <!-- I6 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise I6 — Prove notebook uses venv</div>
+        <p>
+          <strong>Notebook cell</strong> (kernel: exl-week2). Prove the notebook uses the Week2 venv
+          and print the process cwd. Run this as the first cell in any session or ConceptBuilding notebook.
+        </p>
+<pre><code># Python — run inside Jupyter with kernel: Python (EXL Week 2)
+# Recommended notebook location for mastery: Week2/ConceptBuilding/*.ipynb
+import sys
+from pathlib import Path
+
+print("executable:", sys.executable)
+print("cwd:", Path.cwd())
+assert ".venv" in sys.executable.replace("\\", "/").lower() or "exl" in sys.executable.lower() or Path(sys.executable).parent.name.lower() == "scripts"
+print("kernel-ok")
+</code></pre>
+        <div class="callout">
+          <strong>About the assert</strong>
+          On a correct install, <code class="inline">sys.executable</code> contains
+          <code class="inline">Week2\.venv\Scripts\python.exe</code> (Windows) or
+          <code class="inline">Week2/.venv/bin/python</code> (Ubuntu). If you see
+          <code class="inline">AppData\Local\Programs\Python\...</code> or a system
+          <code class="inline">/usr/bin/python</code> instead, you picked the wrong kernel.
+        </div>
+      </div>
+
+      <!-- I7 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise I7 — Set notebook cwd to ConceptBuilding</div>
+        <p>
+          Set notebook cwd to <code class="inline">Week2\ConceptBuilding</code>. Editors differ; use an explicit
+          Python chdir so exercises are portable across Cursor, VS Code, and JupyterLab.
+        </p>
+<pre><code># Python — first cell when your notebook lives under Week2/ConceptBuilding or a W2Dx session
+from pathlib import Path
+import os
+
+# Strategy A: notebook already under Week2/ConceptBuilding — keep that cwd
+CONCEPT_BUILDING = Path.cwd()
+if CONCEPT_BUILDING.name != "ConceptBuilding":
+    # Strategy B: notebook under a W2Dx session — walk up to Week2 then into ConceptBuilding
+    week2 = Path.cwd()
+    while week2.name != "Week2" and week2.parent != week2:
+        week2 = week2.parent
+    CONCEPT_BUILDING = week2 / "ConceptBuilding"
+    os.chdir(CONCEPT_BUILDING)
+
+print("notebook cwd set to:", Path.cwd())
+assert Path.cwd().name == "ConceptBuilding"
+assert (Path.cwd() / "data").is_dir()
+</code></pre>
+      </div>
+
+      <!-- I8 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise I8 — Resolve data path tricks</div>
+        <p>
+          <strong>Path tricks</strong> — resolve <code class="inline">data/</code>,
+          <code class="inline">ConceptBuilding/data</code>, or
+          <code class="inline">../ConceptBuilding/data</code> depending on cwd. Mastery index assumes fixtures in
+          <code class="inline">ConceptBuilding/data/</code>.
+        </p>
+<pre><code># Python — assume cwd is Week2/ConceptBuilding (see I7)
+from pathlib import Path
+
+DATA = Path("data")                            # when cwd == Week2/ConceptBuilding
+DATA_ALT = Path("ConceptBuilding") / "data"    # when cwd == Week2
+
+root = Path.cwd()
+if (root / "data").is_dir():
+    data_dir = root / "data"
+elif (root / "ConceptBuilding" / "data").is_dir():
+    data_dir = root / "ConceptBuilding" / "data"
+else:
+    raise FileNotFoundError("Could not find ConceptBuilding/data from cwd=" + str(root))
+
+print("data_dir:", data_dir.resolve())
+print("sample files:", sorted(p.name for p in data_dir.glob("*"))[:8])
+</code></pre>
+      </div>
+
+      <!-- I9 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise I9 — Load FNOL CSV</div>
+        <p>
+          First real read: load FNOL CSV from mastery data. This mirrors insurance-lane fixtures
+          used later in labs and modules.
+        </p>
+<pre><code># Python — cwd should be Week2/ConceptBuilding (set in I7)
+from pathlib import Path
+
+path = Path("data") / "fnol_emails.csv"
+text = path.read_text(encoding="utf-8")
+lines = text.splitlines()
+print("rows including header:", len(lines))
+print("header:", lines[0] if lines else "(empty)")
+print("first data row:", lines[1] if len(lines) > 1 else "(none)")
+</code></pre>
+      </div>
+
+      <!-- I10 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise I10 — Read policy markdown</div>
+        <p>
+          Read a policy markdown file via <code class="inline">data/policies/</code>. Confirms nested
+          relative paths work — important for RAG notebooks on Day 3.
+        </p>
+<pre><code># Python — cwd: Week2/ConceptBuilding
+from pathlib import Path
+
+policy = Path("data") / "policies" / "POL-AUTO-001_coverage.md"
+assert policy.is_file(), policy
+print(policy.read_text(encoding="utf-8")[:400])
+</code></pre>
+      </div>
+
+      <!-- I11 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise I11 — Resolve data from Week2 cwd</div>
+        <p>
+          Same read when cwd is <strong>Week2</strong> (CLI habit). Use <code class="inline">ConceptBuilding/data</code>
+          prefix — this is how many <code class="inline">uv run python</code> scripts should resolve fixtures.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2  (not ConceptBuilding)
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv run python -c "from pathlib import Path; p=Path('ConceptBuilding/data/inventory.json'); print(p.exists(), p.resolve())"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2  (not ConceptBuilding)
+cd ~/EXL-CampusHire/Week2
+
+uv run python -c "from pathlib import Path; p=Path('ConceptBuilding/data/inventory.json'); print(p.exists(), p.resolve())"
+</code></pre>
+</div>
+      </div>
+
+      <!-- I12 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise I12 — Resolve from a session folder</div>
+        <p>
+          Session notebooks live under <code class="inline">Week2\W2D1</code> through <code class="inline">Week2\W2D5</code>.
+          Practice resolving <code class="inline">../ConceptBuilding/data</code> from that folder without chdir.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: a Week 2 session
+Set-Location D:\Ambilio\EXL-CampusHire\Week2\W2D1\W2D1AM
+
+uv run python -c "from pathlib import Path; p=Path('../ConceptBuilding/data/shipment_events.jsonl'); print(p.resolve()); print(p.is_file())"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: a Week 2 session
+cd ~/EXL-CampusHire/Week2/W2D1/W2D1AM
+
+uv run python -c "from pathlib import Path; p=Path('../ConceptBuilding/data/shipment_events.jsonl'); print(p.resolve()); print(p.is_file())"
+</code></pre>
+</div>
+      </div>
+
+      <!-- I13 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise I13 — Set notebookFileRoot</div>
+        <p>
+          Editor setting reminder: in VS Code/Cursor, you can also set
+          <code class="inline">notebook.notebookFileRoot</code> or open the folder
+          <code class="inline">Week2</code> as the workspace so relative paths stay stable.
+          Verify workspace folder with a shell cell equivalent:
+        </p>
+<pre><code># Python — inside notebook
+from pathlib import Path
+import os
+
+print("WORKSPACE hint — parents of cwd:")
+for i, parent in enumerate(Path.cwd().parents):
+    print(i, parent)
+    if parent.name == "Week2":
+        print("found Week2 at parent index", i)
+        break
+</code></pre>
+        <div class="callout warn">
+          <strong>Opened the wrong folder?</strong>
+          If the workspace root is <code class="inline">EXL-CampusHire</code> instead of
+          <code class="inline">Week2</code>, paths like <code class="inline">requirements.txt</code>
+          need <code class="inline">Week2/requirements.txt</code>. Prefer opening
+          <code class="inline">Week2</code> as the folder in Cursor for lab week.
+        </div>
+      </div>
+
+      <!-- I14 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise I14 — End-to-end intermediate gate</div>
+        <p>
+          End-to-end intermediate gate: kernel + cwd + data + one Week2 library import in one cell.
+        </p>
+<pre><code># Python — kernel: Python (EXL Week 2); prefer cwd Week2/ConceptBuilding
+from pathlib import Path
+import os
+import json
+
+# normalize cwd to ConceptBuilding
+cwd = Path.cwd()
+if cwd.name != "ConceptBuilding":
+    week2 = cwd
+    while week2.name != "Week2" and week2.parent != week2:
+        week2 = week2.parent
+    os.chdir(week2 / "ConceptBuilding")
+
+import pydantic
+import langgraph
+
+inv = json.loads(Path("data/inventory.json").read_text(encoding="utf-8"))
+print("pydantic", pydantic.__version__)
+print("inventory type", type(inv).__name__)
+print("intermediate-gate-ok")
+</code></pre>
+      </div>
+
+      <h3>Intermediate checkpoint</h3>
+      <ul>
+        <li>kernelspec <code class="inline">exl-week2</code> listed</li>
+        <li>Notebook UI shows <strong>Python (EXL Week 2)</strong></li>
+        <li><code class="inline">sys.executable</code> points at <code class="inline">Week2\.venv</code></li>
+        <li>Can read <code class="inline">data/fnol_emails.csv</code> and a policy markdown file</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="advanced">
+      <h2><span class="level advanced">Advanced</span> Multiple kernels, pinning, troubleshooting, classroom reproducibility</h2>
+      <p>
+        Goal: support office hours when learners have Week 1 and Week 2 kernels, recover from
+        wrong-venv ImportErrors, regenerate kernelspecs, optionally use JupyterLab as the shared
+        browser IDE, and apply pinning / freeze practices so a classroom of twenty machines stays aligned.
+      </p>
+
+      <h3>Multiple kernels without chaos</h3>
+      <p>
+        It is fine to keep a Week 1 kernel and a Week 2 kernel. Problems start when notebooks do not
+        record which kernel they need, or when a learner installs packages into Week 1's env while
+        running a Week 2 notebook. Convention: Week 2 materials always say
+        <strong>Python (EXL Week 2)</strong> / <code class="inline">exl-week2</code>.
+      </p>
+
+      <!-- A1 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A1 — List and classify kernels</div>
+        <p>
+          <strong>cwd:</strong> any. List all kernels and classify which are Week 2 vs others.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv run jupyter kernelspec list
+# Identify:
+#   exl-week2  -> Week 2 (required)
+#   python3 / other names -> do not use for Week 2 labs unless argv points at Week2\.venv
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+uv run jupyter kernelspec list
+# Identify:
+#   exl-week2  -> Week 2 (required)
+#   python3 / other names -> do not use for Week 2 labs unless argv points at Week2/.venv
+</code></pre>
+</div>
+      </div>
+
+      <!-- A2 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A2 — Compare system vs uv Python</div>
+        <p>
+          Simulate the classic failure: run a Week 2 import with the <em>system</em> Python
+          (wrong). Then run with uv (right). Teach learners to compare the two outputs.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+# Often fails or is stale (depends on machine):
+py -3 -c "import langgraph; print('system-has-langgraph')" 2>&amp;1
+
+# Should succeed:
+uv run python -c "import langgraph; print('venv-has-langgraph')"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+# Often fails or is stale (depends on machine):
+python3 -c "import langgraph; print('system-has-langgraph')" 2&gt;&amp;1
+
+# Should succeed:
+uv run python -c "import langgraph; print('venv-has-langgraph')"
+</code></pre>
+</div>
+        <div class="callout warn">
+          <strong>ImportError: No module named 'langgraph'</strong>
+          Almost always means wrong interpreter, not "requirements failed." Fix kernel /
+          <code class="inline">sys.executable</code> first; only reinstall if the venv Python also fails.
+        </div>
+      </div>
+
+      <!-- A3 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A3 — Diagnose wrong venv</div>
+        <p>
+          Diagnose wrong venv from inside a notebook cell: print executable, prefix, and whether
+          key packages resolve.
+        </p>
+<pre><code># Python — run on a MISBEHAVING notebook to diagnose
+import sys, importlib.util
+from pathlib import Path
+
+print("executable:", sys.executable)
+print("prefix:", sys.prefix)
+for name in ["langgraph", "claude_agent_sdk", "chromadb", "llama_index"]:
+    spec = importlib.util.find_spec(name)
+    print(f"{name}:", "FOUND" if spec else "MISSING")
+
+venv_hint = Path(sys.prefix)
+print("looks like Week2 venv:", (("Scripts" in str(venv_hint) or (venv_hint / "bin" / "python").exists()) and "Week2" in str(venv_hint)))
+</code></pre>
+      </div>
+
+      <!-- A4 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A4 — Force-reinstall a package</div>
+        <p>
+          Force-reinstall a single package into the Week2 venv when a learner corrupted it with a
+          partial install. Prefer uv pip against the project env.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv pip install --reinstall pydantic
+uv run python -c "import pydantic; print(pydantic.__version__)"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+uv pip install --reinstall pydantic
+uv run python -c "import pydantic; print(pydantic.__version__)"
+</code></pre>
+</div>
+      </div>
+
+      <!-- A5 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A5 — Regenerate the kernelspec</div>
+        <p>
+          Regenerate the kernelspec after moving the repo folder or recreating <code class="inline">.venv</code>.
+          Remove the old kernelspec name, then install again.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+# Remove old registration (ignore errors if missing)
+uv run jupyter kernelspec uninstall exl-week2 -y
+
+# Recreate venv only if needed:
+# Remove-Item -Recurse -Force .\.venv
+# uv venv
+# uv pip install -r requirements.txt
+
+uv run python -m ipykernel install --user --name=exl-week2 --display-name="Python (EXL Week 2)"
+uv run jupyter kernelspec list
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+# Remove old registration (ignore errors if missing)
+uv run jupyter kernelspec uninstall exl-week2 -y
+
+# Recreate venv only if needed:
+# rm -rf .venv
+# uv venv
+# uv pip install -r requirements.txt
+
+uv run python -m ipykernel install --user --name=exl-week2 --display-name="Python (EXL Week 2)"
+uv run jupyter kernelspec list
+</code></pre>
+</div>
+      </div>
+
+      <!-- A6 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A6 — Export lock-style pin</div>
+        <p>
+          Pinning strategy for classroom reproducibility. Week2 <code class="inline">requirements.txt</code>
+          uses lower bounds (<code class="inline">&gt;=</code>). For a frozen lab image, export a lock-style
+          freeze from a known-good machine and keep it as an instructor artifact (do not commit secrets).
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+# Capture exact versions from a healthy learner/instructor machine:
+uv pip freeze &gt; .\requirements.freeze.txt
+
+Get-Content .\requirements.freeze.txt -TotalCount 30
+# Instructor may distribute requirements.freeze.txt for "install exactly this"
+# uv pip install -r requirements.freeze.txt
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+# Capture exact versions from a healthy learner/instructor machine:
+uv pip freeze &gt; ./requirements.freeze.txt
+
+head -n 30 requirements.freeze.txt
+# Instructor may distribute requirements.freeze.txt for "install exactly this"
+# uv pip install -r requirements.freeze.txt
+</code></pre>
+</div>
+        <div class="callout">
+          <strong>When to freeze</strong>
+          Use lower bounds during active development (repo default). Freeze on the morning of a
+          cohort start if campus mirrors or upstream breaking releases are a risk. Revisit after Week 2 ends.
+        </div>
+      </div>
+
+      <!-- A7 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A7 — Launch JupyterLab locally</div>
+        <p>
+          Optional JupyterLab as the classroom browser IDE — useful when Cursor licenses are uneven.
+          Launch bound to localhost and open the current session folder.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv run jupyter lab --notebook-dir=.
+# File browser starts at Week2
+# Open W2D1\W2D1AM\_CONCEPTS.ipynb
+# Kernel: Python (EXL Week 2)
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+uv run jupyter lab --notebook-dir=.
+# File browser starts at Week2
+# Open W2D1/W2D1AM/_CONCEPTS.ipynb
+# Kernel: Python (EXL Week 2)
+</code></pre>
+</div>
+      </div>
+
+      <!-- A8 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A8 — Clear checkpoint clutter</div>
+        <p>
+          Clear Jupyter checkpoint clutter and confirm data fixtures still exist — hygiene before
+          assessments (guide: 19:20–20:00 assessment window).
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+Get-ChildItem -Recurse -Directory -Filter ".ipynb_checkpoints" | Select-Object -ExpandProperty FullName
+# Optional cleanup (only if you intend to delete checkpoints):
+# Get-ChildItem -Recurse -Directory -Filter ".ipynb_checkpoints" | Remove-Item -Recurse -Force
+
+Test-Path .\ConceptBuilding\data\rag_goldens.json
+Test-Path .\ConceptBuilding\data\workflow_cases_15.json
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+find . -type d -name '.ipynb_checkpoints'
+# Optional cleanup (only if you intend to delete checkpoints):
+# find . -type d -name '.ipynb_checkpoints' -exec rm -rf {} +
+
+test -f ConceptBuilding/data/rag_goldens.json && echo True
+test -f ConceptBuilding/data/workflow_cases_15.json && echo True
+</code></pre>
+</div>
+      </div>
+
+      <!-- A9 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A9 — Run without activating venv</div>
+        <p>
+          Reproduce the instructor guide Day 1 CLI habit with <code class="inline">uv run</code>
+          without activating the venv — same env as the notebook kernel.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv run python -c "import sys; print(sys.version)"
+uv run python -c "import langgraph, pydantic, dotenv; print('d1-bridge-ok')"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+uv run python -c "import sys; print(sys.version)"
+uv run python -c "import langgraph, pydantic, dotenv; print('d1-bridge-ok')"
+</code></pre>
+</div>
+      </div>
+
+      <!-- A10 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A10 — Conflict drill two terminals</div>
+        <p>
+          Conflict drill: two terminals, one activated Week2 venv, one not. Show that
+          <code class="inline">pip install</code> without activation can hit the wrong Python.
+          Prefer always prefixing with <code class="inline">uv pip</code> from Week2.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — Terminal A (correct)
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+uv pip show tenacity
+
+# PowerShell — Terminal B (dangerous pattern demo — do not use for real installs)
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+# where.exe pip
+# pip show tenacity
+# If this differs from Terminal A, you have proven the footgun.
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — Terminal A (correct)
+cd ~/EXL-CampusHire/Week2
+uv pip show tenacity
+
+# bash — Terminal B (dangerous pattern demo — do not use for real installs)
+cd ~/EXL-CampusHire/Week2
+# command -v pip
+# pip show tenacity
+# If this differs from Terminal A, you have proven the footgun.
+</code></pre>
+</div>
+      </div>
+
+      <!-- A11 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A11 — Rebuild from scratch</div>
+        <p>
+          Rebuild from scratch on a loaner laptop (disaster recovery). Run as a checklist; only
+          delete <code class="inline">.venv</code> if you intend a full reset.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+# FULL RESET (destructive to local env only — not git files):
+# Remove-Item -Recurse -Force .\.venv
+
+uv venv
+uv pip install -r requirements.txt
+uv run python -m ipykernel install --user --name=exl-week2 --display-name="Python (EXL Week 2)"
+uv run python -c "import langgraph, mcp, pydantic; print('rebuild-ok')"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+# FULL RESET (destructive to local env only — not git files):
+# rm -rf .venv
+
+uv venv
+uv pip install -r requirements.txt
+uv run python -m ipykernel install --user --name=exl-week2 --display-name="Python (EXL Week 2)"
+uv run python -c "import langgraph, mcp, pydantic; print('rebuild-ok')"
+</code></pre>
+</div>
+        <div class="callout warn">
+          <strong>Permission</strong>
+          Deleting <code class="inline">.venv</code> is local and recoverable via reinstall, but
+          close Jupyter/Cursor kernels first or the OS may lock files.
+        </div>
+      </div>
+
+      <!-- A12 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A12 — Classroom reproducibility checks</div>
+        <p>
+          Classroom reproducibility tips as runnable checks: Python version floor, venv present,
+          data present, core imports present. Shell-safe one-liner form (Windows PowerShell or Ubuntu bash).
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv run python -c "import sys; from pathlib import Path; assert sys.version_info &gt;= (3, 11), sys.version; root = Path('.').resolve(); assert (root / '.venv').is_dir(), 'missing .venv'; assert (root / 'requirements.txt').is_file(), 'missing requirements.txt'; assert (root / 'ConceptBuilding' / 'data').is_dir(), 'missing ConceptBuilding/data'; import dotenv, pydantic, ipykernel, langgraph; print('classroom-ready', sys.version.split()[0])"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+uv run python -c "import sys; from pathlib import Path; assert sys.version_info &gt;= (3, 11), sys.version; root = Path('.').resolve(); assert (root / '.venv').is_dir(), 'missing .venv'; assert (root / 'requirements.txt').is_file(), 'missing requirements.txt'; assert (root / 'ConceptBuilding' / 'data').is_dir(), 'missing ConceptBuilding/data'; import dotenv, pydantic, ipykernel, langgraph; print('classroom-ready', sys.version.split()[0])"
+</code></pre>
+</div>
+      </div>
+
+      <!-- A13 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A13 — Confirm python-dotenv import</div>
+        <p>
+          Link env health to the next mastery module (dotenv &amp; budgets). Confirm
+          <code class="inline">python-dotenv</code> imports; do not create secrets yet — that is module 02.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv run python -c "import dotenv; print('dotenv', dotenv.__version__)"
+Test-Path .\.env.example
+# Next module: copy .env.example to .env and set LLM_PROVIDER — do that in 02_dotenv_provider_budgets.html
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+uv run python -c "import dotenv; print('dotenv', dotenv.__version__)"
+test -f .env.example && echo True
+# Next module: copy .env.example to .env and set LLM_PROVIDER — do that in 02_dotenv_provider_budgets.html
+</code></pre>
+</div>
+      </div>
+
+      <!-- A14 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A14 — Map packages to day themes</div>
+        <p>
+          Map this env to the build thread in the instructor guide: one codebase, five ship days.
+          Run a tiny inventory of packages vs day themes.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv run python -c @"
+mods = {
+  'D1': ['langgraph', 'langchain_core', 'anthropic', 'mcp'],
+  'D2': ['tenacity'],
+  'D3': ['chromadb', 'sentence_transformers'],
+}
+import importlib
+for day, names in mods.items():
+    for n in names:
+        try:
+            importlib.import_module(n)
+            print(day, n, 'OK')
+        except Exception as e:
+            print(day, n, 'FAIL', type(e).__name__)
+"@
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+uv run python -c '
+mods = {
+  "D1": ["langgraph", "langchain_core", "anthropic", "mcp"],
+  "D2": ["tenacity"],
+  "D3": ["chromadb", "sentence_transformers"],
+}
+import importlib
+for day, names in mods.items():
+    for n in names:
+        try:
+            importlib.import_module(n)
+            print(day, n, "OK")
+        except Exception as e:
+            print(day, n, "FAIL", type(e).__name__)
+'
+</code></pre>
+</div>
+      </div>
+
+      <h3>Advanced checkpoint</h3>
+      <ul>
+        <li>Can explain ImportError as wrong kernel vs missing install</li>
+        <li>Can uninstall/reinstall <code class="inline">exl-week2</code> kernelspec</li>
+        <li>Can produce <code class="inline">requirements.freeze.txt</code> for cohort lock-down</li>
+        <li>Can rebuild <code class="inline">.venv</code> from scratch on a clean machine</li>
+      </ul>
+
+      <h3>Office-hours decision tree</h3>
+      <p>
+        When a learner raises their hand during the Day 1 bridge or mid-lab, run this tree in order.
+        Skipping to "reinstall everything" wastes the assessment window.
+      </p>
+      <ol>
+        <li>Ask for the notebook kernel display name. If it is not <strong>Python (EXL Week 2)</strong>, switch and rerun the failing cell.</li>
+        <li>Run a cell printing <code class="inline">sys.executable</code>. It must contain <code class="inline">Week2\.venv</code>.</li>
+        <li>From Windows PowerShell or Ubuntu bash in Week2, run <code class="inline">uv run python -c "import langgraph"</code>. If this works but the notebook fails, the problem is kernel selection only.</li>
+        <li>If <code class="inline">uv run</code> also fails, reinstall requirements into the project venv.</li>
+        <li>If <code class="inline">.venv</code> is missing or the venv python is locked/corrupt, recreate venv and regenerate the kernelspec (A5 / A11).</li>
+        <li>Only after env health is green, debug application code, API keys, or path-to-data issues.</li>
+      </ol>
+
+      <!-- A15 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A15 — Office-hours health script</div>
+        <p>
+          Time-boxed office-hours script (under two minutes). Instructors can paste this when
+          walking the room during the 16:00 PM bridge from the instructor guide.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+Write-Host "=== UV ==="
+uv --version
+Write-Host "=== VENV ==="
+Test-Path .\.venv\Scripts\python.exe
+Write-Host "=== IMPORTS ==="
+uv run python -c "import langgraph, pydantic, dotenv, ipykernel; print('imports-ok')"
+Write-Host "=== KERNEL ==="
+uv run jupyter kernelspec list
+Write-Host "=== DATA ==="
+Test-Path .\ConceptBuilding\data\fnol_emails.csv
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+echo "=== UV ==="
+uv --version
+echo "=== VENV ==="
+test -x .venv/bin/python && echo ok
+echo "=== IMPORTS ==="
+uv run python -c "import langgraph, pydantic, dotenv, ipykernel; print('imports-ok')"
+echo "=== KERNEL ==="
+uv run jupyter kernelspec list
+echo "=== DATA ==="
+test -f ConceptBuilding/data/fnol_emails.csv && echo True
+</code></pre>
+</div>
+      </div>
+
+      <!-- A16 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A16 — Package name vs import name</div>
+        <p>
+          Distinguish package name vs import name (common after pip list confusion).
+          Example: <code class="inline">python-dotenv</code> installs as import
+          <code class="inline">dotenv</code>; <code class="inline">claude-agent-sdk</code> may import as
+          a different module path depending on version — always verify with import, not assumptions.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv pip show python-dotenv
+uv run python -c "import dotenv; print('import name ok', dotenv.__file__)"
+
+uv pip show claude-agent-sdk
+uv run python -c "import importlib.util; print('claude_agent_sdk', bool(importlib.util.find_spec('claude_agent_sdk'))); print('claude_agent', bool(importlib.util.find_spec('claude_agent')))"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+uv pip show python-dotenv
+uv run python -c "import dotenv; print('import name ok', dotenv.__file__)"
+
+uv pip show claude-agent-sdk
+uv run python -c "import importlib.util; print('claude_agent_sdk', bool(importlib.util.find_spec('claude_agent_sdk'))); print('claude_agent', bool(importlib.util.find_spec('claude_agent')))"
+</code></pre>
+</div>
+      </div>
+
+      <!-- A17 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A17 — Proxy network drill</div>
+        <p>
+          Proxy / corporate network drill. If uv or pip cannot reach PyPI, set mirror env vars for
+          the session (values depend on campus IT — placeholders shown).
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+# Only if IT provides a mirror. Example placeholders — replace with real campus URLs:
+# $env:UV_INDEX_URL = "https://pypi.example.edu/simple"
+# $env:PIP_INDEX_URL = "https://pypi.example.edu/simple"
+
+uv pip install -r requirements.txt
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+# Only if IT provides a mirror. Example placeholders — replace with real campus URLs:
+# export UV_INDEX_URL="https://pypi.example.edu/simple"
+# export PIP_INDEX_URL="https://pypi.example.edu/simple"
+
+uv pip install -r requirements.txt
+</code></pre>
+</div>
+        <div class="callout warn">
+          <strong>Do not invent mirrors</strong>
+          If installs fail with network errors, escalate to IT with the exact error line. Do not
+          paste untrusted index URLs from chat.
+        </div>
+      </div>
+
+      <!-- A18 -->
+      <div class="exercise">
+        <div class="ex-label">Exercise A18 — Share one env across folders</div>
+        <p>
+          Verify that session notebooks and ConceptBuilding mastery share one env by importing from
+          both directory contexts without creating a second venv.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd switches intentionally
+Set-Location D:\Ambilio\EXL-CampusHire\Week2\W2D1\W2D1AM
+uv run --directory ..\..\.. python -c "import langgraph; print('from session via Week2 venv ok')"
+
+Set-Location D:\Ambilio\EXL-CampusHire\Week2\ConceptBuilding
+uv run --directory .. python -c "import langgraph; print('from ConceptBuilding via Week2 venv ok')"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd switches intentionally
+cd ~/EXL-CampusHire/Week2/W2D1/W2D1AM
+uv run --directory ../../.. python -c "import langgraph; print('from session via Week2 venv ok')"
+
+cd ~/EXL-CampusHire/Week2/ConceptBuilding
+uv run --directory .. python -c "import langgraph; print('from ConceptBuilding via Week2 venv ok')"
+</code></pre>
+</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="day-mapping">
+      <h2>How the env shows up each Week 2 day</h2>
+      <p>
+        The mastery index maps modules to days. This section ties the <em>same</em>
+        <code class="inline">exl-week2</code> environment to the instructor guide ship thread so
+        facilitators know what "env check" means on each afternoon.
+      </p>
+
+      <h3>Day 1 — Foundations + tool agent</h3>
+      <p>
+        Morning session notebook topics (01 through 06)
+        and afternoon Agent SDK triage all need langgraph, pydantic, provider SDKs, and mcp.
+        The PM bridge should include the A15 script. Module 02 (dotenv) happens before provider API calls.
+      </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2 — Day 1 bridge
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+uv run python -c "import langgraph, pydantic, anthropic, openai, mcp; print('d1-packages-ok')"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2 — Day 1 bridge
+cd ~/EXL-CampusHire/Week2
+uv run python -c "import langgraph, pydantic, anthropic, openai, mcp; print('d1-packages-ok')"
+</code></pre>
+</div>
+
+      <h3>Day 2 — Orchestration + MCP / A2A</h3>
+      <p>
+        Checkpoint SQLite extras and tenacity must already be in requirements. Learners should not
+        create a new env mid-week. If Day 2 morning shows missing tenacity, they skipped the
+        requirements install or used the wrong kernel overnight.
+      </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2 — Day 2 bridge
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+uv run python -c "import tenacity, langgraph; print('d2-packages-ok')"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2 — Day 2 bridge
+cd ~/EXL-CampusHire/Week2
+uv run python -c "import tenacity, langgraph; print('d2-packages-ok')"
+</code></pre>
+</div>
+
+      <h3>Day 3 — RAG + memory + cache</h3>
+      <p>
+        Heavier packages (chroma, sentence-transformers, llama-index) dominate install time. That is
+        why Day 1 install must complete fully — waiting for transformers wheels during Day 3 lab
+        destroys the schedule. Confirm data fixtures under <code class="inline">ConceptBuilding\data</code>
+        for goldens and policy markdown.
+      </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2 — Day 3 bridge
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+uv run python -c "import chromadb, sentence_transformers; print('d3-embed-ok')"
+Test-Path .\ConceptBuilding\data\rag_goldens.json
+Test-Path .\ConceptBuilding\data\policies\POL-AUTO-001_coverage.md
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2 — Day 3 bridge
+cd ~/EXL-CampusHire/Week2
+uv run python -c "import chromadb, sentence_transformers; print('d3-embed-ok')"
+test -f ConceptBuilding/data/rag_goldens.json && echo True
+test -f ConceptBuilding/data/policies/POL-AUTO-001_coverage.md && echo True
+</code></pre>
+</div>
+
+      <h3>Day 4 — Eval / CI preview</h3>
+      <p>
+        Trajectory fixtures and mocked CI should run without extra pip installs if requirements
+        were complete. Env issues on Day 4 are almost always wrong kernel after a laptop reboot.
+      </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2 — Day 4 bridge
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+uv run python -c "import pydantic, dotenv; print('d4-core-ok')"
+Test-Path .\ConceptBuilding\data\workflow_cases_15.json
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2 — Day 4 bridge
+cd ~/EXL-CampusHire/Week2
+uv run python -c "import pydantic, dotenv; print('d4-core-ok')"
+test -f ConceptBuilding/data/workflow_cases_15.json && echo True
+</code></pre>
+</div>
+
+      <h3>Day 5 — Demo + governance</h3>
+      <p>
+        Demo machines must boot into the known kernel. Prefer
+        <code class="inline">uv run</code> for demo CLIs so activation state does not matter on stage.
+      </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2 — demo machine
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+uv run python -c "import sys; print(sys.executable); import langgraph; print('demo-env-ok')"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2 — demo machine
+cd ~/EXL-CampusHire/Week2
+uv run python -c "import sys; print(sys.executable); import langgraph; print('demo-env-ok')"
+</code></pre>
+</div>
+
+      <div class="callout">
+        <strong>Single codebase reminder</strong>
+        Per <code class="inline">guide/week2_instructor_guide.html</code>, Anthropic vs OpenRouter is
+        a <code class="inline">.env</code> switch — not a second virtualenv. Never tell one cohort to
+        <code class="inline">uv venv</code> into a differently named env for provider reasons.
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="path-cookbook">
+      <h2>Path cookbook (Week2 vs Week2/ConceptBuilding)</h2>
+      <p>
+        Relative paths are the second most common failure after wrong kernels. Keep this cookbook
+        visible during mastery modules that read <code class="inline">ConceptBuilding/data</code>.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Your cwd</th><th>Read FNOL CSV with</th><th>Read policy md with</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">Week2</code></td>
+            <td><code class="inline">ConceptBuilding/data/fnol_emails.csv</code></td>
+            <td><code class="inline">ConceptBuilding/data/policies/POL-AUTO-001_coverage.md</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">Week2\ConceptBuilding</code></td>
+            <td><code class="inline">data/fnol_emails.csv</code></td>
+            <td><code class="inline">data/policies/POL-AUTO-001_coverage.md</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">Week2\W2Dx\W2DxAM</code></td>
+            <td><code class="inline">../ConceptBuilding/data/fnol_emails.csv</code></td>
+            <td><code class="inline">../ConceptBuilding/data/policies/POL-AUTO-001_coverage.md</code></td>
+          </tr>
+          <tr>
+            <td><code class="inline">Week2\W2D1\...</code></td>
+            <td>Prefer resolve-to-Week2 helper (see below)</td>
+            <td>Prefer resolve-to-Week2 helper (see below)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise Path-1 — Portable notebook path resolver</div>
+        <p>
+          Portable resolver you can paste at the top of any Week 2 notebook. Works whether the
+          notebook started in ConceptBuilding or a W2Dx session folder.
+        </p>
+<pre><code># Python — any Week 2 notebook using kernel Python (EXL Week 2)
+from pathlib import Path
+
+def find_week2() -&gt; Path:
+    here = Path.cwd().resolve()
+    for candidate in [here, *here.parents]:
+        if candidate.name == "Week2" and (candidate / "requirements.txt").is_file():
+            return candidate
+    raise FileNotFoundError("Could not locate Week2 root from " + str(here))
+
+WEEK2 = find_week2()
+DATA = WEEK2 / "ConceptBuilding" / "data"
+print("WEEK2:", WEEK2)
+print("DATA:", DATA)
+print("fnol exists:", (DATA / "fnol_emails.csv").is_file())
+</code></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise Path-2 — Prove both path styles</div>
+        <p>
+          <strong>cwd:</strong> Week2. Prove both path styles from the shell so CLI labs and notebooks agree.
+        </p>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — cwd: Week2
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+
+uv run python -c "from pathlib import Path; print((Path('ConceptBuilding/data/delay_events.jsonl')).is_file())"
+
+Set-Location .\ConceptBuilding
+uv run --directory .. python -c "from pathlib import Path; print(Path('data/delay_events.jsonl').is_file())"
+# Note: when using --directory .., relative Path() is still evaluated from process cwd (ConceptBuilding).
+# Prefer absolute via Week2 resolve in notebooks (Path-1).
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — cwd: Week2
+cd ~/EXL-CampusHire/Week2
+
+uv run python -c "from pathlib import Path; print((Path('ConceptBuilding/data/delay_events.jsonl')).is_file())"
+
+cd ConceptBuilding
+uv run --directory .. python -c "from pathlib import Path; print(Path('data/delay_events.jsonl').is_file())"
+# Note: when using --directory .., relative Path() is still evaluated from process cwd (ConceptBuilding).
+# Prefer absolute via Week2 resolve in notebooks (Path-1).
+</code></pre>
+</div>
+      </div>
+
+      <div class="exercise">
+        <div class="ex-label">Exercise Path-3 — Load JSONL shipment events</div>
+        <p>
+          Load JSONL shipment events with an explicit encoding and a small print — validates that
+          logistics-lane fixtures are reachable before MCP hold-release labs.
+        </p>
+<pre><code># Python — use Path-1 helper first, or set cwd to Week2/ConceptBuilding
+from pathlib import Path
+
+data = Path("data") / "shipment_events.jsonl"
+if not data.is_file():
+    data = Path("ConceptBuilding") / "data" / "shipment_events.jsonl"
+
+lines = data.read_text(encoding="utf-8").splitlines()
+print("events:", len(lines))
+print("first:", lines[0][:200] if lines else "")
+</code></pre>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="classroom-checklist">
+      <h2>Classroom readiness checklist</h2>
+      <p>
+        Use this before Day 1 PM (Agentic Operations Assistant) or any time the guide says
+        "repo pull, env check."
+      </p>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Check</th><th>Command / action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>uv installed</td><td><code class="inline">uv --version</code></td></tr>
+          <tr><td>2</td><td>Week2\.venv exists</td><td>Windows: <code class="inline">Test-Path .\.venv\Scripts\python.exe</code> · Ubuntu: <code class="inline">test -x .venv/bin/python &amp;&amp; echo ok</code></td></tr>
+          <tr><td>3</td><td>requirements installed</td><td><code class="inline">uv pip install -r requirements.txt</code></td></tr>
+          <tr><td>4</td><td>kernel registered</td><td><code class="inline">jupyter kernelspec list</code> shows exl-week2</td></tr>
+          <tr><td>5</td><td>notebook kernel selected</td><td>UI shows Python (EXL Week 2)</td></tr>
+          <tr><td>6</td><td>imports work</td><td><code class="inline">import langgraph, pydantic, dotenv</code></td></tr>
+          <tr><td>7</td><td>data visible</td><td><code class="inline">ConceptBuilding/data/fnol_emails.csv</code> readable</td></tr>
+          <tr><td>8</td><td>ready for module 02</td><td><code class="inline">.env.example</code> present; secrets not committed</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout">
+        <strong>How this page connects forward</strong>
+        Module 02 (dotenv &amp; provider budgets) assumes this environment. Modules 03–17 and all
+        W2D1–W2D5 labs assume the same kernel. The instructor guide's single-codebase /
+        <code class="inline">LLM_PROVIDER</code> model never works if half the room is on a different Python.
+      </div>
+
+      <div class="callout warn">
+        <strong>Support script (say this in office hours)</strong>
+        "Show me <code class="inline">sys.executable</code> from the notebook. If it is not under
+        <code class="inline">Week2\.venv</code>, change kernel before we reinstall anything."
+      </div>
+
+      <h3>Quick reference — copy block</h3>
+<div class="os-pair">
+  <div class="os-label windows">Windows PowerShell</div>
+  <pre class="os-windows"><code># PowerShell — full happy path from zero (cwd will be Week2)
+Set-Location D:\Ambilio\EXL-CampusHire\Week2
+uv --version
+uv venv
+uv pip install -r requirements.txt
+uv run python -m ipykernel install --user --name=exl-week2 --display-name="Python (EXL Week 2)"
+uv run python -c "import langgraph, pydantic, dotenv; print('week2-env-ready')"
+</code></pre>
+  <div class="os-label ubuntu">Ubuntu / bash</div>
+  <pre class="os-ubuntu"><code># bash — full happy path from zero (cwd will be Week2)
+cd ~/EXL-CampusHire/Week2
+uv --version
+uv venv
+uv pip install -r requirements.txt
+uv run python -m ipykernel install --user --name=exl-week2 --display-name="Python (EXL Week 2)"
+uv run python -c "import langgraph, pydantic, dotenv; print('week2-env-ready')"
+</code></pre>
+</div>
+
+      <h3>Common failures (cheat sheet)</h3>
+      <table>
+        <thead>
+          <tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">uv</code> not recognized</td>
+            <td>PATH / need new shell</td>
+            <td>Reopen shell; reinstall uv; check <code class="inline">.local\bin</code> (Windows) or <code class="inline">~/.local/bin</code> (Ubuntu)</td>
+          </tr>
+          <tr>
+            <td>Activate.ps1 disabled (Windows)</td>
+            <td>Execution policy</td>
+            <td>Process-scoped Bypass, or use <code class="inline">uv run</code> only (N/A on Ubuntu)</td>
+          </tr>
+          <tr>
+            <td>ModuleNotFoundError in notebook</td>
+            <td>Wrong kernel</td>
+            <td>Select Python (EXL Week 2); verify <code class="inline">sys.executable</code></td>
+          </tr>
+          <tr>
+            <td>FileNotFoundError for data/</td>
+            <td>Wrong cwd</td>
+            <td>chdir to <code class="inline">Week2\ConceptBuilding</code> or use <code class="inline">ConceptBuilding/data</code> from Week2</td>
+          </tr>
+          <tr>
+            <td>kernel.json points to missing python</td>
+            <td>Moved repo or deleted .venv</td>
+            <td>Recreate venv; reinstall kernelspec</td>
+          </tr>
+          <tr>
+            <td>Packages installed but still missing</td>
+            <td>Installed into non-venv Python</td>
+            <td><code class="inline">uv pip install -r requirements.txt</code> from Week2</td>
+          </tr>
+          <tr>
+            <td>Jupyter opens but kernel stuck on "starting"</td>
+            <td>Stale kernelspec or antivirus lock</td>
+            <td>Close editors; rerun I1; reboot if <code class="inline">python.exe</code> locked</td>
+          </tr>
+          <tr>
+            <td>Works in terminal, fails in notebook</td>
+            <td>Editor selected global Python</td>
+            <td>Pick Jupyter kernel <code class="inline">exl-week2</code>, not "Python 3.12"</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>What success looks like before module 02</h3>
+      <p>
+        A learner is ready for <code class="inline">02_dotenv_provider_budgets.html</code> when they can
+        (1) activate or <code class="inline">uv run</code> from Week2, (2) open any session
+        notebook on kernel <strong>Python (EXL Week 2)</strong>, (3) read a file under
+        <code class="inline">ConceptBuilding/data</code>, and (4) import <code class="inline">dotenv</code> without
+        error. Module 02 then teaches <code class="inline">LLM_PROVIDER</code>, keys, and budgets —
+        not environment creation.
+      </p>
+      <div class="callout">
+        <strong>Facilitator close-out line</strong>
+        "Env is a solved problem. From here on, ImportError means you changed kernels or pulled new
+        requirements — re-run the Day bridge script, do not reinvent the venv."
+      </div>
+
+      <h3>FAQ (fast answers)</h3>
+      <p><strong>Q: Can I use conda instead of uv?</strong><br />
+      A: Not for this cohort. The instructor guide and session manifest standardize on uv +
+      <code class="inline">Week2\.venv</code> so support stays one-path.</p>
+      <p><strong>Q: Do I need JupyterLab if I use Cursor?</strong><br />
+      A: No. JupyterLab is optional; ipykernel registration is required either way.</p>
+      <p><strong>Q: Should each day get its own venv?</strong><br />
+      A: No. One Week 2 env for D1–D5. Provider differences are <code class="inline">.env</code> only.</p>
+      <p><strong>Q: Where do I put API keys?</strong><br />
+      A: Module 02 — copy <code class="inline">Week2\.env.example</code> to
+      <code class="inline">Week2\.env</code>. Never commit secrets.</p>
+      <p><strong>Q: I pulled new commits and something import-fails.</strong><br />
+      A: From Week2 run <code class="inline">uv pip install -r requirements.txt</code> again, then
+      confirm the notebook still uses <strong>Python (EXL Week 2)</strong>.</p>
+      <p><strong>Q: Does activation survive closing the terminal?</strong><br />
+      A: No. Each new PowerShell needs Activate.ps1 (or Ubuntu bash needs
+      <code class="inline">source .venv/bin/activate</code>) or use <code class="inline">uv run</code>. The
+      Jupyter kernelspec does not need activation — it embeds the venv python path.</p>
+      <p>
+        You are done with Module 01 when the classroom checklist above is all green.
+      </p>
+    </section>
+
+    <div class="nav-footer">
+      <a href="../index.html">&larr; Mastery index</a>
+      <a href="02_dotenv_provider_budgets.html">Next: 02 dotenv &amp; provider budgets &rarr;</a>
+    </div>
+
+  </div>
+</body>
+</html>

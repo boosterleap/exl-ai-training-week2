@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>02 — dotenv, LLM_PROVIDER &amp; agent budgets</title>
+  <link rel="stylesheet" href="../css/mastery.css" />
+</head>
+<body>
+  <div class="wrap">
+    <nav class="topnav">
+      <a href="../index.html">Mastery track home</a>
+      <a href="01_uv_jupyter_env.html">Prev: 01 uv + Jupyter</a>
+      <a href="03_pydantic_contracts.html">Next: 03 Pydantic</a>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">Module 02 · Week 2 · June 2026</div>
+      <h1>python-dotenv, LLM_PROVIDER &amp; budget knobs</h1>
+      <p class="lead">
+        One shared Week 2 codebase. Your <code class="inline">Week2/.env</code> picks
+        Anthropic or OpenRouter, fills the right API key, and sets hard/soft spend
+        guardrails used on Day 1 PM and beyond. This module teaches you to load that
+        file from a notebook under <code class="inline">ConceptBuilding/</code>, validate settings,
+        and simulate step/token/budget stops — without inventing secrets or calling a model.
+      </p>
+      <div class="meta-row">
+        <span class="chip strong">python-dotenv</span>
+        <span class="chip">LLM_PROVIDER</span>
+        <span class="chip">AGENT_MAX_STEPS</span>
+        <span class="chip">AGENT_MAX_TOKENS</span>
+        <span class="chip">AGENT_MAX_BUDGET_USD</span>
+        <span class="chip">Day 1 PM cost awareness</span>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="Table of contents">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#why">Why this matters</a></li>
+        <li><a href="#env-map">Reading <code class="inline">.env.example</code></a></li>
+        <li><a href="#load-path">Loading from <code class="inline">ConceptBuilding/</code></a></li>
+        <li><a href="#hard-soft">Hard stops vs soft thresholds</a></li>
+        <li><a href="#beginner">Beginner</a> — parse, validate, never commit</li>
+        <li><a href="#intermediate">Intermediate</a> — settings dict, branching, cost log</li>
+        <li><a href="#advanced">Advanced</a> — simulate stops, provider-aware enforcement</li>
+        <li><a href="#day1pm">Tie-in: Week 2 Day 1 PM</a></li>
+        <li><a href="#checklist">Exit checklist</a></li>
+      </ol>
+    </nav>
+
+    <!-- ───────── Why ───────── -->
+    <section class="section" id="why">
+      <h2>Why this matters</h2>
+      <p>
+        Week 2 does <strong>not</strong> ship separate <code class="inline">_openrouter</code>
+        folders. The same <code class="inline">W2D*</code> code reads
+        <code class="inline">LLM_PROVIDER</code> at runtime and branches. Budget knobs keep
+        learner loops cheap: fewer tool turns, capped output tokens, and (on Anthropic) a
+        hard dollar stop per run.
+      </p>
+      <div class="callout warn">
+        <strong>Never commit <code class="inline">.env</code></strong>
+        Copy <code class="inline">Week2/.env.example</code> to <code class="inline">Week2/.env</code>,
+        fill keys locally, and leave <code class="inline">.env</code> in
+        <code class="inline">.gitignore</code>. Never paste keys into notebooks, screenshots,
+        chat, or HTML. This guide uses empty placeholders only — matching the example file.
+      </div>
+      <p>
+        The standalone example mirrors the provider-selection concepts in <code class="inline">W2D1/W2D1PM/_CONCEPTS.ipynb</code>:
+        <code class="inline">load_dotenv(WEEK2_ROOT / ".env")</code>, then build a settings
+        dict with <code class="inline">max_steps</code>, <code class="inline">max_tokens</code>,
+        and <code class="inline">max_budget_usd</code>.
+      </p>
+    </section>
+
+    <!-- ───────── Env map ───────── -->
+    <section class="section" id="env-map">
+      <h2>Reading Week2/.env.example patterns</h2>
+      <p>
+        Open the real file at the Week 2 repo root. Do not invent new variable names.
+        Patterns below are taken from that example (June 2026 cohort defaults).
+      </p>
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Example / default</th><th>Role</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">LLM_PROVIDER</code></td>
+            <td><code class="inline">anthropic</code> or <code class="inline">openrouter</code></td>
+            <td>Runtime branch for the whole week</td>
+          </tr>
+          <tr>
+            <td><code class="inline">AGENT_LANE</code></td>
+            <td><code class="inline">insurance</code> | <code class="inline">banking</code> | <code class="inline">logistics</code></td>
+            <td>Domain tools + data folder</td>
+          </tr>
+          <tr>
+            <td><code class="inline">ANTHROPIC_API_KEY</code></td>
+            <td>(empty in example)</td>
+            <td>Required when provider is anthropic</td>
+          </tr>
+          <tr>
+            <td><code class="inline">ANTHROPIC_MODEL</code></td>
+            <td><code class="inline">claude-sonnet-4-6</code></td>
+            <td>Default lab model; opus only when trainer asks</td>
+          </tr>
+          <tr>
+            <td><code class="inline">OPENROUTER_API_KEY</code></td>
+            <td>(empty in example)</td>
+            <td>Required when provider is openrouter</td>
+          </tr>
+          <tr>
+            <td><code class="inline">OPENROUTER_BASE_URL</code></td>
+            <td><code class="inline">https://openrouter.ai/api/v1</code></td>
+            <td>OpenAI-compatible endpoint</td>
+          </tr>
+          <tr>
+            <td><code class="inline">OPENROUTER_MODEL</code></td>
+            <td><code class="inline">anthropic/claude-sonnet-4</code></td>
+            <td>Must match org key access</td>
+          </tr>
+          <tr>
+            <td><code class="inline">AGENT_MAX_STEPS</code></td>
+            <td><code class="inline">10</code> (range 5–20)</td>
+            <td>Hard tool-turn stop</td>
+          </tr>
+          <tr>
+            <td><code class="inline">AGENT_MAX_TOKENS</code></td>
+            <td><code class="inline">8000</code> (range 4000–16000)</td>
+            <td>OpenRouter: per-call cap; Anthropic: post-run threshold</td>
+          </tr>
+          <tr>
+            <td><code class="inline">AGENT_MAX_BUDGET_USD</code></td>
+            <td><code class="inline">0.50</code></td>
+            <td>Anthropic SDK hard cost cap per run</td>
+          </tr>
+          <tr>
+            <td><code class="inline">AGENT_THINKING_TOKENS</code></td>
+            <td><code class="inline">0</code></td>
+            <td>0 disables extended thinking; try 2000 only for guided compare</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Setup once (from Week2 root)</strong>
+        Create a local <code class="inline">.env</code> from the example. Trainer confirms
+        provider + lane before Day 1 PM.
+      </div>
+      <div class="os-pair">
+        <div class="os-label windows">Windows PowerShell</div>
+        <pre class="os-windows"><code># cwd: Week2
+copy .env.example .env</code></pre>
+        <div class="os-label ubuntu">Ubuntu / bash</div>
+        <pre class="os-ubuntu"><code># cwd: Week2
+cp .env.example .env</code></pre>
+      </div>
+      <pre><code># Snippet shape from .env.example (no real secrets)
+LLM_PROVIDER=anthropic
+AGENT_LANE=insurance
+ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=claude-sonnet-4-6
+OPENROUTER_API_KEY=
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_MODEL=anthropic/claude-sonnet-4
+AGENT_MAX_STEPS=10
+AGENT_MAX_TOKENS=8000
+AGENT_MAX_BUDGET_USD=0.50
+AGENT_THINKING_TOKENS=0</code></pre>
+    </section>
+
+    <!-- ───────── Load path ───────── -->
+    <section class="section" id="load-path">
+      <h2>load_dotenv from Week2 root when the notebook is in ConceptBuilding/</h2>
+      <p>
+        If your Jupyter kernel’s working directory is <code class="inline">Week2/ConceptBuilding</code>,
+        the Week 2 root is one level up. Always pass an absolute path into
+        <code class="inline">load_dotenv</code> so the file resolves even when the cwd drifts.
+      </p>
+      <pre><code>from pathlib import Path
+from dotenv import load_dotenv
+
+# Notebook cwd assumed: Week2/ConceptBuilding
+WEEK2_ROOT = Path.cwd().resolve().parent
+ENV_PATH = WEEK2_ROOT / ".env"
+
+ok = load_dotenv(ENV_PATH)
+print("Week2 root:", WEEK2_ROOT)
+print(".env path:", ENV_PATH)
+print(".env exists:", ENV_PATH.exists())
+print("load_dotenv returned:", ok)</code></pre>
+      <div class="callout warn">
+        <strong>Common mistake</strong>
+        Calling bare <code class="inline">load_dotenv()</code> looks for
+        <code class="inline">.env</code> in the current directory. From
+        <code class="inline">ConceptBuilding/</code> that misses <code class="inline">Week2/.env</code>.
+        The Day 1 PM session artifacts use
+        <code class="inline">load_dotenv(WEEK2_ROOT / ".env")</code> for the same reason.
+      </div>
+      <p>
+        If you opened the notebook from another folder, prefer an explicit walk:
+      </p>
+      <pre><code>def find_week2_root(start: Path | None = None) -> Path:
+  """Walk parents until Week2/.env.example is found."""
+  here = (start or Path.cwd()).resolve()
+  for candidate in [here, *here.parents]:
+    if (candidate / ".env.example").exists() and candidate.name == "Week2":
+      return candidate
+  raise FileNotFoundError("Could not locate Week2 root from " + str(here))
+
+WEEK2_ROOT = find_week2_root()
+load_dotenv(WEEK2_ROOT / ".env")</code></pre>
+    </section>
+
+    <!-- ───────── Hard vs soft ───────── -->
+    <section class="section" id="hard-soft">
+      <h2>Hard stops vs soft thresholds</h2>
+      <p>
+        Cost awareness on Day 1 PM depends on knowing which knobs actually abort a run
+        versus which ones only annotate or truncate a single call.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Knob</th><th>Anthropic (Claude Agent SDK)</th><th>OpenRouter (LangGraph)</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">AGENT_MAX_STEPS</code></td>
+            <td><strong>Hard</strong> — maps to <code class="inline">max_turns</code></td>
+            <td><strong>Hard</strong> — recursion limit derived from max steps</td>
+          </tr>
+          <tr>
+            <td><code class="inline">AGENT_MAX_BUDGET_USD</code></td>
+            <td><strong>Hard</strong> — <code class="inline">max_budget_usd</code> per run</td>
+            <td>Recorded in cost log; not an SDK hard abort (track manually / trainer policy)</td>
+          </tr>
+          <tr>
+            <td><code class="inline">AGENT_MAX_TOKENS</code></td>
+            <td><strong>Soft / post-run</strong> — usage compared after the run; may mark
+              <code class="inline">token_budget_exceeded</code></td>
+            <td><strong>Per-call hard cap</strong> — passed as model <code class="inline">max_tokens</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Operator rule of thumb</strong>
+        Steps always stop the loop. Dollars stop Anthropic runs. Tokens clip OpenRouter
+        completions immediately, but on Anthropic they are a post-run threshold for the
+        cost object — useful for dashboards and learner feedback, not a mid-turn abort.
+      </div>
+    </section>
+
+    <!-- ═════════ BEGINNER ═════════ -->
+    <section class="section" id="beginner">
+      <h2><span class="level beginner">Beginner</span> Parse env &amp; stay safe</h2>
+      <p>
+        Goal: locate <code class="inline">.env</code>, load it, read provider/lane/budgets,
+        and prove you never print secret values.
+      </p>
+
+      <div class="exercise" id="b1">
+        <div class="ex-label">Exercise B1 — Confirm Week2 root from ConceptBuilding/</div>
+        <p>Print the resolved Week2 root and whether <code class="inline">.env.example</code> exists.</p>
+        <pre><code>from pathlib import Path
+
+WEEK2_ROOT = Path.cwd().resolve().parent
+print(WEEK2_ROOT)
+print((WEEK2_ROOT / ".env.example").exists())
+assert WEEK2_ROOT.name == "Week2", "cwd should be Week2/ConceptBuilding for this track"</code></pre>
+      </div>
+
+      <div class="exercise" id="b2">
+        <div class="ex-label">Exercise B2 — Copy checklist (no code secrets)</div>
+        <p>
+          In a markdown cell, note both OS commands to copy
+          <code class="inline">.env.example</code> to <code class="inline">.env</code>.
+          Do not write any API key values.
+        </p>
+        <div class="os-pair">
+          <div class="os-label windows">Windows PowerShell</div>
+          <pre class="os-windows"><code># cwd: Week2
+copy .env.example .env
+# Then edit .env locally — never commit it.</code></pre>
+          <div class="os-label ubuntu">Ubuntu / bash</div>
+          <pre class="os-ubuntu"><code># cwd: Week2
+cp .env.example .env
+# Then edit .env locally — never commit it.</code></pre>
+        </div>
+      </div>
+
+      <div class="exercise" id="b3">
+        <div class="ex-label">Exercise B3 — load_dotenv with explicit path</div>
+        <p>Load <code class="inline">Week2/.env</code> and print the boolean return value.</p>
+        <pre><code>import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+WEEK2_ROOT = Path.cwd().resolve().parent
+ENV_PATH = WEEK2_ROOT / ".env"
+loaded = load_dotenv(ENV_PATH)
+print("loaded:", loaded)
+print("exists:", ENV_PATH.exists())</code></pre>
+      </div>
+
+      <div class="exercise" id="b4">
+        <div class="ex-label">Exercise B4 — Read LLM_PROVIDER safely</div>
+        <p>Default to <code class="inline">anthropic</code> if unset; always lowercase.</p>
+        <pre><code>provider = os.getenv("LLM_PROVIDER", "anthropic").lower()
+print("LLM_PROVIDER:", provider)
+assert provider in {"anthropic", "openrouter"} or provider == "anthropic"</code></pre>
+      </div>
+
+      <div class="exercise" id="b5">
+        <div class="ex-label">Exercise B5 — Read AGENT_LANE</div>
+        <p>Print lane; accept only the three Week 2 lanes from <code class="inline">.env.example</code>.</p>
+        <pre><code>ALLOWED_LANES = {"insurance", "banking", "logistics"}
+lane = os.getenv("AGENT_LANE", "insurance").lower()
+print("AGENT_LANE:", lane)
+print("valid:", lane in ALLOWED_LANES)</code></pre>
+      </div>
+
+      <div class="exercise" id="b6">
+        <div class="ex-label">Exercise B6 — Parse budget ints and float</div>
+        <p>Convert the three agent knobs with the example defaults.</p>
+        <pre><code>max_steps = int(os.getenv("AGENT_MAX_STEPS", "10"))
+max_tokens = int(os.getenv("AGENT_MAX_TOKENS", "8000"))
+max_budget_usd = float(os.getenv("AGENT_MAX_BUDGET_USD", "0.50"))
+print(max_steps, max_tokens, max_budget_usd)</code></pre>
+      </div>
+
+      <div class="exercise" id="b7">
+        <div class="ex-label">Exercise B7 — Key presence without leaking values</div>
+        <p>
+          Check whether the active provider’s key is set. Print only
+          <code class="inline">present</code> / <code class="inline">missing</code> — never the key.
+        </p>
+        <pre><code>def key_status(name: str) -> str:
+  value = os.getenv(name, "")
+  return "present" if value.strip() else "missing"
+
+provider = os.getenv("LLM_PROVIDER", "anthropic").lower()
+if provider == "openrouter":
+  print("OPENROUTER_API_KEY:", key_status("OPENROUTER_API_KEY"))
+else:
+  print("ANTHROPIC_API_KEY:", key_status("ANTHROPIC_API_KEY"))</code></pre>
+      </div>
+
+      <div class="exercise" id="b8">
+        <div class="ex-label">Exercise B8 — List .env.example keys (offline)</div>
+        <p>Parse the example file and print non-comment, non-empty assignment keys only.</p>
+        <pre><code>from pathlib import Path
+
+example = Path.cwd().resolve().parent / ".env.example"
+keys = []
+for line in example.read_text(encoding="utf-8").splitlines():
+  line = line.strip()
+  if not line or line.startswith("#") or "=" not in line:
+    continue
+  keys.append(line.split("=", 1)[0])
+print(keys)
+assert "LLM_PROVIDER" in keys
+assert "AGENT_MAX_BUDGET_USD" in keys</code></pre>
+      </div>
+
+      <div class="exercise" id="b9">
+        <div class="ex-label">Exercise B9 — Why .gitignore matters</div>
+        <p>
+          Write a one-sentence operator note: what goes wrong if
+          <code class="inline">.env</code> is committed. No code required beyond a print.
+        </p>
+        <pre><code>print(
+  "If .env is committed, API keys leak into git history and every clone — "
+  "revoke keys immediately and keep secrets local only."
+)</code></pre>
+      </div>
+
+      <div class="callout">
+        <strong>Beginner exit</strong>
+        You can find Week2 root from <code class="inline">ConceptBuilding/</code>, load dotenv by path,
+        read provider/lane/budgets, and check key presence without printing secrets.
+      </div>
+    </section>
+
+    <!-- ═════════ INTERMEDIATE ═════════ -->
+    <section class="section" id="intermediate">
+      <h2><span class="level intermediate">Intermediate</span> Branch, validate, settings dict</h2>
+      <p>
+        Goal: build the same shape of settings dict Day 1 PM uses, validate provider,
+        and structure a cost log without calling a model.
+      </p>
+
+      <div class="exercise" id="i1">
+        <div class="ex-label">Exercise I1 — Validate provider strictly</div>
+        <p>Raise <code class="inline">ValueError</code> for anything other than the two allowed values.</p>
+        <pre><code>def validate_provider(raw: str | None) -> str:
+  provider = (raw or "anthropic").lower().strip()
+  allowed = {"anthropic", "openrouter"}
+  if provider not in allowed:
+    raise ValueError(f"LLM_PROVIDER must be one of {sorted(allowed)}, got {provider!r}")
+  return provider
+
+print(validate_provider(os.getenv("LLM_PROVIDER")))</code></pre>
+      </div>
+
+      <div class="exercise" id="i2">
+        <div class="ex-label">Exercise I2 — Provider-specific model selection</div>
+        <p>Branch model + base URL like <code class="inline">providers.load_settings</code>.</p>
+        <pre><code>def provider_config(provider: str) -> dict:
+  if provider == "openrouter":
+    return {
+      "provider": provider,
+      "model": os.getenv("OPENROUTER_MODEL", "anthropic/claude-sonnet-4"),
+      "base_url": os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+    }
+  return {
+    "provider": provider,
+    "model": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
+  }
+
+cfg = provider_config(validate_provider(os.getenv("LLM_PROVIDER")))
+print(cfg)</code></pre>
+      </div>
+
+      <div class="exercise" id="i3">
+        <div class="ex-label">Exercise I3 — Build full settings dict</div>
+        <p>Include max_steps, max_tokens, max_budget_usd, and thinking tokens.</p>
+        <pre><code>def load_settings() -> dict:
+  load_dotenv(Path.cwd().resolve().parent / ".env")
+  provider = validate_provider(os.getenv("LLM_PROVIDER"))
+  thinking_tokens = int(os.getenv("AGENT_THINKING_TOKENS", "0"))
+  base = provider_config(provider)
+  base.update({
+    "max_steps": int(os.getenv("AGENT_MAX_STEPS", "10")),
+    "max_tokens": int(os.getenv("AGENT_MAX_TOKENS", "8000")),
+    "max_budget_usd": float(os.getenv("AGENT_MAX_BUDGET_USD", "0.50")),
+    "thinking_tokens": thinking_tokens,
+  })
+  return base
+
+settings = load_settings()
+print(settings)</code></pre>
+      </div>
+
+      <div class="exercise" id="i4">
+        <div class="ex-label">Exercise I4 — Require the matching API key</div>
+        <p>Fail fast with a clear message if the active provider’s key is empty.</p>
+        <pre><code>def require_api_key(provider: str) -> None:
+  if provider == "openrouter":
+    name = "OPENROUTER_API_KEY"
+  else:
+    name = "ANTHROPIC_API_KEY"
+  if not (os.getenv(name) or "").strip():
+    raise RuntimeError(
+      f"{name} is missing. Copy Week2/.env.example to Week2/.env and fill the key."
+    )
+
+# Safe in class: wrap so missing keys do not crash the whole notebook
+try:
+  require_api_key(settings["provider"])
+  print("API key present for", settings["provider"])
+except RuntimeError as exc:
+  print("EXPECTED until you fill .env:", exc)</code></pre>
+      </div>
+
+      <div class="exercise" id="i5">
+        <div class="ex-label">Exercise I5 — Suggested ranges from .env.example</div>
+        <p>Warn (do not crash) when knobs fall outside suggested lab ranges.</p>
+        <pre><code>def warn_budget_ranges(s: dict) -> list[str]:
+  notes = []
+  if not (5 &lt;= s["max_steps"] &lt;= 20):
+    notes.append("AGENT_MAX_STEPS suggested range is 5-20")
+  if not (4000 &lt;= s["max_tokens"] &lt;= 16000):
+    notes.append("AGENT_MAX_TOKENS suggested range is 4000-16000")
+  if s["max_budget_usd"] &lt;= 0:
+    notes.append("AGENT_MAX_BUDGET_USD should be positive for Anthropic hard caps")
+  return notes
+
+print(warn_budget_ranges(settings))</code></pre>
+      </div>
+
+      <div class="exercise" id="i6">
+        <div class="ex-label">Exercise I6 — Cost log structure (skeleton)</div>
+        <p>
+          Match the Day 1 PM cost object fields used in
+          <code class="inline">providers.py</code> returns.
+        </p>
+        <pre><code>def empty_cost_log(settings: dict, stopped_reason: str = "not_run") -> dict:
+  return {
+    "steps_used": 0,
+    "max_steps": settings["max_steps"],
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "max_tokens": settings["max_tokens"],
+    "total_cost_usd": None,
+    "max_budget_usd": settings["max_budget_usd"],
+    "stopped_reason": stopped_reason,
+  }
+
+print(empty_cost_log(settings))</code></pre>
+      </div>
+
+      <div class="exercise" id="i7">
+        <div class="ex-label">Exercise I7 — Annotate enforcement mode per provider</div>
+        <p>Return a short dict describing hard vs soft behavior for each knob.</p>
+        <pre><code>def enforcement_matrix(provider: str) -> dict:
+  return {
+    "AGENT_MAX_STEPS": "hard",
+    "AGENT_MAX_BUDGET_USD": "hard" if provider == "anthropic" else "tracked_only",
+    "AGENT_MAX_TOKENS": (
+      "post_run_threshold" if provider == "anthropic" else "per_call_hard_cap"
+    ),
+  }
+
+print(enforcement_matrix(settings["provider"]))</code></pre>
+      </div>
+
+      <div class="exercise" id="i8">
+        <div class="ex-label">Exercise I8 — Mask secrets in a debug dump</div>
+        <p>When dumping env for support tickets, redact any key ending in <code class="inline">_API_KEY</code>.</p>
+        <pre><code>def safe_env_snapshot(names: list[str]) -> dict[str, str]:
+  out = {}
+  for name in names:
+    raw = os.getenv(name, "")
+    if name.endswith("_API_KEY"):
+      out[name] = "present" if raw.strip() else "missing"
+    else:
+      out[name] = raw or "(unset)"
+  return out
+
+print(safe_env_snapshot([
+  "LLM_PROVIDER", "AGENT_LANE", "ANTHROPIC_MODEL",
+  "OPENROUTER_MODEL", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY",
+  "AGENT_MAX_STEPS", "AGENT_MAX_TOKENS", "AGENT_MAX_BUDGET_USD",
+]))</code></pre>
+      </div>
+
+      <div class="exercise" id="i9">
+        <div class="ex-label">Exercise I9 — Thinking tokens note</div>
+        <p>
+          Read <code class="inline">AGENT_THINKING_TOKENS</code>. Print whether extended
+          thinking is disabled (0) or enabled (&gt;0). Keep default 0 for normal labs.
+        </p>
+        <pre><code>thinking = int(os.getenv("AGENT_THINKING_TOKENS", "0"))
+if thinking == 0:
+  print("extended thinking: disabled (lab default)")
+else:
+  print(f"extended thinking: enabled with budget_tokens={thinking}")</code></pre>
+      </div>
+
+      <div class="callout">
+        <strong>Intermediate exit</strong>
+        You can validate provider, build a settings dict, describe enforcement modes,
+        and emit a cost-log skeleton that matches Day 1 PM.
+      </div>
+    </section>
+
+    <!-- ═════════ ADVANCED ═════════ -->
+    <section class="section" id="advanced">
+      <h2><span class="level advanced">Advanced</span> Simulate stops &amp; cost awareness</h2>
+      <p>
+        Goal: simulate the agent loop’s step counter, Anthropic budget hard stop,
+        OpenRouter per-call token cap, and Anthropic post-run token threshold — offline.
+      </p>
+
+      <div class="exercise" id="a1">
+        <div class="ex-label">Exercise A1 — Simulate hard step counter stop</div>
+        <p>
+          Fake tool turns until <code class="inline">AGENT_MAX_STEPS</code>. Stop when
+          index exceeds the cap (same idea as reliability demos).
+        </p>
+        <pre><code>def simulate_steps(max_steps: int, planned_turns: int) -> dict:
+  steps_used = 0
+  stopped_reason = "completed"
+  for index in range(1, planned_turns + 1):
+    if index &gt; max_steps:
+      stopped_reason = "max_steps"
+      break
+    steps_used = index
+  return {"steps_used": steps_used, "max_steps": max_steps, "stopped_reason": stopped_reason}
+
+print(simulate_steps(max_steps=3, planned_turns=10))
+assert simulate_steps(3, 10)["stopped_reason"] == "max_steps"
+assert simulate_steps(10, 4)["stopped_reason"] == "completed"</code></pre>
+      </div>
+
+      <div class="exercise" id="a2">
+        <div class="ex-label">Exercise A2 — Simulate Anthropic hard budget stop</div>
+        <p>Accumulate fake USD spend; abort when spend would exceed <code class="inline">max_budget_usd</code>.</p>
+        <pre><code>def simulate_budget(max_budget_usd: float, step_costs: list[float]) -> dict:
+  spent = 0.0
+  steps_used = 0
+  stopped_reason = "completed"
+  for cost in step_costs:
+    if spent + cost &gt; max_budget_usd:
+      stopped_reason = "max_budget_usd"
+      break
+    spent += cost
+    steps_used += 1
+  return {
+    "steps_used": steps_used,
+    "total_cost_usd": round(spent, 4),
+    "max_budget_usd": max_budget_usd,
+    "stopped_reason": stopped_reason,
+  }
+
+print(simulate_budget(0.05, [0.02, 0.02, 0.02, 0.02]))
+assert simulate_budget(0.05, [0.02, 0.02, 0.02])["stopped_reason"] == "max_budget_usd"</code></pre>
+      </div>
+
+      <div class="exercise" id="a3">
+        <div class="ex-label">Exercise A3 — OpenRouter per-call token cap</div>
+        <p>
+          For OpenRouter, <code class="inline">max_tokens</code> clips each model call’s
+          output. Simulate truncating a planned completion.
+        </p>
+        <pre><code>def openrouter_clip_output(planned_output_tokens: int, max_tokens: int) -> dict:
+  emitted = min(planned_output_tokens, max_tokens)
+  return {
+    "planned_output_tokens": planned_output_tokens,
+    "emitted_output_tokens": emitted,
+    "max_tokens": max_tokens,
+    "truncated": planned_output_tokens &gt; max_tokens,
+    "enforcement": "per_call_hard_cap",
+  }
+
+print(openrouter_clip_output(12000, 8000))</code></pre>
+      </div>
+
+      <div class="exercise" id="a4">
+        <div class="ex-label">Exercise A4 — Anthropic post-run token threshold</div>
+        <p>
+          After a finished run, compare total tokens to
+          <code class="inline">AGENT_MAX_TOKENS</code>. If over, set
+          <code class="inline">stopped_reason</code> to
+          <code class="inline">token_budget_exceeded</code> (does not rewind the run).
+        </p>
+        <pre><code>def anthropic_post_run_tokens(
+  input_tokens: int,
+  output_tokens: int,
+  max_tokens: int,
+  prior_reason: str = "completed",
+) -> dict:
+  total = input_tokens + output_tokens
+  reason = prior_reason
+  if total &gt; max_tokens:
+    reason = "token_budget_exceeded"
+  return {
+    "input_tokens": input_tokens,
+    "output_tokens": output_tokens,
+    "total_tokens": total,
+    "max_tokens": max_tokens,
+    "stopped_reason": reason,
+    "enforcement": "post_run_threshold",
+  }
+
+print(anthropic_post_run_tokens(5000, 4000, 8000))
+assert anthropic_post_run_tokens(5000, 4000, 8000)["stopped_reason"] == "token_budget_exceeded"
+assert anthropic_post_run_tokens(1000, 500, 8000)["stopped_reason"] == "completed"</code></pre>
+      </div>
+
+      <div class="exercise" id="a5">
+        <div class="ex-label">Exercise A5 — Combined loop simulator</div>
+        <p>Apply step hard-stop first, then budget hard-stop (Anthropic path mental model).</p>
+        <pre><code>def simulate_anthropic_run(
+  max_steps: int,
+  max_budget_usd: float,
+  max_tokens: int,
+  events: list[dict],
+) -> dict:
+  # events: [{"cost_usd": 0.01, "in_tok": 100, "out_tok": 50}, ...]
+  spent = 0.0
+  in_tok = out_tok = 0
+  steps_used = 0
+  stopped_reason = "completed"
+  for i, event in enumerate(events, start=1):
+    if i &gt; max_steps:
+      stopped_reason = "max_steps"
+      break
+    if spent + event["cost_usd"] &gt; max_budget_usd:
+      stopped_reason = "max_budget_usd"
+      break
+    spent += event["cost_usd"]
+    in_tok += event["in_tok"]
+    out_tok += event["out_tok"]
+    steps_used = i
+  cost = {
+    "steps_used": steps_used,
+    "max_steps": max_steps,
+    "input_tokens": in_tok,
+    "output_tokens": out_tok,
+    "total_tokens": in_tok + out_tok,
+    "max_tokens": max_tokens,
+    "total_cost_usd": round(spent, 4),
+    "max_budget_usd": max_budget_usd,
+    "stopped_reason": stopped_reason,
+  }
+  if cost["total_tokens"] &gt; max_tokens and stopped_reason == "completed":
+    cost["stopped_reason"] = "token_budget_exceeded"
+  return cost
+
+demo = simulate_anthropic_run(
+  max_steps=10,
+  max_budget_usd=0.50,
+  max_tokens=8000,
+  events=[
+    {"cost_usd": 0.04, "in_tok": 2000, "out_tok": 500},
+    {"cost_usd": 0.05, "in_tok": 2500, "out_tok": 800},
+  ],
+)
+print(demo)</code></pre>
+      </div>
+
+      <div class="exercise" id="a6">
+        <div class="ex-label">Exercise A6 — OpenRouter recursion mental model</div>
+        <p>
+          Day 1 PM sets LangGraph
+          <code class="inline">recursion_limit = max_steps * 2 + 1</code>.
+          Explain in code why that is still a hard stop tied to steps.
+        </p>
+        <pre><code>def openrouter_recursion_limit(max_steps: int) -> int:
+  # Each tool turn needs model + tool nodes; labs use 2*steps+1 headroom.
+  return max_steps * 2 + 1
+
+for steps in (5, 10, 20):
+  print(steps, "-&gt; recursion_limit", openrouter_recursion_limit(steps))</code></pre>
+      </div>
+
+      <div class="exercise" id="a7">
+        <div class="ex-label">Exercise A7 — Provider-aware cost finalizer</div>
+        <p>Fill <code class="inline">total_cost_usd</code> only on Anthropic-like results; keep None for OpenRouter sims.</p>
+        <pre><code>def finalize_cost(provider: str, cost: dict) -> dict:
+  out = dict(cost)
+  if provider != "anthropic":
+    out["total_cost_usd"] = None
+  return out
+
+print(finalize_cost("openrouter", demo))
+print(finalize_cost("anthropic", demo))</code></pre>
+      </div>
+
+      <div class="exercise" id="a8">
+        <div class="ex-label">Exercise A8 — Dry-run gate before provider API spend</div>
+        <p>
+          Day 1 PM SETUP says test with
+          <code class="inline">d1pmt6c02_guarded_operations_assistant.py</code> before provider API calls.
+          Write a gate that refuses provider mode if settings look unsafe.
+        </p>
+        <pre><code>def allow_provider_run(settings: dict, dry_run: bool, key_ok: bool) -> tuple[bool, str]:
+  if dry_run:
+    return True, "dry-run only — no provider spend"
+  if not key_ok:
+    return False, "missing API key for active provider"
+  if settings["max_budget_usd"] &gt; 2.0:
+    return False, "budget too high for unsupervised learner run — ask trainer"
+  if settings["max_steps"] &gt; 20:
+    return False, "steps above suggested lab range"
+  return True, "provider run permitted under lab guardrails"
+
+print(allow_provider_run(settings, dry_run=True, key_ok=False))
+print(allow_provider_run(settings, dry_run=False, key_ok=True))</code></pre>
+      </div>
+
+      <div class="exercise" id="a9">
+        <div class="ex-label">Exercise A9 — Mini settings module for notebooks</div>
+        <p>
+          Combine path find + validate + settings + cost skeleton into one cell you can
+          paste at the top of later mastery notebooks.
+        </p>
+        <pre><code>from __future__ import annotations
+
+import os
+from pathlib import Path
+from typing import Any
+
+from dotenv import load_dotenv
+
+
+def week2_root(start: Path | None = None) -> Path:
+  here = (start or Path.cwd()).resolve()
+  for candidate in [here, *here.parents]:
+    if (candidate / ".env.example").is_file() and candidate.name == "Week2":
+      return candidate
+  raise FileNotFoundError("Week2 root not found")
+
+
+def load_week2_settings() -> dict[str, Any]:
+  root = week2_root()
+  load_dotenv(root / ".env")
+  provider = (os.getenv("LLM_PROVIDER", "anthropic") or "anthropic").lower()
+  if provider not in {"anthropic", "openrouter"}:
+    raise ValueError(f"bad LLM_PROVIDER: {provider}")
+  model = (
+    os.getenv("OPENROUTER_MODEL", "anthropic/claude-sonnet-4")
+    if provider == "openrouter"
+    else os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+  )
+  return {
+    "week2_root": root,
+    "provider": provider,
+    "lane": os.getenv("AGENT_LANE", "insurance").lower(),
+    "model": model,
+    "max_steps": int(os.getenv("AGENT_MAX_STEPS", "10")),
+    "max_tokens": int(os.getenv("AGENT_MAX_TOKENS", "8000")),
+    "max_budget_usd": float(os.getenv("AGENT_MAX_BUDGET_USD", "0.50")),
+    "thinking_tokens": int(os.getenv("AGENT_THINKING_TOKENS", "0")),
+  }
+
+
+S = load_week2_settings()
+print({k: v for k, v in S.items() if k != "week2_root"})
+print("root:", S["week2_root"])</code></pre>
+      </div>
+
+      <div class="exercise" id="a10">
+        <div class="ex-label">Exercise A10 — Quiz yourself (no peeking)</div>
+        <p>Answer in a markdown cell, then check below.</p>
+        <ol>
+          <li>Which knob is always a hard loop stop on both providers?</li>
+          <li>Which knob is an Anthropic SDK hard dollar stop?</li>
+          <li>How does <code class="inline">AGENT_MAX_TOKENS</code> differ Anthropic vs OpenRouter?</li>
+          <li>Where must <code class="inline">.env</code> live relative to <code class="inline">ConceptBuilding/</code>?</li>
+        </ol>
+        <div class="callout">
+          <strong>Answers</strong>
+          (1) <code class="inline">AGENT_MAX_STEPS</code> —
+          (2) <code class="inline">AGENT_MAX_BUDGET_USD</code> —
+          (3) OpenRouter: per-call output cap; Anthropic: post-run usage threshold /
+          <code class="inline">token_budget_exceeded</code> —
+          (4) One level up: <code class="inline">Week2/.env</code>
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <strong>Advanced exit</strong>
+        You can simulate step and budget hard stops, contrast token enforcement modes,
+        and paste a reusable settings loader that never prints secrets.
+      </div>
+    </section>
+
+    <!-- ───────── Day 1 PM ───────── -->
+    <section class="section" id="day1pm">
+      <h2>Tie-in: Week 2 Day 1 PM cost awareness</h2>
+      <p>
+        Afternoon Day 1 runs the Agentic Operations Assistant through
+        <code class="inline">W2D1/W2D1PM/</code>. Provider routing and limits live in
+        <code class="inline">providers.py</code>:
+      </p>
+      <ul>
+        <li>
+          <code class="inline">load_settings()</code> reads
+          <code class="inline">LLM_PROVIDER</code>, model, and the three budget knobs from
+          <code class="inline">Week2/.env</code>.
+        </li>
+        <li>
+          Anthropic path: <code class="inline">max_turns</code> +
+          <code class="inline">max_budget_usd</code> on
+          <code class="inline">ClaudeAgentOptions</code>; after the run, total tokens vs
+          <code class="inline">AGENT_MAX_TOKENS</code> may set
+          <code class="inline">token_budget_exceeded</code>.
+        </li>
+        <li>
+          OpenRouter path: LangGraph ReAct with
+          <code class="inline">max_tokens</code> on the chat model and a recursion limit
+          derived from <code class="inline">AGENT_MAX_STEPS</code>.
+        </li>
+        <li>
+          W2D1/W2D1PM/_README.html: begin with the required offline run order
+          (<code class="inline">d1pmt6c02_guarded_operations_assistant.py</code>)
+          so you validate contracts before spending.
+        </li>
+      </ul>
+      <div class="callout">
+        <strong>Classroom habit</strong>
+        Keep <code class="inline">AGENT_MAX_STEPS=10</code> and
+        <code class="inline">AGENT_MAX_BUDGET_USD=0.50</code> unless the trainer raises them.
+        Lower limits = cheaper mistakes. Cost fields on the returned object are how you
+        show “I know what this run spent.”
+      </div>
+      <pre><code># Conceptual mapping (ASCII) — Anthropic Day 1 PM
+.env AGENT_MAX_STEPS      -&gt; ClaudeAgentOptions.max_turns          (HARD)
+.env AGENT_MAX_BUDGET_USD -&gt; ClaudeAgentOptions.max_budget_usd     (HARD)
+.env AGENT_MAX_TOKENS     -&gt; post-run compare vs usage totals      (SOFT / annotate)
+
+# Conceptual mapping — OpenRouter Day 1 PM
+.env AGENT_MAX_STEPS      -&gt; recursion_limit ~= steps*2+1          (HARD)
+.env AGENT_MAX_TOKENS     -&gt; ChatOpenAI(max_tokens=...)            (HARD per call)
+.env AGENT_MAX_BUDGET_USD -&gt; cost log field / trainer policy       (not SDK abort)</code></pre>
+    </section>
+
+    <!-- ───────── Checklist ───────── -->
+    <section class="section" id="checklist">
+      <h2>Exit checklist</h2>
+      <ul>
+        <li>Copied <code class="inline">.env.example</code> → <code class="inline">.env</code>; never committed.</li>
+        <li><code class="inline">load_dotenv(WEEK2_ROOT / ".env")</code> works from a <code class="inline">ConceptBuilding/</code> notebook.</li>
+        <li>Can explain <code class="inline">LLM_PROVIDER=anthropic|openrouter</code> branching.</li>
+        <li>Know hard vs soft: steps hard; budget Anthropic hard; tokens OpenRouter per-call vs Anthropic post-run.</li>
+        <li>Can build a settings dict and a cost log structure offline.</li>
+        <li>Ready for module 03 (Pydantic contracts) and Day 1 PM provider labs.</li>
+      </ul>
+    </section>
+
+    <nav class="nav-footer">
+      <a href="01_uv_jupyter_env.html">Prev: 01 — uv + Jupyter</a>
+      <a href="03_pydantic_contracts.html">Next: 03 — Pydantic contracts</a>
+    </nav>
+  </div>
+</body>
+</html>

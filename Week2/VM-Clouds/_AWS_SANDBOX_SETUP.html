@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Short learner runbook for authenticating to the AWS training sandbox and verifying Amazon Bedrock with the Week 2 curriculum script.">
+  <title>AWS Bedrock Sandbox Learner Runbook</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #182230;
+      --muted: #536273;
+      --surface: #ffffff;
+      --surface-alt: #f3f7fb;
+      --line: #d7e0e8;
+      --navy: #102a43;
+      --blue: #146eb4;
+      --orange: #ff9900;
+      --red: #a61b1b;
+      --amber-bg: #fff8e5;
+      --red-bg: #fff1f0;
+      --shadow: 0 10px 30px rgba(16, 42, 67, 0.1);
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--surface-alt);
+      color: var(--ink);
+      font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: #075b9b; text-underline-offset: 0.18em; }
+    a:hover, a:focus-visible { color: #003f73; }
+    .hero {
+      padding: 3.5rem max(1.25rem, calc((100vw - 1120px) / 2));
+      border-bottom: 5px solid var(--orange);
+      background: linear-gradient(135deg, #0b2239 0%, #123f65 68%, #146eb4 100%);
+      color: #fff;
+    }
+    .eyebrow {
+      margin: 0 0 0.4rem;
+      color: #ffd28a;
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    h1 { max-width: 850px; margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.08; }
+    .hero p:last-child { max-width: 780px; margin-bottom: 0; color: #dcecff; font-size: 1.08rem; }
+    .layout {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      gap: 2rem;
+      width: min(1080px, calc(100% - 2rem));
+      margin: 2rem auto 4rem;
+    }
+    nav {
+      position: sticky;
+      top: 1rem;
+      align-self: start;
+      padding: 1rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    nav strong { display: block; margin: 0.2rem 0 0.65rem; color: var(--navy); }
+    nav a {
+      display: block;
+      padding: 0.38rem 0.55rem;
+      border-radius: 7px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.92rem;
+    }
+    nav a:hover, nav a:focus-visible { background: #eaf3fb; color: var(--navy); }
+    main { min-width: 0; }
+    section {
+      scroll-margin-top: 1rem;
+      margin-bottom: 1.3rem;
+      padding: clamp(1.15rem, 3vw, 2rem);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    h2, h3 { color: var(--navy); line-height: 1.25; }
+    h2 { margin-top: 0; font-size: clamp(1.45rem, 3vw, 2rem); }
+    h3 { margin-top: 0; }
+    code, pre { font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; }
+    code { padding: 0.1em 0.3em; border-radius: 4px; background: #eaf0f5; font-size: 0.9em; }
+    pre {
+      overflow-x: auto;
+      margin: 0.85rem 0 1.15rem;
+      padding: 1rem;
+      border: 1px solid #29445d;
+      border-radius: 10px;
+      background: #0c1b2a;
+      color: #edf6ff;
+      line-height: 1.5;
+      white-space: pre;
+    }
+    pre code { padding: 0; background: transparent; color: inherit; font-size: 0.88rem; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+    .card { padding: 1rem; border: 1px solid var(--line); border-radius: 10px; background: #fbfdff; }
+    .tag {
+      display: inline-block;
+      padding: 0.15rem 0.55rem;
+      border: 1px solid #9fb7ca;
+      border-radius: 999px;
+      background: #f2f7fb;
+      color: #28475f;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    .callout { margin: 1rem 0; padding: 0.9rem 1rem; border-left: 5px solid var(--blue); border-radius: 8px; background: #edf6fd; }
+    .callout.warning { border-color: var(--orange); background: var(--amber-bg); }
+    .callout.danger { border-color: var(--red); background: var(--red-bg); }
+    .steps { padding-left: 1.3rem; }
+    .steps > li { margin-bottom: 0.7rem; }
+    .small { color: var(--muted); font-size: 0.9rem; }
+    footer { padding: 1rem 1rem 3rem; color: var(--muted); text-align: center; }
+    :focus-visible { outline: 3px solid #ffb84d; outline-offset: 3px; }
+
+    @media (max-width: 760px) {
+      .layout { display: block; width: min(100% - 1rem, 1080px); margin-top: 0.5rem; }
+      nav { position: static; margin-bottom: 1.25rem; }
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .hero { padding: 1.5rem; background: #fff; color: #000; border-bottom-color: #000; }
+      .hero p:last-child, .eyebrow { color: #333; }
+      .layout { display: block; width: 100%; margin: 0; }
+      nav { display: none; }
+      section { break-inside: avoid; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <p class="eyebrow">EXL Campus Hire · Week 2</p>
+    <h1>AWS Bedrock sandbox learner runbook</h1>
+    <p>Authenticate, confirm the sandbox identity, set the approved model target, run one curriculum verification, and clean up.</p>
+  </header>
+
+  <div class="layout">
+    <nav aria-label="Runbook sections">
+      <strong>On this page</strong>
+      <a href="#limits">1. Sandbox limits</a>
+      <a href="#command-context">Where commands run</a>
+      <a href="#authenticate">2. Authenticate</a>
+      <a href="#identity">3. Check identity</a>
+      <a href="#target">4. Set the target</a>
+      <a href="#verify">5. Verify once</a>
+      <a href="#cleanup">6. Clean up</a>
+    </nav>
+
+    <main>
+      <section id="limits">
+        <h2>1. Start with the sandbox limits</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Region</h3>
+            <span class="tag">us-east-1 only</span>
+            <p>Keep the console and every command in <strong>US East (N. Virginia)</strong>.</p>
+          </div>
+          <div class="card">
+            <h3>Lifetime</h3>
+            <span class="tag">4-hour automatic cleanup</span>
+            <p>Stop by 3 hours 30 minutes. Stopping starts cleanup, which usually blocks access for 15–20 minutes.</p>
+          </div>
+        </div>
+        <div class="callout danger">
+          <strong>Do not provision resources.</strong> Use the assigned sandbox only, make one bounded inference request, and never place credentials in <code>.env</code>, code, chat, screenshots, or Git.
+        </div>
+      </section>
+
+      <section id="command-context">
+        <h2>Run commands on the Ubuntu VM</h2>
+        <p>Open the repository in VS Code, select <strong>Terminal → New Terminal</strong>, and run every command block below in that Ubuntu terminal:</p>
+        <pre><code>source /home/labuser/venv/bin/activate
+cd /home/labuser/Desktop/Persistent_Folder/exl-ai-training-week2-shared/exl-ai-training-week2/Week2
+pwd</code></pre>
+        <p><code>pwd</code> must end in <code>exl-ai-training-week2/Week2</code>. Use the browser only for the training sandbox portal and AWS console.</p>
+      </section>
+
+      <section id="authenticate">
+        <h2>2. Authenticate with supplied temporary credentials</h2>
+        <div class="callout warning">
+          <strong>The sandboxes are separate.</strong> An AWS console or AWS CloudShell session does not authenticate the Ubuntu VM. The VM requires its own short-lived access key, secret access key, and session token (or another administrator-approved VM credential process).
+        </div>
+        <p>In the VS Code terminal, use this flow only when the training portal supplies a temporary access key, secret key, and session token. Hidden prompts keep values off-screen and out of shell history.</p>
+        <pre><code>unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_PROFILE
+read -rsp "Temporary access key ID: " AWS_ACCESS_KEY_ID; echo
+read -rsp "Temporary secret access key: " AWS_SECRET_ACCESS_KEY; echo
+read -rsp "Temporary session token: " AWS_SESSION_TOKEN; echo
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+export AWS_REGION=us-east-1 AWS_DEFAULT_REGION=us-east-1 AWS_PAGER=""</code></pre>
+        <div class="callout warning">
+          Follow the exact credential type and sign-in instructions shown in the sandbox portal. If it does not supply all three temporary values above, stop and contact the sandbox administrator/support contact for a VM-compatible credential method. Do not copy CloudShell credential files, and do not combine or invent authentication flows.
+        </div>
+      </section>
+
+      <section id="identity">
+        <h2>3. Confirm identity and region</h2>
+        <pre><code>test "$AWS_REGION" = "us-east-1" &amp;&amp; aws sts get-caller-identity --region us-east-1</code></pre>
+        <p>Confirm the account and role match the sandbox details shown in the browser. If either is unexpected, do not invoke Bedrock; clear the variables and contact the sandbox administrator.</p>
+      </section>
+
+      <section id="target">
+        <h2>4. Obtain <code>BEDROCK_MODEL_ID</code></h2>
+        <p>Use the exact model ID, inference-profile ID, or ARN supplied by the sandbox administrator. If instructed to discover it, list visible targets in the VS Code terminal and have the administrator confirm the invocation target—never guess a suffix or regional prefix.</p>
+        <pre><code>aws bedrock list-foundation-models \
+  --region us-east-1 \
+  --query 'modelSummaries[?modelLifecycle.status==`ACTIVE`].[modelId,modelName,inferenceTypesSupported]' \
+  --output table</code></pre>
+        <p>In VS Code, open <code>Week2/.env</code> (copy <a href="../.env.example"><code>.env.example</code></a> if needed) and set only these canonical values:</p>
+        <pre><code>AWS_REGION=us-east-1
+BEDROCK_MODEL_ID=&lt;exact admin-approved target&gt;
+BEDROCK_TIMEOUT_SECONDS=60
+BEDROCK_MAX_TOKENS=256</code></pre>
+        <p class="small">AWS credentials do not belong in <code>Week2/.env</code>.</p>
+      </section>
+
+      <section id="verify">
+        <h2>5. Run one curriculum verification</h2>
+        <p>From the VS Code terminal at the <code>Week2</code> root, run the existing bounded gateway once. It pins <code>us-east-1</code>, disables automatic retries, and makes one Converse request.</p>
+        <pre><code>uv run --env-file .env python W2D2/W2D2PM/d2pmt4c03_bedrock_gateway.py</code></pre>
+        <p>Success prints a classification, deterministic authorization decision, usage, provider request ID, and latency. Do not rerun merely to change model wording. Review the <a href="../W2D2/W2D2PM/d2pmt4c03_bedrock_gateway.py">curriculum script</a> rather than copying a separate smoke-test program.</p>
+        <div class="callout">
+          <strong>Need command details?</strong> Run <code>aws help</code>, <code>aws sts help</code>, or <code>aws bedrock help</code> in the Ubuntu terminal. For identity, access, model availability, or permission issues, use the sandbox administrator/support contact in the training portal.
+        </div>
+      </section>
+
+      <section id="cleanup">
+        <h2>6. Unset, log out, and stop</h2>
+        <pre><code>unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+unset AWS_PROFILE AWS_DEFAULT_PROFILE AWS_REGION AWS_DEFAULT_REGION AWS_PAGER
+unset BEDROCK_MODEL_ID BEDROCK_TIMEOUT_SECONDS BEDROCK_MAX_TOKENS</code></pre>
+        <ol class="steps">
+          <li>Close the terminal and log out of the AWS console.</li>
+          <li>Choose <strong>Stop Sandbox</strong> in the training portal and confirm.</li>
+          <li>Do not restart the sandbox to watch cleanup.</li>
+        </ol>
+      </section>
+    </main>
+  </div>
+
+  <footer>Learner runbook · One bounded Bedrock request · us-east-1 only</footer>
+</body>
+</html>

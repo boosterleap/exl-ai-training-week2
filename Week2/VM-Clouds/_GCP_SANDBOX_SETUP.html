@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A safe, bounded Cloud Shell setup flow for using Gemini on Vertex AI in the four-hour GCP learner sandbox.">
+  <title>GCP Sandbox Setup — Vertex AI from Cloud Shell</title>
+  <style>
+    :root {
+      --ink: #17202e;
+      --muted: #596579;
+      --line: #dce3ed;
+      --paper: #ffffff;
+      --wash: #f4f7fb;
+      --navy: #102a43;
+      --blue: #1769e0;
+      --blue-dark: #0d4da7;
+      --cyan: #15a7b5;
+      --green: #16794b;
+      --green-wash: #edf9f2;
+      --amber: #8a5700;
+      --amber-wash: #fff7e5;
+      --red: #a02b31;
+      --red-wash: #fff1f1;
+      --code: #111827;
+      --radius: 14px;
+      --shadow: 0 12px 30px rgba(16, 42, 67, .08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 1rem; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: linear-gradient(180deg, #edf4ff 0, var(--wash) 24rem, var(--wash) 100%);
+      font: 16px/1.62 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: var(--blue-dark); text-underline-offset: 3px; }
+    a:hover { color: var(--blue); }
+    code, pre { font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; }
+    code {
+      padding: .1rem .3rem;
+      border-radius: 5px;
+      background: #eaf0f8;
+      font-size: .91em;
+    }
+    pre {
+      position: relative;
+      overflow-x: auto;
+      margin: .75rem 0 1rem;
+      padding: 1rem 1.1rem;
+      border: 1px solid #273449;
+      border-radius: 10px;
+      color: #e8eef7;
+      background: var(--code);
+      font-size: .88rem;
+      line-height: 1.55;
+      tab-size: 2;
+    }
+    pre code { padding: 0; color: inherit; background: transparent; font-size: inherit; }
+    h1, h2, h3 { line-height: 1.2; color: var(--navy); }
+    h1 { max-width: 900px; margin: 0 0 1rem; font-size: clamp(2.2rem, 6vw, 4.6rem); letter-spacing: -.045em; }
+    h2 { margin: 0 0 1rem; font-size: clamp(1.6rem, 3vw, 2.3rem); letter-spacing: -.025em; }
+    h3 { margin: 1.5rem 0 .5rem; font-size: 1.15rem; }
+    p, ul, ol { margin-top: .55rem; }
+    ul, ol { padding-left: 1.3rem; }
+    li + li { margin-top: .35rem; }
+    kbd {
+      padding: .1rem .35rem;
+      border: 1px solid #b8c4d3;
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      background: white;
+      font: .84rem "Cascadia Code", Consolas, monospace;
+    }
+
+    .hero {
+      padding: clamp(2.7rem, 8vw, 6.5rem) max(1.2rem, calc((100vw - 1180px) / 2));
+      color: white;
+      background:
+        radial-gradient(circle at 82% 18%, rgba(21, 167, 181, .35), transparent 26rem),
+        linear-gradient(125deg, #102a43 0%, #123f74 58%, #1769e0 100%);
+    }
+    .hero h1, .hero a { color: white; }
+    .eyebrow {
+      display: inline-block;
+      margin-bottom: 1.2rem;
+      padding: .35rem .7rem;
+      border: 1px solid rgba(255,255,255,.35);
+      border-radius: 999px;
+      background: rgba(255,255,255,.1);
+      font-size: .78rem;
+      font-weight: 750;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .lede { max-width: 760px; margin: 0; color: #dceaff; font-size: clamp(1.04rem, 2vw, 1.3rem); }
+    .hero-meta { display: flex; flex-wrap: wrap; gap: .65rem; margin-top: 1.6rem; }
+    .hero-meta span { padding: .4rem .75rem; border-radius: 999px; background: rgba(255,255,255,.11); font-size: .88rem; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 245px minmax(0, 1fr);
+      gap: 2rem;
+      width: min(1180px, calc(100% - 2.4rem));
+      margin: 2rem auto 5rem;
+    }
+    nav {
+      position: sticky;
+      top: 1rem;
+      align-self: start;
+      max-height: calc(100vh - 2rem);
+      overflow: auto;
+      padding: 1rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.94);
+      box-shadow: var(--shadow);
+    }
+    nav strong { display: block; margin: .2rem .55rem .65rem; color: var(--navy); }
+    nav a { display: block; padding: .42rem .55rem; border-radius: 7px; color: var(--muted); text-decoration: none; font-size: .9rem; }
+    nav a:hover { color: var(--blue-dark); background: #edf4ff; }
+    main { min-width: 0; }
+    section {
+      margin-bottom: 1.4rem;
+      padding: clamp(1.25rem, 3.2vw, 2.2rem);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+    .step-label { margin-bottom: .5rem; color: var(--blue); font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+    .card { padding: 1rem; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfe; }
+    .card h3 { margin-top: 0; }
+    .callout { margin: 1rem 0; padding: .9rem 1rem; border-left: 4px solid var(--blue); border-radius: 0 9px 9px 0; background: #edf4ff; }
+    .callout strong { color: var(--navy); }
+    .warning { border-left-color: #d68a00; background: var(--amber-wash); }
+    .warning strong { color: var(--amber); }
+    .danger { border-left-color: var(--red); background: var(--red-wash); }
+    .danger strong { color: var(--red); }
+    .success { border-left-color: var(--green); background: var(--green-wash); }
+    .success strong { color: var(--green); }
+    .checklist { padding-left: 0; list-style: none; }
+    .checklist li { position: relative; padding-left: 1.7rem; }
+    .checklist li::before { position: absolute; left: 0; content: "□"; color: var(--blue); font-weight: 800; }
+    .flow { counter-reset: flow; padding-left: 0; list-style: none; }
+    .flow > li { position: relative; padding: 0 0 1.25rem 3rem; }
+    .flow > li::before {
+      counter-increment: flow;
+      position: absolute;
+      left: 0;
+      display: grid;
+      width: 2rem;
+      height: 2rem;
+      place-items: center;
+      border-radius: 50%;
+      color: white;
+      background: var(--blue);
+      content: counter(flow);
+      font-weight: 800;
+    }
+    .flow > li:not(:last-child)::after { position: absolute; top: 2rem; bottom: 0; left: .95rem; width: 2px; background: #cdd9e8; content: ""; }
+    .matrix { width: 100%; border-collapse: collapse; font-size: .92rem; }
+    .matrix th, .matrix td { padding: .8rem; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .matrix th { color: var(--navy); background: #edf4ff; }
+    .matrix tr:nth-child(even) td { background: #fafbfd; }
+    .table-wrap { overflow-x: auto; }
+    .pill { display: inline-block; padding: .18rem .48rem; border-radius: 999px; color: var(--green); background: var(--green-wash); font-size: .78rem; font-weight: 750; }
+    .refs li { overflow-wrap: anywhere; }
+    footer { padding: 2rem 1.2rem 4rem; color: var(--muted); text-align: center; font-size: .88rem; }
+
+    @media (max-width: 850px) {
+      .layout { grid-template-columns: 1fr; }
+      nav { position: static; max-height: none; }
+      nav .links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 600px) {
+      .hero { padding-top: 3rem; padding-bottom: 3rem; }
+      .layout { width: min(100% - 1rem, 1180px); margin-top: .5rem; gap: .6rem; }
+      section, nav { border-radius: 10px; }
+      .grid, nav .links { grid-template-columns: 1fr; }
+      .matrix { min-width: 680px; }
+    }
+    @media print {
+      body { background: white; font-size: 11pt; }
+      .hero { padding: 1.5rem; color: var(--ink); background: white; }
+      .hero h1, .hero a, .lede { color: var(--ink); }
+      nav { display: none; }
+      .layout { display: block; width: 100%; margin: 0; }
+      section { break-inside: avoid; margin: 0; border: 0; border-top: 1px solid #bbb; box-shadow: none; }
+      a { color: inherit; }
+      pre { white-space: pre-wrap; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <span class="eyebrow">Week 2 · GCP Cloud Shell runbook</span>
+    <h1>Run Google ADK on Vertex AI</h1>
+    <p class="lede">Essential project, API, and model-access checks for the Google ADK primer using the authenticated GCP sandbox.</p>
+    <div class="hero-meta">
+      <span>Four-hour sandbox</span>
+      <span>Assigned project only</span>
+      <span>Vertex AI · ADC</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav aria-label="Page navigation">
+      <strong>On this page</strong>
+      <div class="links">
+        <a href="#guardrails">Sandbox constraints</a>
+        <a href="#command-context">Where commands run</a>
+        <a href="#auth">1. Verify identity</a>
+        <a href="#project">2. Pin the project</a>
+        <a href="#environment">3. Configure Week2/.env</a>
+        <a href="#check">4. Run one check</a>
+        <a href="#primer">5. Run the primer</a>
+        <a href="#cleanup">6. Clean up</a>
+      </div>
+    </nav>
+
+    <main>
+      <section id="guardrails">
+        <div class="step-label">Read first</div>
+        <h2>Stay inside the sandbox</h2>
+        <div class="callout danger">
+          <strong>Four-hour lifetime.</strong> Time starts when the sandbox starts. Stop it as soon as you finish; cleanup takes about 15–20 minutes and deletes sandbox resources.
+        </div>
+        <ul class="checklist">
+          <li>Use the sandbox account and exact assigned project ID; never substitute a personal project.</li>
+          <li>Use the location assigned in the sandbox details. The classroom default is <code>global</code>.</li>
+          <li>Use Vertex AI with Google credentials—never an API key or service-account key.</li>
+          <li>Do not create projects, change billing, or alter IAM.</li>
+        </ul>
+      </section>
+
+      <section id="command-context">
+        <div class="step-label">Command context</div>
+        <h2>Run GCP commands in GCP Cloud Shell</h2>
+        <p>Open the assigned GCP sandbox in the browser, select <strong>Activate Cloud Shell</strong> in the Google Cloud console, and run every <code>gcloud</code> command in that Cloud Shell terminal.</p>
+        <ul>
+          <li><strong>GCP Cloud Shell:</strong> inspect the sandbox account, select the project, enable/check APIs, and test Vertex access.</li>
+          <li><strong>Google Cloud console:</strong> check the project selector and <strong>APIs &amp; Services → Enabled APIs &amp; services</strong>.</li>
+          <li><strong>Ubuntu VM:</strong> continue normal Week 2 work, but do not assume the separate GCP identity is available there.</li>
+        </ul>
+      </section>
+
+      <section id="auth">
+        <div class="step-label">Step 1</div>
+        <h2>Verify the Cloud Shell identity</h2>
+        <p>Cloud Shell is authenticated by the active GCP sandbox session. Confirm the account and list the projects visible to it:</p>
+        <pre><code>gcloud auth list
+gcloud projects list --format="table(projectId,name)"</code></pre>
+        <div class="callout">
+          <strong>Select the assigned sandbox project.</strong> Use the exact project ID shown in the sandbox portal. An <code>exlservic-*</code> project is typically the training project; a <code>gen-lang-client-*</code> “Default Gemini Project” is not the Vertex sandbox project.
+        </div>
+        <div class="callout danger">
+          <strong>If the assigned project is absent, stop.</strong> Contact the sandbox administrator. Do not use another visible project or change IAM.
+        </div>
+      </section>
+
+      <section id="project">
+        <div class="step-label">Step 2</div>
+        <h2>Pin the project and enable Vertex AI</h2>
+        <p>Copy the exact project ID from the training sandbox details or the project selector at the top of the Google Cloud console. In GCP Cloud Shell, run:</p>
+        <pre><code>export GOOGLE_CLOUD_PROJECT="REPLACE_WITH_EXACT_ASSIGNED_PROJECT_ID"
+gcloud config set project "$GOOGLE_CLOUD_PROJECT"</code></pre>
+        <div class="callout warning">
+          <strong>Reject an inaccessible project.</strong> If <code>gcloud</code> says the active account cannot access the project and asks whether to continue, answer <code>n</code>. Return to <code>gcloud projects list</code> and select the exact assigned project ID.
+        </div>
+        <p>Check whether Vertex AI API is enabled:</p>
+        <pre><code>gcloud services list --enabled \
+  --project="$GOOGLE_CLOUD_PROJECT" \
+  --filter="name:aiplatform.googleapis.com"</code></pre>
+        <p>If this prints <code>Listed 0 items</code>, Vertex AI API is not enabled. Attempt the approved enablement command:</p>
+        <pre><code>gcloud services enable aiplatform.googleapis.com \
+  --project="$GOOGLE_CLOUD_PROJECT"</code></pre>
+        <div class="callout warning">
+          <strong>If enablement returns <code>PERMISSION_DENIED</code>, stop.</strong> Contact the sandbox administrator or support contact shown in the training portal. Request that <code>aiplatform.googleapis.com</code> be enabled and that the sandbox identity can use Vertex AI publisher models and consume the service in the assigned project. Ask them to confirm billing/quota and the allowed Gemini model/location. Include the project ID and error text, but no tokens or credentials. The instructor cannot change sandbox IAM or service configuration.
+        </div>
+        <p>To check in the browser, open <strong>Google Cloud console → APIs &amp; Services → Enabled APIs &amp; services</strong>, select the assigned project, and search for <strong>Vertex AI API</strong>.</p>
+      </section>
+
+      <section id="environment">
+        <div class="step-label">Step 3</div>
+        <h2>Prepare the curriculum in Cloud Shell</h2>
+        <p>Clone the repository in GCP Cloud Shell. Git prompts for username <code>boosterleap</code> and the trainer-provided repository PAT:</p>
+        <pre><code>git config --global credential.helper 'cache --timeout=14400'
+git clone https://github.com/boosterleap/exl-ai-training-week2.git
+cd exl-ai-training-week2/Week2
+
+python3 -m venv ~/exl-week2-gcp-venv
+source ~/exl-week2-gcp-venv/bin/activate
+python -m pip install uv
+uv pip install "pydantic&gt;=2.0" "jupyterlab&gt;=4.0" "ipykernel&gt;=6.29" \
+  "google-adk&gt;=2.4,&lt;3.0" "google-genai&gt;=2.9,&lt;3.0" \
+  "google-auth&gt;=2.38,&lt;3.0"
+python -m ipykernel install --user \
+  --name exl-week2-gcp-venv \
+  --display-name "Python (EXL Week 2 GCP)"</code></pre>
+        <p>If the repository already exists in Cloud Shell, enter it and run <code>git pull</code> instead of cloning again.</p>
+        <p>Copy <code>.env.example</code> to <code>.env</code>, open that file in the Cloud Shell Editor, and set these values. Use the sandbox-admin-approved model and location if they differ from the defaults shown.</p>
+        <pre><code>cp .env.example .env</code></pre>
+        <pre><code>GOOGLE_CLOUD_PROJECT=REPLACE_WITH_EXACT_ASSIGNED_PROJECT_ID
+GOOGLE_CLOUD_LOCATION=global
+GOOGLE_ADK_MODEL=gemini-3.1-flash-lite
+GOOGLE_GENAI_USE_VERTEXAI=true
+GOOGLE_GENAI_USE_ENTERPRISE=true</code></pre>
+        <p>Do not add a Google API key. Keep <code>Week2/.env</code> private.</p>
+      </section>
+
+      <section id="check">
+        <div class="step-label">Step 4</div>
+        <h2>Run one minimal check</h2>
+        <p>In GCP Cloud Shell at the <code>Week2</code> root, confirm the identity, project, and Vertex AI API:</p>
+        <pre><code>gcloud auth list --filter=status:ACTIVE --format='value(account)'
+gcloud config get-value project
+gcloud services list --enabled \
+  --filter='config.name:aiplatform.googleapis.com' \
+  --format='value(config.name)' \
+  --project="$GOOGLE_CLOUD_PROJECT"</code></pre>
+        <p>The output must show the assigned sandbox account, the assigned project ID, and <code>aiplatform.googleapis.com</code>. Cloud Shell supplies ADC to Google client libraries; do not run a cross-sandbox login flow or download credential files.</p>
+        <p>After the API is enabled, the first bounded model cell in the primer checks the remaining requirements: Vertex permission, selected model availability, location, quota, and billing. A <code>403</code> indicates missing access; a <code>404</code> usually indicates an unavailable model/location; a <code>429</code> indicates quota or capacity. Send the exact error and project ID to the sandbox administrator.</p>
+      </section>
+
+      <section id="primer">
+        <div class="step-label">Step 5</div>
+        <h2>Run the existing Google ADK primer</h2>
+        <p>From GCP Cloud Shell, load <code>.env</code> and start Jupyter on the supported web-preview port:</p>
+        <pre><code>set -a
+source .env
+set +a
+unset GOOGLE_API_KEY GEMINI_API_KEY
+jupyter lab --no-browser --ip=0.0.0.0 --port=8080</code></pre>
+        <p>Select <strong>Web Preview → Preview on port 8080</strong>, open <a href="../W2D2/W2D2AM/_GOOGLE_ADK_PRIMER.ipynb">Google ADK 2.x primer</a>, select the <code>exl-week2-gcp-venv</code> kernel, and run it in order. Its bounded provider call is the smoke test.</p>
+        <div class="callout">
+          <strong>Need command details?</strong> Run <code>gcloud config set --help</code> or <code>gcloud services --help</code> in Cloud Shell. For account, project, API, quota, model, billing, or permission issues, use the sandbox administrator/support contact in the training portal.
+        </div>
+      </section>
+
+      <section id="cleanup">
+        <div class="step-label">Step 6 · Finish before timeout</div>
+        <h2>Revoke and stop</h2>
+        <ol class="checklist">
+          <li>Stop Jupyter with <kbd>Ctrl</kbd>+<kbd>C</kbd> and close Cloud Shell.</li>
+          <li>Do not revoke or export the sandbox-managed Cloud Shell identity.</li>
+          <li>Delete <code>Week2/.env</code> from Cloud Shell if the sandbox home directory will persist beyond the exercise.</li>
+          <li>Stop the sandbox in the portal; allow 15–20 minutes for cleanup.</li>
+        </ol>
+      </section>
+
+    </main>
+  </div>
+
+  <footer>
+    EXL Campus Hire · GCP learner sandbox · Use the assigned project, location, and sandbox-admin-approved model.
+  </footer>
+</body>
+</html>

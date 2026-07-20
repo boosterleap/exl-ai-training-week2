@@ -1,11 +1,17 @@
-# Week 2 — single environment (install once from Week2 repo root)
+# Week 2 — single environment (install once)
+# Local trainer env on this machine:
+#   C:\Users\Asus\.venv
+#   C:\Users\Asus\.venv\Scripts\Activate.ps1
+#   uv pip install -r requirements.txt --python C:\Users\Asus\.venv\Scripts\python.exe
+#
+# Alternate project-local pattern (other machines / learners):
 #   cd Week2
 #   uv venv
 #   uv pip install -r requirements.txt
 #
 # Must-have libraries only — mapped to instructor guide (AM / PM per day).
 # Re-run after git pull when this file is updated:
-#   uv pip install -r requirements.txt
+#   uv pip install -r requirements.txt --python C:\Users\Asus\.venv\Scripts\python.exe
 #
 # Prerequisites: Python 3.11+. Week 1 concepts assumed; this file is self-contained for Week 2 labs.
 
@@ -15,7 +21,7 @@ pydantic>=2.0
 ipykernel>=6.29
 jupyterlab>=4.0
 
-# ── W2D1 AM — live LangGraph agent foundations ──
+# ── W2D1 AM — LangGraph agent foundations ──
 langgraph>=1.0,<2.0
 langchain-core>=1.0,<2.0
 langchain-anthropic>=1.0,<2.0
@@ -23,15 +29,24 @@ langchain-openai>=0.3
 anthropic>=0.40
 openai>=1.40
 
-# ── W2D1 PM — live Claude Agent SDK agent + typed MCP tools ──
+# ── W2D1 PM — Claude Agent SDK agent + typed MCP tools ──
 claude-agent-sdk>=0.1
 mcp[cli]>=1.0
 
 # ── W2D2 required framework primers ──
 crewai[anthropic]>=1.15,<1.16
 google-adk>=2.4,<3.0
+# google-adk 2.4+ requires google-genai 2.x (Vertex / Gemini client).
+google-genai>=2.9,<3.0
+# Direct Google ADK authentication imports; retain its supported major.
+google-auth>=2.38,<3.0
 agent-framework>=1.0,<2.0
+# Azure OpenAI provider integration for Agent Framework.
+agent-framework-openai>=1.0,<2.0
+# Optional Microsoft Entra authentication for Azure OpenAI.
 azure-identity>=1.17
+# Amazon Bedrock client; authentication uses the standard AWS credential chain.
+boto3>=1.35,<2.0
 
 # ── W2D2 AM — LangGraph checkpointing, SDK hooks, reliability ──
 langgraph-checkpoint-sqlite>=2.0
@@ -39,7 +54,11 @@ tenacity>=9.0
 
 # ── W2D2 PM — MCP, A2A, and resumable workflow ──
 a2a-sdk>=1.1,<2.0
+# Direct A2A message imports; allow its supported protobuf majors.
+protobuf>=5.29,<7.0
 sse-starlette>=2.0
+# Direct ASGI imports; FastAPI 0.139+ supports Starlette 1.x.
+starlette>=0.46,<2.0
 # (also uses mcp and langgraph — already above)
 
 # ── W2D3 AM — Agentic RAG, hybrid search, GraphRAG concept, ACL retrieval ──

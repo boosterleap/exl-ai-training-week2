@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Same workload, two agent architectures</title>
+  <desc id="desc">LangGraph declarative graph and Claude Agent SDK imperative asynchronous orchestration both fan out to five specialists and fan in to a validated triage decision.</desc>
+  <defs>
+    <style>
+      .title{font:700 42px Arial,sans-serif;fill:#10224a}.heading{font:700 27px Arial,sans-serif;fill:#fff}
+      .label{font:700 21px Arial,sans-serif;fill:#10224a}.small{font:600 16px Arial,sans-serif;fill:#33466d}
+      .tiny{font:600 14px Arial,sans-serif;fill:#33466d}.metric{font:700 20px Arial,sans-serif;fill:#fff}
+      .box{fill:#fff;stroke:#cbd5e1;stroke-width:2}.lgbox{fill:#f7f4ff;stroke:#6d40c6;stroke-width:3}
+      .sdkbox{fill:#f0fbfc;stroke:#087f8c;stroke-width:3}.shared{fill:#f8fafc;stroke:#10224a;stroke-width:3}
+      .lgline{stroke:#6d40c6;stroke-width:4;fill:none}.sdkline{stroke:#087f8c;stroke-width:4;fill:none}
+    </style>
+    <marker id="lgArrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#6d40c6"/></marker>
+    <marker id="sdkArrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#087f8c"/></marker>
+  </defs>
+  <rect width="1600" height="900" fill="#fff"/>
+  <text x="800" y="64" text-anchor="middle" class="title">Same Workload, Two Agent Architectures</text>
+  <rect x="220" y="92" width="1160" height="72" rx="14" class="shared"/>
+  <text x="800" y="136" text-anchor="middle" class="label">Insurance case bundle: FNOL + claim + policy + related notices + controls</text>
+
+  <rect x="40" y="202" width="742" height="520" rx="18" class="lgbox"/>
+  <path d="M40 220 Q40 202 58 202 H764 Q782 202 782 220 V268 H40 Z" fill="#5b2ca8"/>
+  <text x="411" y="244" text-anchor="middle" class="heading">LangGraph: declarative fan-out / fan-in</text>
+  <rect x="296" y="292" width="230" height="58" rx="12" class="lgbox"/><text x="411" y="329" text-anchor="middle" class="label">START / shared state</text>
+  <text x="66" y="303" class="small">StateGraph</text><text x="66" y="329" class="small">typed state + reducers</text><text x="66" y="355" class="small">ainvoke()</text>
+  <path d="M411 350 V394 M411 378 H137 V418 M411 378 H274 V418 M411 378 V418 M411 378 H548 V418 M411 378 H685 V418" class="lgline" marker-end="url(#lgArrow)"/>
+  <g class="label">
+    <rect x="76" y="418" width="122" height="62" rx="12" class="lgbox"/><text x="137" y="457" text-anchor="middle">FNOL</text>
+    <rect x="213" y="418" width="122" height="62" rx="12" class="lgbox"/><text x="274" y="457" text-anchor="middle">Claim</text>
+    <rect x="350" y="418" width="122" height="62" rx="12" class="lgbox"/><text x="411" y="457" text-anchor="middle">Policy</text>
+    <rect x="487" y="418" width="122" height="62" rx="12" class="lgbox"/><text x="548" y="457" text-anchor="middle">Duplicate</text>
+    <rect x="624" y="418" width="122" height="62" rx="12" class="lgbox"/><text x="685" y="457" text-anchor="middle">Control</text>
+  </g>
+  <path d="M137 480 V522 H411 M274 480 V522 M411 480 V552 M548 480 V522 M685 480 V522 H411" class="lgline" marker-end="url(#lgArrow)"/>
+  <rect x="274" y="552" width="274" height="64" rx="12" class="lgbox"/><text x="411" y="592" text-anchor="middle" class="label">Synthesis node</text>
+  <path d="M411 616 V646" class="lgline" marker-end="url(#lgArrow)"/>
+  <rect x="250" y="646" width="322" height="54" rx="12" class="lgbox"/><text x="411" y="680" text-anchor="middle" class="label">Validated TriageDecision</text>
+
+  <rect x="818" y="202" width="742" height="520" rx="18" class="sdkbox"/>
+  <path d="M818 220 Q818 202 836 202 H1542 Q1560 202 1560 220 V268 H818 Z" fill="#08727e"/>
+  <text x="1189" y="244" text-anchor="middle" class="heading">Claude Agent SDK: imperative async orchestration</text>
+  <rect x="1074" y="292" width="230" height="58" rx="12" class="sdkbox"/><text x="1189" y="329" text-anchor="middle" class="label">asyncio.gather()</text>
+  <text x="844" y="303" class="small">ClaudeAgentOptions</text><text x="844" y="329" class="small">query() + ResultMessage</text><text x="844" y="355" class="small">Python owns concurrency</text>
+  <path d="M1189 350 V394 M1189 378 H915 V418 M1189 378 H1052 V418 M1189 378 V418 M1189 378 H1326 V418 M1189 378 H1463 V418" class="sdkline" marker-end="url(#sdkArrow)"/>
+  <g class="label">
+    <rect x="854" y="418" width="122" height="62" rx="12" class="sdkbox"/><text x="915" y="445" text-anchor="middle">query:</text><text x="915" y="469" text-anchor="middle">FNOL</text>
+    <rect x="991" y="418" width="122" height="62" rx="12" class="sdkbox"/><text x="1052" y="445" text-anchor="middle">query:</text><text x="1052" y="469" text-anchor="middle">Claim</text>
+    <rect x="1128" y="418" width="122" height="62" rx="12" class="sdkbox"/><text x="1189" y="445" text-anchor="middle">query:</text><text x="1189" y="469" text-anchor="middle">Policy</text>
+    <rect x="1265" y="418" width="122" height="62" rx="12" class="sdkbox"/><text x="1326" y="445" text-anchor="middle">query:</text><text x="1326" y="469" text-anchor="middle">Duplicate</text>
+    <rect x="1402" y="418" width="122" height="62" rx="12" class="sdkbox"/><text x="1463" y="445" text-anchor="middle">query:</text><text x="1463" y="469" text-anchor="middle">Control</text>
+  </g>
+  <path d="M915 480 V522 H1189 M1052 480 V522 M1189 480 V552 M1326 480 V522 M1463 480 V522 H1189" class="sdkline" marker-end="url(#sdkArrow)"/>
+  <rect x="1052" y="552" width="274" height="64" rx="12" class="sdkbox"/><text x="1189" y="592" text-anchor="middle" class="label">Synthesis query</text>
+  <path d="M1189 616 V646" class="sdkline" marker-end="url(#sdkArrow)"/>
+  <rect x="1028" y="646" width="322" height="54" rx="12" class="sdkbox"/><text x="1189" y="680" text-anchor="middle" class="label">Validated TriageDecision</text>
+
+  <rect x="40" y="754" width="1520" height="116" rx="18" fill="#10224a"/>
+  <text x="800" y="800" text-anchor="middle" class="metric">Measure: wall time | operation latency | input tokens | output tokens | model calls | grounding checks</text>
+  <text x="800" y="840" text-anchor="middle" class="metric">Same Anthropic model " identical prompts " identical evidence " five parallel specialists + one synthesis call</text>
+</svg>

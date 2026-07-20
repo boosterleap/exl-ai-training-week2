@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Azure Sandbox Setup — Ubuntu Learner Guide</title>
+  <style>
+    :root {
+      --azure: #0078d4;
+      --azure-dark: #004578;
+      --ink: #17202a;
+      --muted: #52606d;
+      --surface: #ffffff;
+      --soft: #f4f8fb;
+      --line: #cbd5df;
+      --ok: #107c10;
+      --warn: #8a4b08;
+      --danger: #b42318;
+      --code: #101820;
+      --code-ink: #e8f1f8;
+      --shadow: 0 10px 28px rgb(0 0 0 / 9%);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 1rem; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--soft);
+      font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    a { color: var(--azure-dark); text-underline-offset: .16em; }
+    a:hover, a:focus-visible { color: var(--azure); }
+    :focus-visible { outline: 3px solid #ffb900; outline-offset: 3px; }
+    header {
+      color: white;
+      background: linear-gradient(125deg, #003b66, var(--azure));
+      padding: 2.4rem max(1rem, calc((100vw - 1180px) / 2));
+    }
+    header p { max-width: 75ch; margin-bottom: 0; }
+    h1 { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.08; margin: 0 0 .8rem; }
+    h2 { color: var(--azure-dark); border-bottom: 2px solid #b9d9f2; padding-bottom: .35rem; }
+    h3 { margin-top: 1.6rem; }
+    code, kbd { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+    code:not(pre code) { background: #e4eef5; border-radius: .25rem; padding: .08rem .3rem; }
+    pre {
+      color: var(--code-ink);
+      background: var(--code);
+      border-radius: .55rem;
+      padding: 1rem;
+      overflow-x: auto;
+      white-space: pre;
+      tab-size: 2;
+    }
+    pre code { background: transparent; padding: 0; }
+    .layout {
+      width: min(1180px, calc(100% - 2rem));
+      margin: 1.5rem auto 3rem;
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      gap: 1.5rem;
+      align-items: start;
+    }
+    nav {
+      position: sticky;
+      top: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: .7rem;
+      box-shadow: var(--shadow);
+      padding: .8rem;
+    }
+    nav strong { display: block; padding: .35rem .55rem .6rem; }
+    nav a {
+      display: block;
+      padding: .38rem .55rem;
+      border-radius: .35rem;
+      text-decoration: none;
+    }
+    nav a:hover, nav a:focus-visible { background: #e5f2fc; }
+    main { min-width: 0; }
+    section {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: .7rem;
+      box-shadow: var(--shadow);
+      padding: clamp(1rem, 3vw, 1.8rem);
+      margin-bottom: 1.3rem;
+    }
+    .callout {
+      border-left: .35rem solid var(--azure);
+      background: #edf7ff;
+      border-radius: .3rem;
+      padding: .75rem 1rem;
+      margin: 1rem 0;
+    }
+    .warning { border-color: #f2a900; background: #fff7e6; }
+    .danger { border-color: var(--danger); background: #fff0ef; }
+    .success { border-color: var(--ok); background: #effbef; }
+    .steps { counter-reset: step; list-style: none; padding: 0; }
+    .steps > li {
+      counter-increment: step;
+      position: relative;
+      padding: 0 0 1.2rem 3.1rem;
+      min-height: 3rem;
+    }
+    .steps > li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: .05rem;
+      width: 2.15rem;
+      height: 2.15rem;
+      display: grid;
+      place-items: center;
+      color: white;
+      background: var(--azure);
+      border-radius: 50%;
+      font-weight: 700;
+    }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+    .card { border: 1px solid var(--line); border-radius: .55rem; padding: 1rem; }
+    .card h3 { margin-top: 0; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 680px; }
+    th, td { border: 1px solid var(--line); padding: .65rem; text-align: left; vertical-align: top; }
+    th { background: #e8f3fb; color: var(--azure-dark); }
+    .checklist { list-style: none; padding-left: 0; }
+    .checklist li { margin: .45rem 0; padding-left: 1.7rem; position: relative; }
+    .checklist li::before { content: "□"; position: absolute; left: 0; font-weight: 700; }
+    .pill {
+      display: inline-block;
+      color: white;
+      background: var(--azure-dark);
+      border-radius: 999px;
+      padding: .12rem .55rem;
+      font-size: .85rem;
+      font-weight: 700;
+    }
+    footer { color: var(--muted); text-align: center; padding: 0 1rem 2rem; }
+    @media (max-width: 820px) {
+      .layout { display: block; width: min(100% - 1rem, 760px); }
+      nav { position: static; margin-bottom: 1rem; columns: 2; }
+      nav strong { column-span: all; }
+      .grid { grid-template-columns: 1fr; }
+      section { border-radius: .45rem; }
+    }
+    @media (max-width: 480px) {
+      nav { columns: 1; }
+      header { padding-block: 1.6rem; }
+      .steps > li { padding-left: 2.7rem; }
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --ink: #e7edf3;
+        --muted: #b7c1ca;
+        --surface: #17212b;
+        --soft: #0d141b;
+        --line: #40505f;
+        --azure-dark: #75c5ff;
+        --code: #070b0f;
+        --code-ink: #e8f1f8;
+      }
+      code:not(pre code), th { background: #223747; }
+      nav a:hover, nav a:focus-visible { background: #223747; }
+      .callout { background: #122f43; }
+      .warning { background: #3b2b10; }
+      .danger { background: #3b1d1b; }
+      .success { background: #17351d; }
+    }
+    @media print {
+      body { background: white; color: black; font-size: 11pt; }
+      header { color: black; background: none; padding: 0; }
+      nav { display: none; }
+      .layout { display: block; width: 100%; margin: 0; }
+      section { box-shadow: none; break-inside: avoid; }
+      a { color: black; overflow-wrap: anywhere; }
+      a::after { content: " (" attr(href) ")"; font-size: 8pt; }
+      pre { white-space: pre-wrap; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="pill">Ubuntu • 4-hour training sandbox</span>
+    <h1>Azure Sandbox Setup</h1>
+    <p>Connect the Week 2 curriculum to a sandbox-admin-provided standalone Azure OpenAI deployment using API-key authentication.</p>
+  </header>
+
+  <div class="layout">
+    <nav aria-label="Page navigation">
+      <strong>On this page</strong>
+      <a href="#rules">1. Sandbox limits</a>
+      <a href="#command-context">Where steps run</a>
+      <a href="#instructor">2. Administrator setup</a>
+      <a href="#env">3. Configure access</a>
+      <a href="#verify">4. Verify once</a>
+      <a href="#cleanup">5. Finish safely</a>
+    </nav>
+
+    <main>
+      <section id="rules">
+        <h2>1. Sandbox limits</h2>
+        <div class="callout danger">
+          <strong>The four-hour clock starts with the sandbox.</strong> Reserve the final 20 minutes, stop the sandbox when finished, and allow 15–20 minutes for automated cleanup.
+        </div>
+        <ul>
+          <li>Azure resources must remain in <strong>East US, East US 2, West US, or West US 2</strong>.</li>
+          <li><strong>Global Standard</strong>, if used for the model deployment, is a processing type—not a resource region.</li>
+          <li>Use only the assigned subscription and pre-created resource group.</li>
+        </ul>
+      </section>
+
+      <section id="command-context">
+        <h2>Where to complete each step</h2>
+        <p>Open the repository in VS Code on the Ubuntu VM. Use <strong>Terminal → New Terminal</strong> to activate the environment and confirm the working folder:</p>
+        <pre><code>source /home/labuser/venv/bin/activate
+cd /home/labuser/Desktop/Persistent_Folder/exl-ai-training-week2-shared/exl-ai-training-week2/Week2
+pwd</code></pre>
+        <p><code>pwd</code> must end in <code>exl-ai-training-week2/Week2</code>. Edit <code>Week2/.env</code> and run the primer in VS Code. Use the browser only for the training sandbox portal and Azure portal.</p>
+      </section>
+
+      <section id="instructor">
+        <h2>2. Sandbox administrator setup</h2>
+        <div class="callout">
+          <strong>Learners do not provision Azure resources.</strong> The sandbox administrator creates one standalone Azure OpenAI S0 resource and a small classroom model deployment in an allowed region.
+        </div>
+        <p>The sandbox administrator or training portal supplies each learner with:</p>
+        <ul>
+          <li>the standalone resource endpoint,</li>
+          <li>an API key,</li>
+          <li>the exact deployment name, and</li>
+          <li>an API-version override only if the installed client requires one.</li>
+        </ul>
+      </section>
+
+      <section id="env">
+        <h2>3. Configure API-key access</h2>
+        <div class="callout">
+          <strong>The sandboxes are separate.</strong> Signing in to the Azure portal does not authenticate the Ubuntu VM. Copy the standalone Azure OpenAI endpoint, deployment name, and API key from the assigned Azure sandbox into the private <code>Week2/.env</code> file on the VM.
+        </div>
+        <p>In VS Code, add or update these four canonical variables in <code>Week2/.env</code>:</p>
+        <pre><code>AZURE_OPENAI_API_KEY=PASTE-KEY-1-LOCALLY
+AZURE_OPENAI_ENDPOINT=https://YOUR-RESOURCE-NAME.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT=class-mini
+AZURE_OPENAI_API_VERSION=</code></pre>
+        <ul>
+          <li>Use the exact values from the sandbox details. The deployment value is the deployment name, not necessarily the underlying model name.</li>
+          <li><code>AZURE_OPENAI_API_VERSION</code> is an optional override in the primer; leave its value blank unless the sandbox administrator or installed client requires a dated version.</li>
+          <li>API-key inference does <strong>not</strong> require Azure CLI or <code>az login</code>.</li>
+        </ul>
+        <p>If learners have Azure portal access, check the endpoint under the assigned Azure OpenAI resource and the deployment name under its model deployments. If those pages are unavailable or values are missing, contact the sandbox administrator/support contact shown in the training portal.</p>
+        <div class="callout danger">
+          <strong>Keep the key secret.</strong> Never print it, paste it into notebooks/chat/screenshots, or commit <code>Week2/.env</code>. Check <code>git status</code> before committing. Report an exposed key immediately so an administrator can rotate it.
+        </div>
+      </section>
+
+      <section id="verify">
+        <h2>4. Verify once with the curriculum primer</h2>
+        <ol class="steps">
+          <li>In VS Code, open <a href="../W2D2/W2D2AM/_MICROSOFT_AGENT_FRAMEWORK_PRIMER.ipynb"><code>W2D2/W2D2AM/_MICROSOFT_AGENT_FRAMEWORK_PRIMER.ipynb</code></a>.</li>
+          <li>Select <code>/home/labuser/venv/bin/python</code> as the notebook kernel.</li>
+          <li>Run its environment/configuration checks, then its single bounded Azure OpenAI verification example.</li>
+          <li>Stop after one successful response. Do not run loops, load tests, or repeated agent calls.</li>
+        </ol>
+        <p>The primer reads <code>Week2/.env</code>, validates the standalone <code>*.openai.azure.com</code> endpoint, and intentionally does not display the API key.</p>
+        <div class="callout">
+          <strong>Need configuration details?</strong> Check the training portal first, then the assigned resource in the Azure portal if access is available. For missing resources, deployments, keys, quota, or permissions, contact the sandbox administrator; the instructor cannot change sandbox configuration.
+        </div>
+      </section>
+
+      <section id="cleanup">
+        <h2>5. Finish safely</h2>
+        <ol class="steps">
+          <li>Stop notebooks, applications, and agents that can call the endpoint.</li>
+          <li>
+            Clear exported shell values:
+            <pre><code>unset AZURE_OPENAI_API_KEY AZURE_OPENAI_ENDPOINT AZURE_OPENAI_DEPLOYMENT AZURE_OPENAI_API_VERSION</code></pre>
+          </li>
+          <li>If you separately used Azure CLI, run <code>az logout</code>. It is not needed for this API-key exercise.</li>
+          <li>Keep the shared <code>Week2/.env</code> file; do not print or commit its contents.</li>
+          <li>Stop the sandbox before the four-hour deadline and allow 15–20 minutes for cleanup.</li>
+        </ol>
+        <div class="callout success">
+          <strong>Done means:</strong> callers stopped, shell credentials cleared, optional CLI session logged out, secrets uncommitted, and sandbox stopped.
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer>EXL Campus Hire • Week 2 • Azure sandbox learner setup</footer>
+</body>
+</html>

@@ -1,0 +1,107 @@
+############### VM Sandbox:
+
+Tools Installed:
+
+1. Development Environment & IDE VS Code (with GitHub Copilot + Claude extension), Python 3.12 + Jupyter, Git
+
+2. AI Agent Frameworks & Orchestration LangGraph, CrewAI, AutoGen (pyautogen), MemGPT, Mem0, Zep, MCP, A2A
+
+3. Vector Databases / Memory / Knowledge Stores PostgreSQL + pgvector, Qdrant, LanceDB, Redis, Neo4j
+
+4. Containerization & Runtime Docker CLI, containerd, Docker Compose
+
+5. Data Engineering, Streaming & Orchestration Apache Kafka, Apache Spark / PySpark, Apache Flink, Apache Airflow, dbt, Delta Lake
+
+6. Monitoring & Observability Prometheus, Grafana
+
+7. Cloud CLI gcloud-cli
+
+Unclear / To Confirm Apache (please specify: HTTP Server, Arrow, etc.?)
+
+Please refer to the README file for the list of all installed tools, along with their access URLs, ports, and any credentials if applicable.
+
+
+############### AWS Sandbox:
+Description
+×
+Account clean-up will run 4 hours after the Sandbox starts.
+Stop the Sandbox after completing your activities.
+Account clean-up will run after the Sandbox is stopped. (The clean-up process will take 15-20 minutes, during which you will not be able to access the Sandbox.)
+Clean-up: All resources will be deleted once the clean-up is completed.
+AWS Resource Setup Instructions
+Resource Location: us-east-1 (N. Virginia) (⚠️ Important Note: Please create all resources in the us-east-1 (N. Virginia) location only)
+AWS Service
+CloudShell, S3, ECR, ECS, EKS, CloudWatch, IAM (us-east-1 only)
+
+EC2 → t2.micro/t3.micro/t3a.medium/t3a.micro only, ≤64GB (us-east-1)
+
+RDS → micro/small only, <30GB (us-east-1)
+
+Bedrock → Claude models only (Invoke, Agents, Knowledge Bases)
+
+Model ID
+anthropic.claude-sonnet-4-6
+anthropic.claude-haiku-4-5-20251001-v1:0
+anthropic.claude-opus-4-6-v1
+anthropic.claude-opus-4-7
+anthropic.claude-opus-4-8
+
+############### Sandbox - Azure:
+Description
+×
+Account clean-up will run 4 hours after the Sandbox starts.
+Stop the Sandbox after completing your activities.
+Account clean-up will run after the Sandbox is stopped. (The clean-up process will take 15-20 minutes, during which you will not be able to access the Sandbox.)
+Clean-up: All resources will be deleted once the clean-up is completed.
+Azure Resource Setup Instructions
+Resource Location: East US | East US 2 | West US | West US 2 | Global (⚠️ Important Note: Please create all resources in Resource Location location only)
+Virtual Machines
+SKU: Standard_B2ms or Standard_DS11_v2
+OS Disk: Standard_LRS only
+Container Instances
+CPU: 1 or 2 cores
+Memory: 1 or 2 GB RAM
+Container Registry
+SKU: Basic
+AKS Node Pools
+SKU: Standard_DS2_v2, Standard_B2ms, or Standard_DS11_v2
+Azure App Service / Function App (Use: East US 2 location)
+F1 (Free tier - suitable for development)
+S1 (Standard tier - required for production scenarios)
+P1V3 (Premium V3 - for higher performance needs)
+Flex Consumption (Get high scalability with compute choices, virtual networking, and pay-as-you-go billing.)
+Azure OpenAI Service / Cognitive Services
+F0 (Free tier - limited features)
+S0 (Standard tier)
+Azure AI Search
+Basic tier (Recommended for course exercises)
+Free tier (Limited to 50MB total storage, sufficient for basic exercises)
+Azure SQL Database
+SKU: Basic tier
+Azure Machine Learning
+SKU: DevTest or Basic
+Azure Storage Account
+SKU: Standard LRS (Locally redundant storage)
+Azure Key Vault
+SKU: Standard
+Load Balancer
+SKU: Basic
+Azure Firewall
+SKU: Standard tier
+CDN Profile
+SKU: Standard_Microsoft
+Application Gateway
+SKU: Standard_v2 or Standard_Small
+Public IP Address
+SKU: Basic or Standard
+
+
+############### Sandbox - GCP:
+Description
+×
+Account clean-up will run 4 hours after the Sandbox starts.
+Stop the Sandbox after completing your activities.
+Account clean-up will run after the Sandbox is stopped. (The clean-up process will take 15-20 minutes, during which you will not be able to access the Sandbox.)
+Clean-up: All resources will be deleted once the clean-up is completed.
+GCP Services: Vertex AI, Cloud Run, Google Kubernetes Engine (GKE), Cloud SQL for PostgreSQL, Cloud Storage and Secret Manager.
+

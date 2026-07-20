@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Week 2 VM and Cloud Sandbox Guides</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #526078;
+      --brand: #2446a8;
+      --brand-dark: #172d70;
+      --surface: #ffffff;
+      --soft: #eef3ff;
+      --warn: #fff4d6;
+      --danger: #fff0f0;
+      --border: #cbd5e1;
+      --ok: #e8f7ef;
+      --shadow: 0 10px 30px rgba(23, 32, 51, 0.09);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #f6f8fc;
+      font: 16px/1.62 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: var(--brand); }
+    a:hover, a:focus { color: var(--brand-dark); }
+    code {
+      padding: 0.12rem 0.35rem;
+      border-radius: 0.3rem;
+      background: #e9edf5;
+      font-family: Consolas, "Liberation Mono", monospace;
+    }
+    .hero {
+      padding: 3.5rem max(1.25rem, calc((100% - 1120px) / 2));
+      color: white;
+      background: linear-gradient(125deg, #172d70, #315bc8);
+    }
+    .hero h1 { max-width: 900px; margin: 0 0 0.5rem; font-size: clamp(2rem, 5vw, 3.3rem); line-height: 1.12; }
+    .hero p { max-width: 820px; margin: 0; color: #e8edff; font-size: 1.08rem; }
+    .page-nav {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      padding: 0.7rem max(1.25rem, calc((100% - 1120px) / 2));
+      overflow-x: auto;
+      white-space: nowrap;
+      background: rgba(255, 255, 255, 0.97);
+      border-bottom: 1px solid var(--border);
+    }
+    .page-nav a { display: inline-block; margin-right: 1rem; font-weight: 650; text-decoration: none; }
+    main { width: min(1120px, calc(100% - 2rem)); margin: 2rem auto 4rem; }
+    section { margin: 2rem 0; scroll-margin-top: 4.5rem; }
+    h2 { margin: 0 0 0.8rem; color: var(--brand-dark); font-size: clamp(1.45rem, 3vw, 2rem); }
+    h3 { margin-bottom: 0.35rem; color: #25345d; }
+    .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+    .card {
+      display: flex;
+      flex-direction: column;
+      min-height: 220px;
+      padding: 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 0.8rem;
+      box-shadow: var(--shadow);
+    }
+    .card h3 { margin-top: 0; }
+    .card p { flex: 1; }
+    .button {
+      align-self: flex-start;
+      display: inline-block;
+      padding: 0.55rem 0.85rem;
+      border-radius: 0.45rem;
+      color: white;
+      background: var(--brand);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .button:hover, .button:focus { color: white; background: var(--brand-dark); }
+    .callout {
+      padding: 1rem 1.2rem;
+      border-left: 5px solid var(--brand);
+      border-radius: 0.4rem;
+      background: var(--soft);
+    }
+    .callout.warning { border-left-color: #d58b00; background: var(--warn); }
+    .callout.danger { border-left-color: #bb2d3b; background: var(--danger); }
+    .callout.success { border-left-color: #278653; background: var(--ok); }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 0.65rem; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); }
+    th, td { padding: 0.85rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+    th { color: white; background: var(--brand-dark); }
+    tr:last-child td { border-bottom: 0; }
+    ul, ol { padding-left: 1.35rem; }
+    footer { padding: 1.5rem; color: var(--muted); text-align: center; border-top: 1px solid var(--border); background: white; }
+    @media (max-width: 720px) {
+      .hero { padding-top: 2.5rem; padding-bottom: 2.5rem; }
+      .cards { grid-template-columns: 1fr; }
+      main { width: min(100% - 1.25rem, 1120px); }
+      th, td { min-width: 150px; padding: 0.7rem; }
+    }
+    @media print {
+      .page-nav { position: static; }
+      .card { break-inside: avoid; box-shadow: none; }
+      body { background: white; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <h1>VM and Cloud Sandbox Guides</h1>
+    <p>Fast setup for Day 2: prepare the Ubuntu VM first, then open only the provider guide required for your session.</p>
+  </header>
+
+  <nav class="page-nav" aria-label="Page navigation">
+    <a href="#start">Purpose</a>
+    <a href="#order">Required order</a>
+    <a href="#sessions">Sessions</a>
+    <a href="#safeguards">Safeguards</a>
+    <a href="#guides">Guides</a>
+  </nav>
+
+  <main>
+    <section id="start">
+      <h2>Purpose</h2>
+      <p>Use these guides to prepare your course VM and the time-limited cloud sandbox needed for the current Day 2 exercise.</p>
+    </section>
+
+    <section id="order">
+      <h2>Required order</h2>
+      <ol>
+        <li>Complete the <a href="_VM_SANDBOX_SETUP.html">Ubuntu VM setup guide</a>.</li>
+        <li>Follow the relevant <a href="#guides">provider guide</a> immediately before that provider's session.</li>
+      </ol>
+      <div class="callout warning">
+        <strong>Separate authentication boundary:</strong> browser access inside a cloud sandbox does not automatically authenticate the Ubuntu VM. Each provider guide explains how to establish approved VM-compatible access.
+      </div>
+    </section>
+
+    <section id="sessions">
+      <h2>Day 2 session map</h2>
+      <ul>
+        <li><strong>Day 2 AM:</strong> GCP for the Google ADK primer; Azure for the Microsoft Agent Framework primer.</li>
+        <li><strong>Day 2 PM, Topic 4:</strong> AWS for the Bedrock enterprise-integration exercise.</li>
+      </ul>
+    </section>
+
+    <section id="safeguards">
+      <h2>Shared safeguards</h2>
+      <div class="callout warning">
+        <ul>
+          <li>Store only application API keys required by a guide in the private <code>Week2/.env</code>; AWS temporary credentials stay in the shell and GCP uses ADC.</li>
+          <li>Never commit secrets, tokens, credentials, or key files.</li>
+          <li>Stop the cloud sandbox as soon as the exercise ends.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="guides">
+      <h2>Setup guides</h2>
+      <div class="cards">
+        <article class="card">
+          <h3>Ubuntu VM</h3>
+          <p>Complete this first.</p>
+          <a class="button" href="_VM_SANDBOX_SETUP.html">Open VM guide</a>
+        </article>
+        <article class="card">
+          <h3>GCP sandbox</h3>
+          <p>For the Day 2 AM Google session.</p>
+          <a class="button" href="_GCP_SANDBOX_SETUP.html">Open GCP guide</a>
+        </article>
+        <article class="card">
+          <h3>Azure sandbox</h3>
+          <p>For the Day 2 AM Microsoft session.</p>
+          <a class="button" href="_AZURE_SANDBOX_SETUP.html">Open Azure guide</a>
+        </article>
+        <article class="card">
+          <h3>AWS sandbox</h3>
+          <p>For Day 2 PM, Topic 4.</p>
+          <a class="button" href="_AWS_SANDBOX_SETUP.html">Open AWS guide</a>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Week 2 · Day 2 · VM and cloud sandbox preparation
+  </footer>
+</body>
+</html>

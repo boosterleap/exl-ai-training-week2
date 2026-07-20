@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(sqlite3 *)",
+      "Bash(python *)",
+      "Bash(uv *)",
+      "Write(Week2/W2D1/outputs/day1/**)",
+      "Edit(Week2/W2D1/outputs/day1/**)"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 - <<'PY'\nimport json\nprint(json.dumps({\n  'systemMessage': 'Day 1 AM rule: never invent FNOL/claim/policy IDs. Read Week2/data/insurance fixtures. Fail closed for incomplete cases like CLN-007.'\n}))\nPY"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Classroom write gate. Allow only if the change does not invent claim/policy/FNOL/shipment IDs missing from Week2/data fixtures, and preferably targets Week2/W2D1/outputs/day1/. Block otherwise. Hook input: $ARGUMENTS"
+          }
+        ]
+      }
+    ]
+  }
+}

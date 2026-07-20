@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>W2D1 AM — Claude Plugin Live Demo Guide</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #536179;
+      --brand: #2446a8;
+      --brand-dark: #172d70;
+      --surface: #ffffff;
+      --soft: #eef3ff;
+      --warn: #fff4d6;
+      --danger: #fff0f0;
+      --ok: #e7f7ee;
+      --border: #cbd5e1;
+      --code: #121827;
+      --shadow: 0 10px 30px rgba(23, 32, 51, 0.09);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #f6f8fc;
+      font: 16px/1.62 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: var(--brand); }
+    a:hover, a:focus { color: var(--brand-dark); }
+    code { padding: 0.12rem 0.32rem; border-radius: 0.28rem; background: #e9edf5; font-family: Consolas, "Liberation Mono", monospace; }
+    pre {
+      margin: 0.8rem 0 1.2rem;
+      padding: 1rem;
+      overflow-x: auto;
+      border-radius: 0.55rem;
+      color: #f4f7ff;
+      background: var(--code);
+      border: 1px solid #2b3856;
+    }
+    pre code { padding: 0; color: inherit; background: transparent; }
+    .hero {
+      padding: 3.25rem max(1.25rem, calc((100% - 1080px) / 2));
+      color: white;
+      background: linear-gradient(125deg, #172d70, #315bc8);
+    }
+    .hero h1 { margin: 0 0 0.5rem; font-size: clamp(2rem, 5vw, 3.2rem); line-height: 1.12; }
+    .hero p { max-width: 860px; margin: 0; color: #e8edff; font-size: 1.08rem; }
+    .page-nav {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      padding: 0.7rem max(1.25rem, calc((100% - 1080px) / 2));
+      overflow-x: auto;
+      white-space: nowrap;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.97);
+    }
+    .page-nav a { display: inline-block; margin-right: 1rem; font-weight: 650; text-decoration: none; }
+    main { width: min(1080px, calc(100% - 2rem)); margin: 2rem auto 4rem; }
+    section { margin: 2.2rem 0; scroll-margin-top: 4.5rem; }
+    h2 { margin: 0 0 0.8rem; color: var(--brand-dark); font-size: clamp(1.45rem, 3vw, 2rem); }
+    h3 { margin: 1.5rem 0 0.35rem; color: #25345d; }
+    h4 { margin: 1rem 0 0.25rem; color: #31436b; }
+    ul, ol { padding-left: 1.4rem; }
+    li + li { margin-top: 0.28rem; }
+    .callout {
+      margin: 1rem 0;
+      padding: 1rem 1.2rem;
+      border-left: 5px solid var(--brand);
+      border-radius: 0.4rem;
+      background: var(--soft);
+    }
+    .callout.warning { border-left-color: #d58b00; background: var(--warn); }
+    .callout.danger { border-left-color: #bb2d3b; background: var(--danger); }
+    .callout.success { border-left-color: #278653; background: var(--ok); }
+    .steps {
+      padding: 1.2rem 1.4rem;
+      border: 1px solid var(--border);
+      border-radius: 0.7rem;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .prompt {
+      border-left: 4px solid #5b8def;
+      background: #0f172a;
+    }
+    .chrono {
+      counter-reset: step;
+      list-style: none;
+      padding-left: 0;
+    }
+    .chrono > li {
+      position: relative;
+      margin: 0 0 1.4rem;
+      padding: 1.1rem 1.2rem 1.1rem 3.4rem;
+      border: 1px solid var(--border);
+      border-radius: 0.7rem;
+      background: white;
+      box-shadow: var(--shadow);
+    }
+    .chrono > li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 0.85rem;
+      top: 1.05rem;
+      width: 1.8rem;
+      height: 1.8rem;
+      border-radius: 999px;
+      color: white;
+      background: var(--brand);
+      font-weight: 700;
+      font-size: 0.95rem;
+      line-height: 1.8rem;
+      text-align: center;
+    }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 0.65rem; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); }
+    th, td { padding: 0.82rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+    th { color: white; background: var(--brand-dark); }
+    tr:last-child td { border-bottom: 0; }
+    footer { padding: 1.5rem; color: var(--muted); text-align: center; border-top: 1px solid var(--border); background: white; }
+    @media (max-width: 720px) {
+      .hero { padding-top: 2.4rem; padding-bottom: 2.4rem; }
+      main { width: min(100% - 1.25rem, 1080px); }
+      .chrono > li { padding-left: 3.1rem; }
+    }
+    @media print {
+      .page-nav { position: static; }
+      body { background: white; }
+      .steps, .chrono > li { box-shadow: none; }
+      pre { white-space: pre-wrap; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <h1>W2D1 AM — Claude Plugin Live Demo</h1>
+    <p>
+      Instructor script to demonstrate the full Day 1 AM content from
+      <code>_DEMONSTRATIONS.ipynb</code> using only the Claude VS Code / Cursor plugin
+      (Claude subscription login). Learners do <strong>not</strong> need
+      <code>ANTHROPIC_API_KEY</code> for this path.
+    </p>
+  </header>
+
+  <nav class="page-nav" aria-label="Guide navigation">
+    <a href="#purpose">Purpose</a>
+    <a href="#access">Access &amp; set</a>
+    <a href="#scaffold">Scaffold</a>
+    <a href="#chrono">Chronological demo</a>
+    <a href="#slash">Slash / skills</a>
+    <a href="#exercises">Exercises</a>
+    <a href="#troubleshoot">Troubleshoot</a>
+  </nav>
+
+  <main>
+    <section id="purpose">
+      <h2>Purpose</h2>
+      <div class="callout">
+        Mirror AM notebook outcomes live in Claude Code: agentic loop, reasoning patterns,
+        tool contracts, memory/handoff, fail-closed grounding (<code>CLN-001</code> vs
+        <code>CLN-007</code>), and application-owned budgets — without running LangGraph/API cells.
+      </div>
+      <div class="callout warning">
+        <strong>Important:</strong> Opening <code>_DEMONSTRATIONS.ipynb</code> and executing
+        live LLM cells still needs an API key. This HTML path is the
+        <em>plugin-only classroom demo</em>. Keep the notebook open as a visual map; run the
+        prompts below in the Claude panel.
+      </div>
+      <ul>
+        <li>Folder to open in VS Code: <code>Week2/W2D1/W2D1AM</code> (so project <code>CLAUDE.md</code> + <code>.claude/</code> load).</li>
+        <li>Companion notebook: <code>_DEMONSTRATIONS.ipynb</code>.</li>
+        <li>Fixtures: <code>Week2/data/insurance/fnol_emails.csv</code>, <code>Week2/data/insurance/claims.db</code>.</li>
+        <li>Teaching IDs: complete <code>CLN-001</code> → <code>CLM-424063</code> → <code>POL-787532354</code> → <code>fnol_intake</code>; incomplete <code>CLN-007</code>.</li>
+      </ul>
+    </section>
+
+    <section id="access">
+      <h2>What you need to access / set</h2>
+      <div class="steps">
+        <h3>Accounts &amp; install (once per VM / machine)</h3>
+        <ol>
+          <li><strong>Claude account</strong> with Claude Code / VS Code Claude extension access (Pro/Team/Enterprise subscription that includes Claude Code). No Console API key required for this guide.</li>
+          <li><strong>VS Code</strong> (or Cursor) on the Ubuntu learner VM with the <strong>Claude</strong> / Claude Code extension installed.</li>
+          <li><strong>Repo on disk</strong> under the persistent folder (typical VM layout):
+            <pre><code>/home/labuser/Persistent_Folder/.../EXL-CampusHire/Week2</code></pre>
+          </li>
+          <li><strong>Python venv</strong> only needed if you also open notebooks later; plugin demo uses Claude’s tools (Read / Bash / sqlite). Typical: <code>/home/labuser/venv</code> or course <code>Week2/.venv</code>.</li>
+        </ol>
+
+        <h3>How to set Claude plugin access</h3>
+        <ol>
+          <li>Open VS Code → Extensions → confirm Claude / Claude Code is installed and enabled.</li>
+          <li>Open the Claude panel (activity bar Claude icon, or Command Palette → “Claude: Open”).</li>
+          <li>Sign in with the classroom Claude account when prompted. Complete browser OAuth if shown.</li>
+          <li>Confirm the status shows signed-in / ready (not “API key missing”). Plugin auth ≠ <code>ANTHROPIC_API_KEY</code>.</li>
+          <li>Do <strong>not</strong> paste API keys into chat, <code>.env</code>, or shared screens during this demo.</li>
+        </ol>
+
+        <h3>Workspace settings that must be true before demos</h3>
+        <ol>
+          <li><strong>Open folder</strong> = <code>W2D1AM</code> (File → Open Folder), not the whole monorepo root if that prevents project rules from loading. If you must open <code>Week2</code>, say in the first prompt: “Use rules from <code>W2D1/W2D1AM/CLAUDE.md</code>.”</li>
+          <li><strong>Trust the workspace</strong> when VS Code asks (required for project hooks/skills).</li>
+          <li>Allow Claude to use <strong>Read</strong> and limited <strong>Bash</strong> (sqlite/python) when permission prompts appear — project <code>.claude/settings.json</code> already allowlists teaching commands.</li>
+          <li>Writes should stay under <code>Week2/W2D1/outputs/day1/</code>. Decline writes that invent claim/policy IDs.</li>
+        </ol>
+      </div>
+
+      <div class="table-wrap" style="margin-top:1.2rem">
+        <table>
+          <thead>
+            <tr><th>Item</th><th>Where</th><th>Set to</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Working folder</td><td>VS Code Open Folder</td><td><code>Week2/W2D1/W2D1AM</code></td></tr>
+            <tr><td>Project rules</td><td><code>CLAUDE.md</code></td><td>Already shipped; verify present</td></tr>
+            <tr><td>Hooks / permissions</td><td><code>.claude/settings.json</code></td><td>Already shipped; trust workspace</td></tr>
+            <tr><td>Slash skills</td><td><code>.claude/skills/day1-am-*/SKILL.md</code></td><td>Already shipped</td></tr>
+            <tr><td>Subagent</td><td><code>.claude/agents/fnol-specialist.md</code></td><td>Already shipped</td></tr>
+            <tr><td>API key in <code>.env</code></td><td>Week2/.env</td><td><strong>Not required</strong> for plugin path</td></tr>
+            <tr><td>Model</td><td>Claude panel picker</td><td>Sonnet (classroom default) unless instructed otherwise</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="scaffold">
+      <h2>Verify / create scaffold (do this first)</h2>
+      <p>These files should already exist in the repo. If a machine is missing them, create them once, then proceed.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Order</th><th>Artifact</th><th>Path</th><th>Why</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>Project rules</td><td><code>CLAUDE.md</code></td><td>Never invent records; teaching fixtures</td></tr>
+            <tr><td>2</td><td>Permissions + hooks</td><td><code>.claude/settings.json</code></td><td>UserPromptSubmit reminder + Write/Edit gate</td></tr>
+            <tr><td>3</td><td>Skill</td><td><code>.claude/skills/day1-am-loop/</code></td><td>Slash <code>/day1-am-loop</code></td></tr>
+            <tr><td>4</td><td>Skill</td><td><code>.claude/skills/day1-am-grounding/</code></td><td>Slash <code>/day1-am-grounding</code></td></tr>
+            <tr><td>5</td><td>Skill</td><td><code>.claude/skills/day1-am-budget/</code></td><td>Slash <code>/day1-am-budget</code></td></tr>
+            <tr><td>6</td><td>Agent</td><td><code>.claude/agents/fnol-specialist.md</code></td><td>Specialist subagent for FNOL reads</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Setup check prompt (paste first)</h3>
+<pre class="prompt"><code>You are in the Day 1 AM classroom workspace.
+1) Confirm you can read CLAUDE.md in this folder.
+2) Confirm these exist: .claude/settings.json, .claude/skills/day1-am-loop/SKILL.md,
+   .claude/skills/day1-am-grounding/SKILL.md, .claude/skills/day1-am-budget/SKILL.md,
+   .claude/agents/fnol-specialist.md.
+3) Confirm Week2/data/insurance/fnol_emails.csv and claims.db are readable
+   (paths may be ../data/... relative to W2D1AM).
+4) Reply with a short checklist: found / missing only.
+Do not invent any claim data yet.</code></pre>
+      <div class="callout success">
+        <strong>Expected:</strong> all artifacts found; fixtures readable. If paths fail, open
+        <code>Week2</code> as the folder and re-run with absolute paths under the repo.
+      </div>
+    </section>
+
+    <section id="chrono">
+      <h2>Chronological live demo (follow in order)</h2>
+      <p>Keep <code>_DEMONSTRATIONS.ipynb</code> scrolled to the matching section title while you paste each prompt.</p>
+
+      <ol class="chrono">
+        <li>
+          <h3>§00 — Warm-up: rules on screen</h3>
+          <p><strong>Show:</strong> open <code>CLAUDE.md</code> briefly. Say: “Claude Code loads project rules automatically.”</p>
+<pre class="prompt"><code>Summarize CLAUDE.md in 5 bullets for operators.
+Emphasize: never invent FNOL/claim/policy IDs; fail closed when evidence is incomplete.</code></pre>
+          <p><strong>Expected:</strong> concise rules; mention fixtures and fail-closed.</p>
+        </li>
+
+        <li>
+          <h3>§01 — Agentic loop (observe → decide → act)</h3>
+          <p><strong>Notebook map:</strong> agentic loop / hybrid routing for CLN-001.</p>
+          <p><strong>Slash (preferred):</strong> type <code>/day1-am-loop</code> then Enter.</p>
+          <p><strong>Or paste:</strong></p>
+<pre class="prompt"><code>/day1-am-loop
+
+If slash skills are unavailable, follow the skill manually:
+Read fnol_emails.csv for CLN-001, extract claim/policy IDs from the row only,
+look up claim/policy in claims.db if needed, explain observe→decide→act→observe
+in 4 bullets, then return TriageDecision JSON with stop_reason completed.
+Never invent IDs.</code></pre>
+          <p><strong>Expected on screen:</strong></p>
+          <ul>
+            <li>CLN-001 → claim <code>CLM-424063</code>, policy <code>POL-787532354</code>, route toward <code>fnol_intake</code></li>
+            <li>4-bullet loop explanation</li>
+            <li>Valid <code>TriageDecision</code>-shaped JSON</li>
+          </ul>
+        </li>
+
+        <li>
+          <h3>§02 — Reasoning patterns (plan / reflect / compare)</h3>
+<pre class="prompt"><code>Using ONLY the FNOL row for CLN-001 from fixtures (do not invent):
+1) Write a 3-step evidence-first plan (fnol → claim → policy).
+2) Draft a TriageDecision JSON.
+3) Critique the draft: list any field that is not backed by the FNOL row alone.
+4) Compare two routes: fnol_intake vs escalate_adjuster — pick one with a one-sentence reason.
+Keep the answer operator-facing and short.</code></pre>
+          <p><strong>Expected:</strong> plan mentions real IDs from FNOL; critique notes claim/policy details need tools/DB; preferred route usually <code>fnol_intake</code>.</p>
+        </li>
+
+        <li>
+          <h3>§03 — Tool contracts &amp; grounding</h3>
+<pre class="prompt"><code>Teach typed tool contracts without inventing data:
+1) Propose a Pydantic-like schema for fnol_lookup with email_id pattern ^CLN-\d{3}$.
+2) Read fixtures and collect evidence for CLN-001 (FNOL + claim + policy if present).
+3) Produce a grounded TriageDecision where case_id is the real CLM- id from evidence.
+4) Then collect evidence for CLN-007. If incomplete, refuse with status=refused and refusal_reason.
+Return JSON: {"CLN-001": {...}, "CLN-007": {...}}.</code></pre>
+          <p><strong>Or slash:</strong> <code>/day1-am-grounding</code></p>
+          <p><strong>Expected:</strong> CLN-001 completed with <code>CLM-424063</code>; CLN-007 refused / fail-closed; no invented claim id.</p>
+        </li>
+
+        <li>
+          <h3>§04 — Memory / handoff summary</h3>
+<pre class="prompt"><code>Investigate CLN-001 from fixtures only.
+Return:
+1) a short working_summary (1–2 sentences) an operator can resume from
+2) a TriageDecision JSON
+3) list of evidence sources you actually read
+Do not claim you wrote to production systems.</code></pre>
+          <p><strong>Expected:</strong> working summary mentions FNOL + claim + policy and <code>fnol_intake</code>.</p>
+        </li>
+
+        <li>
+          <h3>§05–§06 — Fail-closed + application-owned budget</h3>
+          <p><strong>Slash:</strong> <code>/day1-am-budget</code></p>
+<pre class="prompt"><code>/day1-am-budget
+
+Narrate an application-owned loop that must call fnol→claim→policy for CLN-001.
+Show budget_1 (max_model_calls=1) stopping with model_call_budget_exhausted
+vs budget_3 allowing more progress. Return {"budget_1":..., "budget_3":...}.
+Teach: the application owns stop_reason, not the model.</code></pre>
+          <p><strong>Expected:</strong> contrasting stop reasons; pedagogy that budgets are application-owned.</p>
+        </li>
+
+        <li>
+          <h3>Optional — specialist subagent</h3>
+<pre class="prompt"><code>Use the fnol-specialist agent (or follow .claude/agents/fnol-specialist.md).
+Look up CLN-001 only from insurance fixtures and return a 5-line operator brief.
+If evidence is missing, refuse.</code></pre>
+          <p><strong>Expected:</strong> brief grounded on Jennifer Garcia / fence damage / high urgency / fnol_intake.</p>
+        </li>
+
+        <li>
+          <h3>Optional — persist teaching handoff (write gate)</h3>
+<pre class="prompt"><code>Write a teaching handoff JSON for CLN-001 to
+Week2/W2D1/outputs/day1/am_plugin_handoff_CLN-001.json
+Include: case_id, route_queue, working_summary, idempotency_key (use am-plugin-cln001-001),
+and sources_read. Do not invent fields. If write is blocked, show the refusal reason.</code></pre>
+          <p><strong>Expected:</strong> file created under outputs, or a clear gate message from the Write/Edit hook.</p>
+          <p><strong>Say aloud:</strong> “Hooks remind us writes are gated — same idea as learner approval + idempotency in PM.”</p>
+        </li>
+      </ol>
+    </section>
+
+    <section id="slash">
+      <h2>Slash commands / skills / hooks / agents (cheat sheet)</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>When (order)</th><th>What</th><th>How to invoke</th><th>Demo outcome</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1 — every session</td>
+              <td>Project rules</td>
+              <td>Auto via <code>CLAUDE.md</code></td>
+              <td>Never invent IDs</td>
+            </tr>
+            <tr>
+              <td>2 — every prompt</td>
+              <td>UserPromptSubmit hook</td>
+              <td>Auto from <code>.claude/settings.json</code></td>
+              <td>System reminder about fail-closed / fixtures</td>
+            </tr>
+            <tr>
+              <td>3 — §01</td>
+              <td>Skill <code>day1-am-loop</code></td>
+              <td><code>/day1-am-loop</code></td>
+              <td>Loop + TriageDecision for CLN-001</td>
+            </tr>
+            <tr>
+              <td>4 — §03 / grounding</td>
+              <td>Skill <code>day1-am-grounding</code></td>
+              <td><code>/day1-am-grounding</code></td>
+              <td>CLN-001 vs CLN-007 side-by-side</td>
+            </tr>
+            <tr>
+              <td>5 — §06 budgets</td>
+              <td>Skill <code>day1-am-budget</code></td>
+              <td><code>/day1-am-budget</code></td>
+              <td>budget_1 vs budget_3 story</td>
+            </tr>
+            <tr>
+              <td>6 — optional</td>
+              <td>Agent <code>fnol-specialist</code></td>
+              <td>Ask Claude to use that agent / open agent file</td>
+              <td>Narrow FNOL specialist brief</td>
+            </tr>
+            <tr>
+              <td>7 — writes</td>
+              <td>PreToolUse Write|Edit hook</td>
+              <td>Auto on write/edit</td>
+              <td>Blocks inventing domain IDs</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>If slash commands do not appear</h3>
+      <ol>
+        <li>Confirm folder is <code>W2D1AM</code> and workspace is trusted.</li>
+        <li>Reload window (Command Palette → “Developer: Reload Window”).</li>
+        <li>Type the skill name after <code>/</code> or paste the skill body as a normal prompt (skills are markdown instructions).</li>
+      </ol>
+
+      <h3>Creating a skill live (only if missing)</h3>
+<pre class="prompt"><code>Create .claude/skills/day1-am-loop/SKILL.md with YAML frontmatter
+name: day1-am-loop
+description: Run the Day 1 AM agentic-loop teaching demo for FNOL CLN-001 using insurance fixtures only.
+disable-model-invocation: true
+Then include steps: read CLN-001 from fixtures, never invent IDs, explain the agentic loop,
+return TriageDecision JSON. After writing, confirm /day1-am-loop is available.</code></pre>
+    </section>
+
+    <section id="exercises">
+      <h2>Exercise prompts (plugin versions of AM-1 / AM-2)</h2>
+      <h3>Exercise AM-1 — Force missing FNOL (CLN-007)</h3>
+<pre class="prompt"><code>Exercise AM-1:
+Force a FNOL lookup for CLN-007 from fixtures (same pattern as CLN-001).
+Show the raw evidence. Do NOT complete a grounded TriageDecision if claim/policy IDs are missing.
+Return: {"email_id":"CLN-007","evidence":...,"decision":"refused","reason":...}</code></pre>
+      <p><strong>Expected different result:</strong> refused / incomplete — contrast with CLN-001 success.</p>
+
+      <h3>Exercise AM-2 — Relax model-call budget</h3>
+<pre class="prompt"><code>Exercise AM-2:
+Simulate the guarded investigate-all-three-tools loop for CLN-001.
+Compare max_model_calls=1 vs max_model_calls=3.
+Return JSON with model_calls and stop_reason for each.
+Explain in one sentence why the application must own the budget.</code></pre>
+    </section>
+
+    <section id="troubleshoot">
+      <h2>Troubleshoot / talking points</h2>
+      <ul>
+        <li><strong>“Where is the API key?”</strong> — Not used here. Plugin uses Claude login. Notebooks still need keys if executed for real.</li>
+        <li><strong>Claude invents CLM ids for CLN-007</strong> — stop; re-run <code>/day1-am-grounding</code>; point at <code>CLAUDE.md</code>.</li>
+        <li><strong>Wrong folder</strong> — skills/hooks missing; reopen <code>W2D1AM</code>.</li>
+        <li><strong>sqlite blocked</strong> — allow Bash for <code>sqlite3</code> / <code>python</code> once; settings already allowlist teaching patterns.</li>
+        <li><strong>Timebox</strong> — if short on time: Steps 1 → 2 → 4 (loop + grounding) cover the AM thesis.</li>
+      </ul>
+      <div class="callout">
+        Afternoon continues in <code>../W2D1PM/_CLAUDE_PLUGIN_DEMO.html</code>
+        (SDK concepts, tools/MCP naming, permissions, budgets via plugin).
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    EXL CampusHire · Week 2 Day 1 AM · Claude plugin demonstration guide · no API key path
+  </footer>
+</body>
+</html>

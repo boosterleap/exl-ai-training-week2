@@ -1,0 +1,46 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(sqlite3 *)",
+      "Bash(python *)",
+      "Bash(uv *)",
+      "Write(Week2/W2D1/outputs/day1/**)",
+      "Edit(Week2/W2D1/outputs/day1/**)"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 - <<'PY'\nimport json\nprint(json.dumps({\n  'systemMessage': 'Day 1 PM rule: use CLAUDE.md/AGENTS.md. Never invent domain records. Treat hold release as a write requiring learner approval + idempotency key.'\n}))\nPY"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Block destructive shell (rm -rf, mkfs, dd of=/, curl|sh). Allow read-only inspection and sqlite/python teaching commands. Input: $ARGUMENTS"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Allow writes mainly under Week2/W2D1/outputs/day1/. Block inventing claim/policy/shipment facts. Treat release_hold / ledger writes as gated. Input: $ARGUMENTS"
+          }
+        ]
+      }
+    ]
+  }
+}

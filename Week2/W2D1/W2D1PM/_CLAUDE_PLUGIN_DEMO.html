@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>W2D1 PM — Claude Plugin Live Demo Guide</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #536179;
+      --brand: #2446a8;
+      --brand-dark: #172d70;
+      --surface: #ffffff;
+      --soft: #eef3ff;
+      --warn: #fff4d6;
+      --danger: #fff0f0;
+      --ok: #e7f7ee;
+      --border: #cbd5e1;
+      --code: #121827;
+      --shadow: 0 10px 30px rgba(23, 32, 51, 0.09);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #f6f8fc;
+      font: 16px/1.62 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: var(--brand); }
+    a:hover, a:focus { color: var(--brand-dark); }
+    code { padding: 0.12rem 0.32rem; border-radius: 0.28rem; background: #e9edf5; font-family: Consolas, "Liberation Mono", monospace; }
+    pre {
+      margin: 0.8rem 0 1.2rem;
+      padding: 1rem;
+      overflow-x: auto;
+      border-radius: 0.55rem;
+      color: #f4f7ff;
+      background: var(--code);
+      border: 1px solid #2b3856;
+    }
+    pre code { padding: 0; color: inherit; background: transparent; }
+    .hero {
+      padding: 3.25rem max(1.25rem, calc((100% - 1080px) / 2));
+      color: white;
+      background: linear-gradient(125deg, #0f3d5c, #1f7a9a);
+    }
+    .hero h1 { margin: 0 0 0.5rem; font-size: clamp(2rem, 5vw, 3.2rem); line-height: 1.12; }
+    .hero p { max-width: 860px; margin: 0; color: #e5f6fb; font-size: 1.08rem; }
+    .page-nav {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      padding: 0.7rem max(1.25rem, calc((100% - 1080px) / 2));
+      overflow-x: auto;
+      white-space: nowrap;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.97);
+    }
+    .page-nav a { display: inline-block; margin-right: 1rem; font-weight: 650; text-decoration: none; }
+    main { width: min(1080px, calc(100% - 2rem)); margin: 2rem auto 4rem; }
+    section { margin: 2.2rem 0; scroll-margin-top: 4.5rem; }
+    h2 { margin: 0 0 0.8rem; color: var(--brand-dark); font-size: clamp(1.45rem, 3vw, 2rem); }
+    h3 { margin: 1.5rem 0 0.35rem; color: #25345d; }
+    ul, ol { padding-left: 1.4rem; }
+    li + li { margin-top: 0.28rem; }
+    .callout {
+      margin: 1rem 0;
+      padding: 1rem 1.2rem;
+      border-left: 5px solid #1f7a9a;
+      border-radius: 0.4rem;
+      background: #eef8fb;
+    }
+    .callout.warning { border-left-color: #d58b00; background: var(--warn); }
+    .callout.danger { border-left-color: #bb2d3b; background: var(--danger); }
+    .callout.success { border-left-color: #278653; background: var(--ok); }
+    .steps {
+      padding: 1.2rem 1.4rem;
+      border: 1px solid var(--border);
+      border-radius: 0.7rem;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .prompt {
+      border-left: 4px solid #3db4d0;
+      background: #0f172a;
+    }
+    .chrono {
+      counter-reset: step;
+      list-style: none;
+      padding-left: 0;
+    }
+    .chrono > li {
+      position: relative;
+      margin: 0 0 1.4rem;
+      padding: 1.1rem 1.2rem 1.1rem 3.4rem;
+      border: 1px solid var(--border);
+      border-radius: 0.7rem;
+      background: white;
+      box-shadow: var(--shadow);
+    }
+    .chrono > li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 0.85rem;
+      top: 1.05rem;
+      width: 1.8rem;
+      height: 1.8rem;
+      border-radius: 999px;
+      color: white;
+      background: #1f7a9a;
+      font-weight: 700;
+      font-size: 0.95rem;
+      line-height: 1.8rem;
+      text-align: center;
+    }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 0.65rem; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); }
+    th, td { padding: 0.82rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+    th { color: white; background: #0f3d5c; }
+    tr:last-child td { border-bottom: 0; }
+    footer { padding: 1.5rem; color: var(--muted); text-align: center; border-top: 1px solid var(--border); background: white; }
+    @media (max-width: 720px) {
+      .hero { padding-top: 2.4rem; padding-bottom: 2.4rem; }
+      main { width: min(100% - 1.25rem, 1080px); }
+      .chrono > li { padding-left: 3.1rem; }
+    }
+    @media print {
+      .page-nav { position: static; }
+      body { background: white; }
+      .steps, .chrono > li { box-shadow: none; }
+      pre { white-space: pre-wrap; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <h1>W2D1 PM — Claude Plugin Live Demo</h1>
+    <p>
+      Instructor script to demonstrate the full Day 1 PM content from
+      <code>_DEMONSTRATIONS.ipynb</code> using only the Claude VS Code / Cursor plugin.
+      Learners have Claude login — <strong>no</strong> <code>ANTHROPIC_API_KEY</code> for this path.
+    </p>
+  </header>
+
+  <nav class="page-nav" aria-label="Guide navigation">
+    <a href="#purpose">Purpose</a>
+    <a href="#access">Access &amp; set</a>
+    <a href="#scaffold">Scaffold</a>
+    <a href="#chrono">Chronological demo</a>
+    <a href="#slash">Slash / skills</a>
+    <a href="#exercises">Exercises</a>
+    <a href="#troubleshoot">Troubleshoot</a>
+  </nav>
+
+  <main>
+    <section id="purpose">
+      <h2>Purpose</h2>
+      <div class="callout">
+        Mirror PM notebook outcomes live: Claude Agent SDK concepts (<code>query()</code> /
+        sessions / <code>ResultMessage</code>), built-in vs custom tools, MCP-style names,
+        structured triage, logistics hold proposal, memory, permissions / write gates, and
+        cost awareness — without running Python SDK cells that need API keys.
+      </div>
+      <div class="callout warning">
+        <strong>Important:</strong> Live <code>query()</code> / MCP notebook cells still need
+        API + Claude Code CLI. This HTML is the <em>plugin-only</em> demonstration path.
+        Keep the notebook as a visual map; paste prompts in the Claude panel.
+      </div>
+      <ul>
+        <li>Folder to open: <code>Week2/W2D1/W2D1PM</code>.</li>
+        <li>Rules: <code>CLAUDE.md</code> + <code>AGENTS.md</code>.</li>
+        <li>Insurance fixtures: <code>CLN-001</code> → <code>CLM-424063</code> → <code>POL-787532354</code>.</li>
+        <li>Logistics fixture: container <code>MSKU789</code> (HELD / bill of lading mismatch).</li>
+        <li>MCP teaching names: <code>mcp__insurance__fnol_lookup</code>, <code>mcp__insurance__claim_lookup</code>, <code>mcp__insurance__policy_lookup</code>, <code>mcp__logistics__shipment_lookup</code>, <code>mcp__logistics__release_hold</code>.</li>
+      </ul>
+    </section>
+
+    <section id="access">
+      <h2>What you need to access / set</h2>
+      <div class="steps">
+        <h3>Accounts &amp; install</h3>
+        <ol>
+          <li>Same Claude subscription login as AM (Claude Code / VS Code Claude extension).</li>
+          <li>No Console API key for this demo path.</li>
+          <li>Repo under Persistent_Folder on the Ubuntu VM; open VS Code from the course tree.</li>
+        </ol>
+
+        <h3>How to set Claude plugin access</h3>
+        <ol>
+          <li>Close AM folder if still open → <strong>File → Open Folder</strong> → <code>W2D1PM</code>.</li>
+          <li>Open Claude panel → confirm signed in (subscription), not API-key mode.</li>
+          <li>Trust the workspace when prompted (required for project hooks/skills).</li>
+          <li>Model picker: Sonnet (classroom default) unless you deliberately show model choice.</li>
+          <li>Never paste secrets from <code>Week2/.env</code> into chat or onto the projector.</li>
+        </ol>
+
+        <h3>Permission / write teaching flags (conceptual — say aloud)</h3>
+        <p>Notebook cells use env-style gates. In the plugin demo you <em>narrate</em> the same four gates; do not actually release holds unless you intentionally arm them:</p>
+        <ol>
+          <li><code>ALLOW_LOCAL_WRITES</code></li>
+          <li><code>ALLOW_HOLD_RELEASE</code></li>
+          <li><code>LEARNER_APPROVED_HOLD_RELEASE</code></li>
+          <li><code>HOLD_RELEASE_IDEMPOTENCY_KEY</code> (12+ chars, non-placeholder)</li>
+        </ol>
+        <div class="callout danger">
+          Default classroom posture: all four <strong>off</strong> / not approved → show
+          <code>ReleaseProposal</code> only and <code>write_skipped: true</code>.
+        </div>
+      </div>
+
+      <div class="table-wrap" style="margin-top:1.2rem">
+        <table>
+          <thead>
+            <tr><th>Item</th><th>Where</th><th>Set to</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Working folder</td><td>VS Code Open Folder</td><td><code>Week2/W2D1/W2D1PM</code></td></tr>
+            <tr><td>Project rules</td><td><code>CLAUDE.md</code>, <code>AGENTS.md</code></td><td>Already shipped</td></tr>
+            <tr><td>Hooks / permissions</td><td><code>.claude/settings.json</code></td><td>Already shipped; trust workspace</td></tr>
+            <tr><td>Skills</td><td><code>.claude/skills/day1-pm-*/</code></td><td>Already shipped</td></tr>
+            <tr><td>Agent</td><td><code>.claude/agents/ops-triage-specialist.md</code></td><td>Already shipped</td></tr>
+            <tr><td><code>ANTHROPIC_API_KEY</code></td><td>.env</td><td><strong>Not required</strong> for plugin path</td></tr>
+            <tr><td>Hold release</td><td>classroom policy</td><td>Proposal only unless you arm all four gates</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="scaffold">
+      <h2>Verify / create scaffold (do this first)</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Order</th><th>Artifact</th><th>Path</th><th>Slash / role</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>Rules</td><td><code>CLAUDE.md</code>, <code>AGENTS.md</code></td><td>Auto-loaded</td></tr>
+            <tr><td>2</td><td>Hooks</td><td><code>.claude/settings.json</code></td><td>UserPromptSubmit + PreToolUse</td></tr>
+            <tr><td>3</td><td>Skill</td><td><code>day1-pm-sdk-query</code></td><td><code>/day1-pm-sdk-query</code></td></tr>
+            <tr><td>4</td><td>Skill</td><td><code>day1-pm-tools</code></td><td><code>/day1-pm-tools</code></td></tr>
+            <tr><td>5</td><td>Skill</td><td><code>day1-pm-permissions</code></td><td><code>/day1-pm-permissions</code></td></tr>
+            <tr><td>6</td><td>Skill</td><td><code>day1-pm-budget</code></td><td><code>/day1-pm-budget</code></td></tr>
+            <tr><td>7</td><td>Agent</td><td><code>ops-triage-specialist</code></td><td>Specialist triage</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+<pre class="prompt"><code>Day 1 PM setup check:
+1) Read CLAUDE.md and AGENTS.md — quote the write-operation rule in one sentence.
+2) Confirm .claude/skills/day1-pm-sdk-query, day1-pm-tools, day1-pm-permissions, day1-pm-budget exist.
+3) Confirm insurance CSV/DB and logistics shipment_events.jsonl are readable.
+4) Reply checklist only: found/missing. Do not invent domain records.</code></pre>
+    </section>
+
+    <section id="chrono">
+      <h2>Chronological live demo (follow in order)</h2>
+      <p>Scroll <code>_DEMONSTRATIONS.ipynb</code> to the matching section while you run each step.</p>
+
+      <ol class="chrono">
+        <li>
+          <h3>§01 — Claude Agent SDK concepts via plugin</h3>
+          <p><strong>Teaching point:</strong> plugin chat ≈ the same agent loop the SDK exposes as <code>query()</code>; metering still matters.</p>
+          <p><strong>Slash:</strong> <code>/day1-pm-sdk-query</code></p>
+<pre class="prompt"><code>/day1-pm-sdk-query
+
+Explain in two sentences why an agent must use domain tools instead of inventing claim facts.
+Then emit a teaching ResultMessage-shaped JSON with fields:
+result, session_id, num_turns, total_cost_usd="subscription_metered_via_claude_code",
+stop_reason="completed".
+Remind learners this path uses Claude Code login, not ANTHROPIC_API_KEY.</code></pre>
+          <p><strong>Expected:</strong> tool-grounding explanation + ResultMessage-shaped JSON; cost string notes subscription metering.</p>
+        </li>
+
+        <li>
+          <h3>§01b — Session memory (ClaudeSDKClient story)</h3>
+<pre class="prompt"><code>Turn A: Remember this operating rule for the rest of this chat:
+"do not infer unknown claim records."
+Acknowledge in one short sentence.
+
+(Wait for reply, then send Turn B in the SAME Claude chat thread)
+
+Turn B: What operating rule did I ask you to remember?
+Answer with the exact rule text only.</code></pre>
+          <p><strong>Expected:</strong> same-thread recall — maps to <code>ClaudeSDKClient</code> multi-turn sessions in the notebook.</p>
+          <p><strong>Say aloud:</strong> “One-shot <code>query()</code> forgets; a client/session remembers.”</p>
+        </li>
+
+        <li>
+          <h3>§02 — Built-in Read vs custom / MCP tools</h3>
+          <p><strong>Slash:</strong> <code>/day1-pm-tools</code></p>
+<pre class="prompt"><code>/day1-pm-tools
+
+1) Use Read on CLAUDE.md and state the first operator rule.
+2) Explain MCP-style names: mcp__insurance__fnol_lookup, claim_lookup, policy_lookup.
+3) Grounded triage for CLN-001 from fixtures (CSV + sqlite). Return TriageDecision JSON
+   with evidence-backed case_id starting CLM-.
+4) List called_tools conceptually as the three insurance tools.
+5) Contrast: if allowlist were FNOL-only, claim/policy tools must be absent (Exercise PM-1 preview).</code></pre>
+          <p><strong>Expected:</strong> grounded triage for Jennifer Garcia / <code>CLM-424063</code> / <code>POL-787532354</code> / <code>fnol_intake</code>; MCP naming clear on screen.</p>
+        </li>
+
+        <li>
+          <h3>§03 — Structured outputs &amp; message blocks</h3>
+<pre class="prompt"><code>Triage CLN-001 using only fixture evidence (simulate FNOL + claim + policy lookups).
+Return ONLY valid TriageDecision JSON (no markdown fences if possible) with:
+lane, case_id (CLM-...), urgency, route_queue, summary, rationale, evidence_refs.
+Every ID in the JSON must appear in the fixtures you read.</code></pre>
+          <p><strong>Expected:</strong> single structured object; rationale cites three consistent sources.</p>
+        </li>
+
+        <li>
+          <h3>§03b — Logistics shipment lookup (no write)</h3>
+<pre class="prompt"><code>Call (conceptually) mcp__logistics__shipment_lookup for MSKU789.
+Read Week2/data/logistics/shipment_events.jsonl.
+State whether the latest authoritative status is HELD.
+Include event id, location, and detail. Do NOT release the hold.</code></pre>
+          <p><strong>Expected:</strong> HELD at Chicago Rail Yard; bill of lading mismatch; event like <code>EVT-MSKU789-001</code>; no release claimed.</p>
+        </li>
+
+        <li>
+          <h3>§04 — Memory &amp; sessions (operating rule recall)</h3>
+<pre class="prompt"><code>In this same thread, restate the operating rule from earlier about unknown claim records.
+Then produce a 3-bullet FNOL operator checklist from CLAUDE.md / AGENTS.md:
+tools for facts, write gates, TriageDecision required.</code></pre>
+          <p><strong>Expected:</strong> rule recall + checklist matching project rules.</p>
+        </li>
+
+        <li>
+          <h3>§05 — Permissions, can_use_tool, hold-release gate</h3>
+          <p><strong>Slash:</strong> <code>/day1-pm-permissions</code></p>
+<pre class="prompt"><code>/day1-pm-permissions
+
+1) Look up MSKU789 from shipment_events.jsonl.
+2) Produce ReleaseProposal JSON only: should_release, reason, source_event_id.
+3) List the four write gates (ALLOW_LOCAL_WRITES, ALLOW_HOLD_RELEASE,
+   LEARNER_APPROVED_HOLD_RELEASE, HOLD_RELEASE_IDEMPOTENCY_KEY).
+4) Set write_skipped=true — do not claim release_hold executed.
+5) Explain can_use_tool allow vs deny in one operator sentence each.</code></pre>
+          <div class="callout danger">
+            <strong>Do not</strong> demonstrate a live hold release in class unless all four gates are
+            deliberately armed and you use a real idempotency key. Default = proposal only.
+          </div>
+          <p><strong>Optional “armed gates” narrative prompt (say, don’t execute unless intentional):</strong></p>
+<pre class="prompt"><code>Teaching-only: if all four gates were armed with idempotency_key=
+learner-hold-msku789-001, what would a successful release_hold Result look like?
+Still do NOT write any ledger. Describe the shape only.</code></pre>
+        </li>
+
+        <li>
+          <h3>§05b — Model choice (talking point)</h3>
+<pre class="prompt"><code>In two sentences: when would an operator prefer a faster/cheaper model vs a stronger model
+for FNOL triage that must call three domain tools? Tie the answer to max_turns / max_budget_usd.</code></pre>
+        </li>
+
+        <li>
+          <h3>§06 — Cost awareness / ResultMessage metering</h3>
+          <p><strong>Slash:</strong> <code>/day1-pm-budget</code></p>
+<pre class="prompt"><code>/day1-pm-budget
+
+Run a short grounded-claims explanation (no invented facts).
+Emit metering JSON analogous to SDK ResultMessage with:
+max_budget_usd=0.01 (tiny-budget exercise), total_cost_usd note for subscription metering,
+num_turns, stop_reason, subtype, usage.
+If writes are allowed, also write Week2/W2D1/outputs/day1/usage_summary_plugin.json.
+Contrast default budget (~0.5) vs tiny 0.01 as a teaching story (Exercise PM-2).</code></pre>
+          <p><strong>Expected:</strong> metering JSON + optional file under outputs; story that tiny budgets stop work early.</p>
+        </li>
+
+        <li>
+          <h3>Optional — ops-triage-specialist agent</h3>
+<pre class="prompt"><code>Use the ops-triage-specialist agent (see .claude/agents/ops-triage-specialist.md).
+Triage CLN-001 from insurance fixtures only. Return TriageDecision JSON.
+Obey CLAUDE.md / AGENTS.md. Never invent records. No writes.</code></pre>
+        </li>
+      </ol>
+    </section>
+
+    <section id="slash">
+      <h2>Slash commands / skills / hooks / agents (cheat sheet)</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>When</th><th>Artifact</th><th>Invoke</th><th>Maps to notebook</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Session start</td><td><code>CLAUDE.md</code> / <code>AGENTS.md</code></td><td>Auto</td><td>System / project context</td></tr>
+            <tr><td>Every prompt</td><td>UserPromptSubmit hook</td><td>Auto</td><td>Operator rule reminder</td></tr>
+            <tr><td>§01</td><td><code>day1-pm-sdk-query</code></td><td><code>/day1-pm-sdk-query</code></td><td><code>query()</code> / ResultMessage</td></tr>
+            <tr><td>§02</td><td><code>day1-pm-tools</code></td><td><code>/day1-pm-tools</code></td><td>Built-in + MCP tools</td></tr>
+            <tr><td>§05</td><td><code>day1-pm-permissions</code></td><td><code>/day1-pm-permissions</code></td><td>Permissions / hold release</td></tr>
+            <tr><td>§06</td><td><code>day1-pm-budget</code></td><td><code>/day1-pm-budget</code></td><td><code>max_budget_usd</code></td></tr>
+            <tr><td>Optional</td><td><code>ops-triage-specialist</code></td><td>Ask to use agent</td><td>Specialist routing</td></tr>
+            <tr><td>Writes</td><td>PreToolUse Bash + Write|Edit</td><td>Auto</td><td>Write / destructive gates</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Create missing skill live (template)</h3>
+<pre class="prompt"><code>Create .claude/skills/day1-pm-permissions/SKILL.md with frontmatter:
+name: day1-pm-permissions
+description: Teach least privilege, hold-release write gates, and ReleaseProposal vs actual write.
+disable-model-invocation: true
+Body: MSKU789 lookup, ReleaseProposal only, four write gates, write_skipped true,
+can_use_tool allow vs deny. Then confirm /day1-pm-permissions works.</code></pre>
+    </section>
+
+    <section id="exercises">
+      <h2>Exercise prompts (plugin versions of PM-1 / PM-2)</h2>
+      <h3>Exercise PM-1 — FNOL-only allowlist</h3>
+<pre class="prompt"><code>Exercise PM-1:
+Pretend allowed tools are ONLY mcp__insurance__fnol_lookup (no claim/policy tools).
+Triage CLN-001 under that constraint.
+Return TriageDecision if possible, OR refuse fields that require claim/policy tools.
+List which tools you would have called but could not. Never invent claim/policy rows.</code></pre>
+      <p><strong>Expected:</strong> incomplete triage or explicit refusal for claim/policy-backed fields; teaching least privilege.</p>
+
+      <h3>Exercise PM-2 — Tiny budget</h3>
+<pre class="prompt"><code>Exercise PM-2:
+Narrate the same grounded triage for CLN-001 under max_budget_usd=0.01 vs 0.5.
+Show how a ResultMessage-like object might stop early (stop_reason / subtype)
+under the tiny budget. Do not invent domain facts. Return side-by-side JSON.</code></pre>
+    </section>
+
+    <section id="troubleshoot">
+      <h2>Troubleshoot / talking points</h2>
+      <ul>
+        <li><strong>Learners ask for API keys</strong> — “Not for this demo. Claude plugin login is enough. Notebooks that call <code>query()</code> need keys — we are not running those cells now.”</li>
+        <li><strong>Wrong MCP names</strong> — correct to <code>mcp__insurance__*</code> when server key is <code>insurance</code> (not <code>mcp__ops__*</code>).</li>
+        <li><strong>Agent claims hold released</strong> — stop; re-run <code>/day1-pm-permissions</code>; emphasize proposal vs write.</li>
+        <li><strong>AM artifacts still loaded</strong> — reopen folder as <code>W2D1PM</code> so PM skills/hooks apply.</li>
+        <li><strong>Timebox</strong> — if short: Steps 1 → 3 → 7 (SDK shape, tools/triage, permissions).</li>
+      </ul>
+      <div class="callout">
+        Morning companion: <a href="../W2D1AM/_CLAUDE_PLUGIN_DEMO.html"><code>../W2D1AM/_CLAUDE_PLUGIN_DEMO.html</code></a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    EXL CampusHire · Week 2 Day 1 PM · Claude plugin demonstration guide · no API key path
+  </footer>
+</body>
+</html>

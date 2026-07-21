@@ -1,0 +1,51 @@
+<svg viewBox="0 0 780 260" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,-apple-system,Segoe UI,sans-serif">
+  <defs>
+    <marker id="arrowm" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#536179"/>
+    </marker>
+  </defs>
+  <rect width="780" height="260" fill="#ffffff"/>
+  <!-- supervisor/worker -->
+  <g>
+    <rect x="20" y="20" width="230" height="220" rx="8" fill="#fafaf7" stroke="#b4b2a9"/>
+    <text x="135" y="42" text-anchor="middle" font-size="13" font-weight="700" fill="#172d70">Supervisor / worker</text>
+    <rect x="95" y="55" width="80" height="35" rx="6" fill="#eef3ff" stroke="#2446a8"/>
+    <text x="135" y="77" text-anchor="middle" font-size="11">supervisor</text>
+    <rect x="35" y="120" width="70" height="35" rx="6" fill="#f1efe8" stroke="#5f5e5a"/>
+    <text x="70" y="142" text-anchor="middle" font-size="10">worker A</text>
+    <rect x="165" y="120" width="70" height="35" rx="6" fill="#f1efe8" stroke="#5f5e5a"/>
+    <text x="200" y="142" text-anchor="middle" font-size="10">worker B</text>
+    <path d="M120,90 L80,120" stroke="#536179" marker-end="url(#arrowm)"/>
+    <path d="M150,90 L190,120" stroke="#536179" marker-end="url(#arrowm)"/>
+    <text x="135" y="190" text-anchor="middle" font-size="10" fill="#536179">supervisor delegates,</text>
+    <text x="135" y="205" text-anchor="middle" font-size="10" fill="#536179">synthesizes results</text>
+  </g>
+  <!-- role crew -->
+  <g>
+    <rect x="270" y="20" width="230" height="220" rx="8" fill="#fafaf7" stroke="#b4b2a9"/>
+    <text x="385" y="42" text-anchor="middle" font-size="13" font-weight="700" fill="#172d70">Role-based crew</text>
+    <rect x="290" y="60" width="60" height="35" rx="6" fill="#eef3ff" stroke="#2446a8"/>
+    <text x="320" y="82" text-anchor="middle" font-size="9">intake</text>
+    <path d="M350,77 L410,77" stroke="#536179" marker-end="url(#arrowm)"/>
+    <rect x="410" y="60" width="70" height="35" rx="6" fill="#eef3ff" stroke="#2446a8"/>
+    <text x="445" y="82" text-anchor="middle" font-size="9">researcher</text>
+    <path d="M445,95 L445,130" stroke="#536179" marker-end="url(#arrowm)"/>
+    <rect x="390" y="130" width="90" height="35" rx="6" fill="#eef3ff" stroke="#2446a8"/>
+    <text x="435" y="152" text-anchor="middle" font-size="9">writer</text>
+    <text x="385" y="200" text-anchor="middle" font-size="10" fill="#536179">sequential handoff</text>
+    <text x="385" y="215" text-anchor="middle" font-size="10" fill="#536179">between named roles</text>
+  </g>
+  <!-- critique/debate -->
+  <g>
+    <rect x="520" y="20" width="240" height="220" rx="8" fill="#fafaf7" stroke="#b4b2a9"/>
+    <text x="640" y="42" text-anchor="middle" font-size="13" font-weight="700" fill="#172d70">Critique / debate</text>
+    <rect x="545" y="60" width="90" height="35" rx="6" fill="#eef3ff" stroke="#2446a8"/>
+    <text x="590" y="82" text-anchor="middle" font-size="10">proposer</text>
+    <path d="M635,77 C660,77 660,77 660,110" stroke="#536179" marker-end="url(#arrowm)"/>
+    <rect x="610" y="110" width="90" height="35" rx="6" fill="#fff7ed" stroke="#c2410c"/>
+    <text x="655" y="132" text-anchor="middle" font-size="10" fill="#7c2d12">critic</text>
+    <path d="M610,127 C580,127 580,127 580,95" stroke="#536179" marker-end="url(#arrowm)"/>
+    <text x="640" y="185" text-anchor="middle" font-size="10" fill="#536179">iterate until</text>
+    <text x="640" y="200" text-anchor="middle" font-size="10" fill="#536179">consensus or budget hit</text>
+  </g>
+</svg>

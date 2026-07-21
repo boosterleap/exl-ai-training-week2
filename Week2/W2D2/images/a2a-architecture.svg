@@ -1,0 +1,27 @@
+<svg viewBox="0 0 780 240" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,-apple-system,Segoe UI,sans-serif">
+  <defs>
+    <marker id="arrowa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#536179"/>
+    </marker>
+  </defs>
+  <rect width="780" height="240" fill="#ffffff"/>
+  <rect x="40" y="30" width="220" height="80" rx="8" fill="#eef3ff" stroke="#2446a8"/>
+  <text x="150" y="58" text-anchor="middle" font-size="13" font-weight="700" fill="#172d70">Agent Card</text>
+  <text x="150" y="76" text-anchor="middle" font-size="10" fill="#536179">JSON: identity, capabilities,</text>
+  <text x="150" y="92" text-anchor="middle" font-size="10" fill="#536179">skills, auth — for discovery</text>
+
+  <path d="M260,70 L320,70" stroke="#536179" marker-end="url(#arrowa)"/>
+  <rect x="320" y="30" width="220" height="80" rx="8" fill="#f1efe8" stroke="#5f5e5a"/>
+  <text x="430" y="58" text-anchor="middle" font-size="13" font-weight="700" fill="#172d70">Client agent</text>
+  <text x="430" y="76" text-anchor="middle" font-size="10" fill="#536179">discovers the card,</text>
+  <text x="430" y="92" text-anchor="middle" font-size="10" fill="#536179">calls a skill</text>
+
+  <path d="M540,70 L600,70" stroke="#536179" marker-end="url(#arrowa)"/>
+  <rect x="600" y="30" width="150" height="80" rx="8" fill="#e7f7ee" stroke="#278653"/>
+  <text x="675" y="58" text-anchor="middle" font-size="13" font-weight="700" fill="#166534">JSON-RPC</text>
+  <text x="675" y="76" text-anchor="middle" font-size="10" fill="#166534">task lifecycle:</text>
+  <text x="675" y="92" text-anchor="middle" font-size="10" fill="#166534">submit → poll → result</text>
+
+  <text x="390" y="160" text-anchor="middle" font-size="12" fill="#536179">MCP = agent → tool.  A2A = agent → agent.  Both together cover a full multi-agent system.</text>
+  <text x="390" y="185" text-anchor="middle" font-size="11" fill="#7c2d12">ACP (the earlier competing protocol) merged into A2A under the Linux Foundation</text>
+</svg>

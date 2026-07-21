@@ -1,0 +1,28 @@
+<svg viewBox="0 0 780 240" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,-apple-system,Segoe UI,sans-serif">
+  <defs>
+    <marker id="arrown" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#536179"/>
+    </marker>
+  </defs>
+  <rect width="780" height="240" fill="#ffffff"/>
+  <rect x="30" y="80" width="160" height="70" rx="8" fill="#eef3ff" stroke="#2446a8"/>
+  <text x="110" y="110" text-anchor="middle" font-size="13" font-weight="700" fill="#172d70">Host</text>
+  <text x="110" y="128" text-anchor="middle" font-size="10" fill="#536179">Claude Code</text>
+  <path d="M190,115 L250,115" stroke="#536179" marker-end="url(#arrown)"/>
+  <rect x="250" y="80" width="160" height="70" rx="8" fill="#eef3ff" stroke="#2446a8"/>
+  <text x="330" y="110" text-anchor="middle" font-size="13" font-weight="700" fill="#172d70">MCP client</text>
+  <text x="330" y="128" text-anchor="middle" font-size="10" fill="#536179">inside the host</text>
+  <path d="M410,105 L470,60" stroke="#536179" marker-end="url(#arrown)"/>
+  <path d="M410,125 L470,170" stroke="#536179" marker-end="url(#arrown)"/>
+
+  <rect x="470" y="25" width="270" height="70" rx="8" fill="#f0fdf4" stroke="#278653"/>
+  <text x="605" y="52" text-anchor="middle" font-size="13" font-weight="700" fill="#166534">In-process server (stdio)</text>
+  <text x="605" y="70" text-anchor="middle" font-size="10" fill="#166534">Day 1 pattern — subprocess, no port</text>
+  <text x="605" y="86" text-anchor="middle" font-size="10" fill="#166534">insurance-lookup, logistics-lookup</text>
+
+  <rect x="470" y="135" width="270" height="70" rx="8" fill="#fff7ed" stroke="#c2410c"/>
+  <text x="605" y="162" text-anchor="middle" font-size="13" font-weight="700" fill="#7c2d12">Network server (Streamable HTTP)</text>
+  <text x="605" y="180" text-anchor="middle" font-size="10" fill="#7c2d12">today's pattern — separate process,</text>
+  <text x="605" y="196" text-anchor="middle" font-size="10" fill="#7c2d12">a real port, could be remote</text>
+  <text x="330" y="220" text-anchor="middle" font-size="11" fill="#536179">registry: 10k+ community servers · auth/SSO and gateways matter once servers are remote</text>
+</svg>

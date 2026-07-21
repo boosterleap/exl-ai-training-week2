@@ -1,0 +1,36 @@
+<svg viewBox="0 0 800 260" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,-apple-system,Segoe UI,sans-serif">
+  <rect width="800" height="260" fill="#ffffff"/>
+  <g font-size="12">
+    <rect x="10" y="15" width="245" height="70" rx="8" fill="#e7f7ee" stroke="#278653" stroke-width="1.5"/>
+    <text x="132" y="36" text-anchor="middle" font-weight="700" fill="#166534">LangGraph</text>
+    <text x="132" y="54" text-anchor="middle" fill="#333">graph state machines,</text>
+    <text x="132" y="70" text-anchor="middle" fill="#333">checkpointing, durable exec.</text>
+
+    <rect x="270" y="15" width="245" height="70" rx="8" fill="#e7f7ee" stroke="#278653" stroke-width="1.5"/>
+    <text x="392" y="36" text-anchor="middle" font-weight="700" fill="#166534">Claude Agent SDK</text>
+    <text x="392" y="54" text-anchor="middle" fill="#333">skills / subagents / teams,</text>
+    <text x="392" y="70" text-anchor="middle" fill="#333">hooks, permissions</text>
+
+    <rect x="530" y="15" width="245" height="70" rx="8" fill="#e7f7ee" stroke="#278653" stroke-width="1.5"/>
+    <text x="652" y="36" text-anchor="middle" font-weight="700" fill="#166534">CrewAI</text>
+    <text x="652" y="54" text-anchor="middle" fill="#333">role-based crews,</text>
+    <text x="652" y="70" text-anchor="middle" fill="#333">installed &amp; touched this session</text>
+
+    <rect x="10" y="100" width="245" height="70" rx="8" fill="#f1efe8" stroke="#5f5e5a" stroke-width="1.5"/>
+    <text x="132" y="121" text-anchor="middle" font-weight="700" fill="#172d70">OpenAI Agents SDK</text>
+    <text x="132" y="139" text-anchor="middle" fill="#536179">landscape survey only —</text>
+    <text x="132" y="155" text-anchor="middle" fill="#536179">not installed this cohort</text>
+
+    <rect x="270" y="100" width="245" height="70" rx="8" fill="#e7f7ee" stroke="#278653" stroke-width="1.5"/>
+    <text x="392" y="121" text-anchor="middle" font-weight="700" fill="#166534">Google ADK</text>
+    <text x="392" y="139" text-anchor="middle" fill="#166534">Agent, tools, sessions —</text>
+    <text x="392" y="155" text-anchor="middle" fill="#166534">learner hands-on (Vertex)</text>
+
+    <rect x="530" y="100" width="245" height="70" rx="8" fill="#e7f7ee" stroke="#278653" stroke-width="1.5"/>
+    <text x="652" y="121" text-anchor="middle" font-weight="700" fill="#166534">Microsoft Agent Framework</text>
+    <text x="652" y="139" text-anchor="middle" fill="#166534">framework: awareness only —</text>
+    <text x="652" y="155" text-anchor="middle" fill="#166534">hands-on = raw Azure OpenAI call</text>
+  </g>
+  <text x="400" y="205" text-anchor="middle" font-size="13" font-weight="700" fill="#333">Same underlying idea (plan, act, observe) — very different scaffolding, ecosystem, and isolation model.</text>
+  <text x="400" y="228" text-anchor="middle" font-size="12" fill="#536179">Green = hands-on this cohort · grey = survey/awareness only</text>
+</svg>

@@ -1,0 +1,36 @@
+<svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,-apple-system,Segoe UI,sans-serif">
+  <defs>
+    <marker id="arrow7" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#536179"/>
+    </marker>
+  </defs>
+  <rect width="760" height="240" fill="#ffffff"/>
+  <rect x="30" y="20" width="140" height="50" rx="8" fill="#eef3ff" stroke="#2446a8"/>
+  <text x="100" y="50" text-anchor="middle" font-size="12" font-weight="700" fill="#172d70">Call tool</text>
+  <path d="M100,70 L100,110" stroke="#536179" marker-end="url(#arrow7)"/>
+  <rect x="30" y="110" width="140" height="50" rx="8" fill="#fff0f0" stroke="#bb2d3b"/>
+  <text x="100" y="140" text-anchor="middle" font-size="12" font-weight="700" fill="#7f1d1d">Fails (timeout,</text>
+  <text x="100" y="153" text-anchor="middle" font-size="11" fill="#7f1d1d">rate limit, ...)</text>
+
+  <path d="M170,135 L230,135" stroke="#536179" marker-end="url(#arrow7)"/>
+  <rect x="230" y="110" width="160" height="50" rx="8" fill="#fef3c7" stroke="#92400e"/>
+  <text x="310" y="132" text-anchor="middle" font-size="12" font-weight="700" fill="#92400e">Classify the fault</text>
+  <text x="310" y="149" text-anchor="middle" font-size="10" fill="#92400e">transient? permanent?</text>
+
+  <path d="M390,120 C420,100 440,90 460,80" stroke="#536179" marker-end="url(#arrow7)"/>
+  <rect x="460" y="55" width="160" height="50" rx="8" fill="#e7f7ee" stroke="#278653"/>
+  <text x="540" y="76" text-anchor="middle" font-size="12" font-weight="700" fill="#166534">Retry w/ backoff</text>
+  <text x="540" y="93" text-anchor="middle" font-size="10" fill="#166534">transient fault</text>
+
+  <path d="M390,150 C420,170 440,178 460,185" stroke="#536179" marker-end="url(#arrow7)"/>
+  <rect x="460" y="160" width="160" height="50" rx="8" fill="#eef3ff" stroke="#2446a8"/>
+  <text x="540" y="181" text-anchor="middle" font-size="12" font-weight="700" fill="#172d70">Fallback / route</text>
+  <text x="540" y="198" text-anchor="middle" font-size="10" fill="#172d70">permanent fault</text>
+
+  <path d="M620,80 L680,80" stroke="#536179" marker-end="url(#arrow7)"/>
+  <path d="M620,185 L680,185" stroke="#536179" marker-end="url(#arrow7)"/>
+  <rect x="655" y="55" width="90" height="50" rx="8" fill="#f1efe8" stroke="#5f5e5a"/>
+  <text x="700" y="83" text-anchor="middle" font-size="11" font-weight="700">bounded</text>
+  <rect x="655" y="160" width="90" height="50" rx="8" fill="#f1efe8" stroke="#5f5e5a"/>
+  <text x="700" y="188" text-anchor="middle" font-size="11" font-weight="700">bounded</text>
+</svg>

@@ -1,0 +1,26 @@
+<svg viewBox="0 0 700 280" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,-apple-system,Segoe UI,sans-serif">
+  <rect width="700" height="280" fill="#ffffff"/>
+  <text x="350" y="28" text-anchor="middle" font-size="14" font-weight="700" fill="#172d70">Same model, same weights — different scaffold around it</text>
+  <!-- axis -->
+  <line x1="80" y1="230" x2="620" y2="230" stroke="#536179" stroke-width="2"/>
+  <line x1="80" y1="230" x2="80" y2="60" stroke="#536179" stroke-width="2"/>
+  <text x="40" y="150" text-anchor="middle" font-size="12" fill="#536179" transform="rotate(-90 40 150)">task success rate</text>
+  <!-- bars -->
+  <rect x="130" y="180" width="90" height="50" fill="#fde68a" stroke="#92400e"/>
+  <text x="175" y="255" text-anchor="middle" font-size="12" fill="#333">no retry,</text>
+  <text x="175" y="270" text-anchor="middle" font-size="12" fill="#333">no tool budget</text>
+
+  <rect x="250" y="140" width="90" height="90" fill="#fdba74" stroke="#9a3412"/>
+  <text x="295" y="255" text-anchor="middle" font-size="12" fill="#333">basic ReAct loop,</text>
+  <text x="295" y="270" text-anchor="middle" font-size="12" fill="#333">no evidence checks</text>
+
+  <rect x="370" y="95" width="90" height="135" fill="#86efac" stroke="#166534"/>
+  <text x="415" y="255" text-anchor="middle" font-size="12" fill="#333">planning + tool</text>
+  <text x="415" y="270" text-anchor="middle" font-size="12" fill="#333">contracts</text>
+
+  <rect x="490" y="65" width="90" height="165" fill="#4ade80" stroke="#166534"/>
+  <text x="535" y="255" text-anchor="middle" font-size="12" fill="#333">+ evidence gates,</text>
+  <text x="535" y="270" text-anchor="middle" font-size="12" fill="#333">+ retries/fallback</text>
+
+  <text x="350" y="55" text-anchor="middle" font-size="12" fill="#7c2d12" font-weight="700">illustrative only — the real point is the shape, not the exact numbers</text>
+</svg>

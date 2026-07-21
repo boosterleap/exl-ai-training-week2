@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D2 PM · Multi-Agent Systems, MCP &amp; A2A</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">Week 2 · Day 2 · Applied Build Lab (16:00–20:00)</p>
+  <h1>Multi-agent systems, MCP &amp; A2A — real subagents, a real network MCP server, a real A2A server</h1>
+  <p>Everything here actually runs: Claude Code's own subagents for multi-agent patterns, a standalone network MCP server you start yourself, and a genuine A2A server with an Agent Card and task lifecycle. The one outside-Claude-Code call today is a single bounded AWS Bedrock request.</p>
+  <div class="thread-badges">
+    <span class="thread-badge insurance">Insurance — primary build, all six topics</span>
+    <span class="thread-badge homework">Logistics — extend the network server as homework</span>
+  </div>
+  <div class="timing-strip">
+    <span class="timing-chip">16:00–16:05 bridge</span>
+    <span class="timing-chip">16:05–17:45 topics 01–03</span>
+    <span class="timing-chip">17:45–17:55 break</span>
+    <span class="timing-chip">17:55–19:00 topics 04–06</span>
+    <span class="timing-chip">19:00–19:30 app build</span>
+    <span class="timing-chip">19:30–20:00 MCQ assessment</span>
+  </div>
+</header>
+
+<nav class="page-nav" aria-label="Session sections">
+  <a href="#bridge">Bridge</a>
+  <a href="#topics-01-03">01 Multi-agent</a>
+  <a href="#topic-02">02 MCP</a>
+  <a href="#topic-03">03 A2A</a>
+  <a href="#topics-04-06">04 Enterprise</a>
+  <a href="#topic-05">05 Handoffs</a>
+  <a href="#topic-06">06 Single vs multi</a>
+  <a href="#appbuild">App build</a>
+  <a href="#homework">Logistics homework</a>
+</nav>
+
+<main>
+
+<section id="bridge">
+  <h2>Bridge (16:00–16:05)</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">0</span><span class="step-title">Transport check</span><span class="step-time">5 min</span></div>
+    <span class="where-tag where-vm">VM · VS Code terminal</span>
+    <pre><code>conda activate ai_agent_env
+python -c "import python_a2a; print('python-a2a ok')"
+python -c "import boto3; print('boto3 ok')"</code></pre>
+  </div>
+</section>
+
+<section id="topics-01-03">
+<h2 id="topic-01">Topic 01 · Multi-agent patterns</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">1</span><span class="step-title">Supervisor/worker, role crews, critique/debate — and sub-agent sprawl</span><span class="step-time">~35 min</span></div>
+  <p><b>Concept (8 min).</b> Supervisor/worker has one coordinator delegating to specialist workers and synthesizing their results. Role-based crews (yesterday's CrewAI scaffold) chain named roles sequentially. Critique/debate has two agents iterating — one proposes, one challenges — until they converge or hit a budget. All three multiply cost and context versus a single agent; Opus 4.8 caps workflows at 1,000 sub-agents specifically because unbounded sub-agent sprawl risks runaway cost and out-of-memory failures, not just slowness.</p>
+  <ul class="concept-list">
+    <li><b>Why sprawl is a real risk, not a hypothetical.</b> Each sub-agent can itself spawn more, and each one holds its own context — a shallow-looking task can balloon into hundreds of parallel branches if nothing bounds fan-out.</li>
+    <li><b>Supervisor/worker vs. role crews — the practical difference.</b> Supervisor/worker suits dynamic delegation (the supervisor decides who does what based on the specific case). A role crew suits a known, fixed pipeline of named steps — less flexible, more predictable.</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/multi-agent-patterns.svg" alt="Three multi-agent patterns: supervisor/worker, role-based crew, and critique/debate">
+    <figcaption>Three patterns, three different coordination costs.</figcaption>
+  </figure>
+
+  <p><b>Instructor drives live, variation A — supervisor/worker via real subagents (14 min).</b> <span class="where-tag where-claude">Claude Code chat panel</span> — this is exactly yesterday's Topic 03 subagent mechanism, applied to coordination now:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Act as supervisor: dispatch two subagents in parallel on claim CLM-748422
+(row CLN-002) — one subagent researching the policy grounding (using
+data/insurance/policies/), one subagent researching claim history/status
+(using claims.db). Then synthesize both reports into one coverage
+decision yourself.</code></pre>
+  </div>
+  <p><b>Instructor drives live, variation B — critique/debate, for contrast (14 min).</b></p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Dispatch a subagent to propose a coverage decision for claim CLM-597471.
+Then dispatch a second subagent whose only job is to critique that
+proposal against the actual policy documents and flag anything
+unsupported. Show me both reports, then tell me your final decision.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief — compare A and B</b>
+    Supervisor/worker split the <i>same</i> task into independent parallel pieces synthesized once. Critique/debate ran <i>sequentially</i>, with the second subagent specifically checking the first — more coordination cost, but it catches a category of error the parallel pattern can't (since the parallel workers never saw each other's output).
+  </div>
+
+  <p><b>Learners repeat (4 min).</b> Pick one more claim and decide, before running anything, which pattern fits it better and why. Note your reasoning for the showcase.</p>
+</div>
+
+<h2 id="topic-02">Topic 02 · MCP, in depth</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">2</span><span class="step-title">Host/client/server, Streamable HTTP, in-process vs. network</span><span class="step-time">~45 min</span></div>
+  <p><b>Concept (9 min).</b> MCP has three roles: the <b>host</b> application (Claude Code), an <b>MCP client</b> inside it, and one or more <b>MCP servers</b> exposing tools. Yesterday's servers were in-process (stdio) — a subprocess Claude Code launches itself, no port. Today's is a <b>network server</b> over Streamable HTTP — a standalone process with a real port, potentially remote. The registry has 10,000+ community servers across 200+ implementations; once servers are remote, auth/SSO and gateways become real concerns, not optional extras.</p>
+  <ul class="concept-list">
+    <li><b>Why the transport choice matters operationally.</b> An in-process server dies when Claude Code's session ends and can only ever be reached by that one session. A network server keeps running independently, can serve multiple clients, and could live on a different machine entirely — but now needs its own auth story.</li>
+    <li><b>What changes in the config.</b> A stdio server entry in <code>.mcp.json</code> gives a <code>command</code>/<code>args</code> to launch. A network server entry gives a <code>url</code> to connect to instead — no process for Claude Code to launch, just a client connection.</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/mcp-architecture.svg" alt="MCP architecture: host, client, and two server transports — in-process stdio vs network Streamable HTTP">
+    <figcaption>Same host/client roles, two different server transports.</figcaption>
+  </figure>
+
+  <p><b>Build it together, variation A — start the network server (15 min).</b> <span class="where-tag where-vm">VS Code terminal (separate tab)</span> — have Claude Code build this fresh, using yesterday's stdio tool as the starting point to adapt, or start from the reference:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Build a network MCP server (FastMCP, streamable-http transport, host
+127.0.0.1, port 8766, streamable_http_path "/mcp") named claims-network,
+exposing get_claim_and_policy the same way yesterday's insurance-lookup
+tool did, but as a standalone network service instead of stdio. Put it at
+W2D2/my_claims_network_server.py.</code></pre>
+  </div>
+  <p>Start it in its own terminal tab (it needs to keep running):</p>
+  <pre><code>uv run python W2D2/my_claims_network_server.py</code></pre>
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>A tested version is at <a href="snippets/claims_network_server.py"><code>snippets/claims_network_server.py</code></a> (verified: responds 200 to a real MCP initialize handshake on <code>http://127.0.0.1:8766/mcp</code>).</p>
+  </details>
+
+  <p><b>Verify it's actually running.</b> Confirm the server answers for a real claim — this catches a crashed or never-started server early, and it's the check you'll reuse in "Learners repeat" and later this afternoon:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Using a quick MCP client script (or a raw HTTP request against the
+Streamable HTTP endpoint), connect to http://127.0.0.1:8766/mcp and call
+get_claim_and_policy for CLM-424063. Show me the raw response.</code></pre>
+  </div>
+  <p class="small">Expected response for <code>CLM-424063</code>: <code>claim_status: "open"</code>, <code>product: "homeowners"</code>, <code>grounding_available: true</code>, <code>policy_doc_files: ["POL-HOME-010_flood_rider.md", "POL-HOME-010_water.md"]</code>. A connection error here means the server isn't actually listening — check its terminal tab for a crash before continuing.</p>
+
+  <p><b>Build it together, variation B — connect to a real MCP server already hosted on the web (17 min).</b> Everything so far was a server you built and started yourself. Most real MCP usage instead means pointing at a server someone else runs — no code to write, no process to keep alive. Try Anthropic's own hosted Claude Code documentation server, which needs no authentication (in a terminal, not inside a <code>claude</code> session):</p>
+  <pre><code>claude mcp add --transport http claude-code-docs https://code.claude.com/docs/mcp</code></pre>
+  <p>Check it connected:</p>
+  <pre><code>claude mcp list</code></pre>
+  <p>You should see <code>claude-code-docs</code> listed as <code>✔ Connected</code>. This registers the server to you only, for this project (the default "local" scope, stored in <code>~/.claude.json</code>) — it doesn't write to <code>.mcp.json</code> at all, unlike a project-scoped server would. Then, in a Claude Code session, ask it to use the new tool:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Use the claude-code-docs server to look up what MCP_TIMEOUT does.</code></pre>
+  </div>
+  <p class="small">Naming the server in the prompt guarantees the answer comes from this MCP tool rather than Claude's built-in knowledge or a web fetch — the tool call in Claude's output will be labeled <code>claude-code-docs</code>. Approve the permission prompt the first time it asks to use the new tool. Optional cleanup once you're done: <code>claude mcp remove claude-code-docs</code> — every connected server's tool list stays loaded in each session's context, so remove ones you're not actively using.</p>
+  <div class="callout instructor">
+    <b class="tag">Debrief — three server patterns, one session</b>
+    You've now touched all three MCP transport patterns across two days: <b>stdio</b> (yesterday's insurance-lookup — Claude Code launches and owns the subprocess), <b>your own network server</b> (today's claims-network — you own the process and its uptime; stop it in its terminal, then rerun the verification prompt from earlier and watch it fail to connect), and <b>someone else's hosted network server</b> (claude-code-docs, just now — Anthropic owns the uptime, and it keeps answering whether or not anything on your machine is running). That third pattern is the shape most real production MCP integrations actually take — a vendor's hosted server, not something you self-host.
+  </div>
+
+  <p><b>Learners repeat (9 min).</b> Two quick repeats: rerun the earlier raw-client verification prompt against your own <code>claims-network</code> server, this time for a claim with the <code>commercial_package</code> product (the ungrounded one), and confirm <code>grounding_available</code> is still correctly <code>false</code> — the transport changed, the contract didn't. Then ask <code>claude-code-docs</code> one more question of your own about Claude Code, and check the tool-call label to confirm it actually came from the MCP server rather than Claude's memory.</p>
+</div>
+
+<h2 id="topic-03">Topic 03 · Agent-to-Agent (A2A)</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">3</span><span class="step-title">Agent Cards, JSON-RPC-style task lifecycle</span><span class="step-time">~35 min</span></div>
+  <p><b>Concept (8 min).</b> An Agent Card is a JSON document describing an agent's identity, capabilities, skills, and auth — published at a well-known URL for discovery. A client agent fetches the card, then calls a skill through a task lifecycle (submit, poll/stream, get result). ACP, an earlier competing protocol, has since merged into A2A under the Linux Foundation. MCP is agent → tool; A2A is agent → agent — a full multi-agent system typically needs both.</p>
+  <ul class="concept-list">
+    <li><b>Why a card, not just a URL.</b> The card tells a caller <i>what</i> the agent can do and how to authenticate before any call is made — discovery and capability negotiation up front, not trial and error.</li>
+    <li><b>Claude Code isn't itself an A2A speaker.</b> Unlike MCP (which Claude Code connects to natively), A2A calls happen through a Python client script Claude Code runs via its Bash tool — a realistic pattern, since most orchestration code talks A2A this way too.</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/a2a-architecture.svg" alt="A2A flow: Agent Card discovery, client agent, JSON-RPC task lifecycle">
+    <figcaption>Agent Card → discovery → task lifecycle.</figcaption>
+  </figure>
+
+  <p><b>Build it together, variation A — stand up the A2A server (14 min).</b> <span class="where-tag where-vm">VS Code terminal (separate tab)</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Build an A2A server using python_a2a (A2AServer, AgentCard, AgentSkill,
+run_server) named claims-status-agent, exposing a skill check_claim_status
+that looks up a claim_id's status/route_queue in data/insurance/claims.db.
+Run it on 127.0.0.1:5055. Put it at
+W2D2/my_a2a_claims_server.py.</code></pre>
+  </div>
+  <p>Start it in its own terminal, then fetch its card directly to confirm discovery works:</p>
+  <pre><code>uv run python W2D2/my_a2a_claims_server.py
+# in a second terminal:
+curl http://127.0.0.1:5055/.well-known/agent.json</code></pre>
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>A tested version is at <a href="snippets/a2a_claims_server.py"><code>snippets/a2a_claims_server.py</code></a> — verified end-to-end: card discoverable, and <code>client.ask("What is the status of CLM-424063?")</code> correctly returns <code>CLM-424063: status=open, route_queue=fnol_intake</code>.</p>
+  </details>
+
+  <p><b>Build it together, variation B — have Claude Code act as the client, for contrast with topic 02's native MCP connection (12 min).</b></p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Write a short Python client script using python_a2a.A2AClient that
+connects to http://127.0.0.1:5055, asks "What is the status of
+CLM-748422?", and prints the response. Run it via Bash and show me the
+result.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief — compare topic 02 and topic 03</b>
+    In Topic 02, Claude Code connected to the MCP server <i>natively</i> — no extra script needed, the tool just appeared. Here, reaching the A2A server required Claude Code to write and run a separate client script via Bash — that's the concrete difference between "agent → tool" (MCP, built in) and "agent → agent" (A2A, orchestrated through your own code).
+  </div>
+
+  <p><b>Learners repeat (6 min).</b> Ask the A2A server about a claim through the client script yourself, then deliberately ask about a claim_id that doesn't exist and confirm the agent's reply degrades sensibly rather than erroring out unhandled.</p>
+</div>
+</section>
+
+<section id="topics-04-06">
+<h2 id="topic-04">Topic 04 · Enterprise integration</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">4</span><span class="step-title">CRM/ERP via MCP, managed runtimes, and one real Bedrock call</span><span class="step-time">~35 min</span></div>
+  <p><b>Concept (8 min).</b> Real enterprises expose CRM/ERP/ticketing systems (Salesforce Agentforce, ServiceNow, SAP) to agents via MCP the same way you exposed <code>claims.db</code> — the tool is the trust boundary. Managed agent runtimes (Bedrock AgentCore, Vertex AI Agent Builder, Azure AI Foundry/Microsoft Foundry, Anthropic Managed Agents) are deployment/control-plane services, conceptually distinct from the inference call you're about to make.</p>
+  <ul class="concept-list">
+    <li><b>The trust boundary is the tool code, never the model's opinion.</b> Whatever the model says it wants to do, the actual authorization decision has to be enforced in deterministic code at the boundary — exactly the pattern in the reference Bedrock script you're about to run.</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/trust-boundary.svg" alt="Trust boundary diagram: trusted Claude Code and MCP tool code on one side, untrusted external Bedrock/CRM/ERP systems on the other">
+    <figcaption>Everything past this line is a real trust-boundary crossing.</figcaption>
+  </figure>
+
+  <details class="setup-guide" open>
+    <summary><span class="setup-tag aws">AWS setup</span> Amazon Bedrock — API keys (the current, simplest path)</summary>
+    <div class="setup-body">
+      <p class="freshness">Current as of July 2026. Amazon Bedrock API keys (launched July 2025) are now the simplest auth path — a single bearer-token string, not a three-part access-key/secret/session-token set. Model access approval for most Anthropic models is now near-instant (submit a one-sentence use case in the console, approved in under a minute) rather than a multi-day review.</p>
+      <h4>1. Confirm model access (AWS Bedrock console, in your AWS sandbox browser)</h4>
+      <ol>
+        <li>Sign in to the AWS sandbox console with your provided login. Confirm the region selector reads <b>US East (N. Virginia) / us-east-1</b>.</li>
+        <li>Go to <b>Bedrock → Model catalog</b>, find the Anthropic Claude model your trainer specifies (e.g. <code>anthropic.claude-sonnet-4-6</code>), and confirm/request access — a one-line use case like "AI-assisted claims triage for a training exercise" is enough.</li>
+      </ol>
+      <h4>2. Generate a Bedrock API key (same console)</h4>
+      <ol>
+        <li>In the Bedrock console left nav, select <b>API keys</b>.</li>
+        <li>Choose the <b>Long-term API keys</b> tab (short-term keys expire with your console session — fine too, but long-term is easier for a multi-hour workshop) → <b>Generate long-term API keys</b> → set a short expiration (a few hours is plenty) → generate.</li>
+        <li>Copy the key value immediately — it's shown once.</li>
+      </ol>
+      <h4>3. Move the key to the VM</h4>
+      <p>The AWS sandbox and the VM are separate machines with no shared clipboard. In the <b>same AWS sandbox browser tab</b>: open <a href="https://syncclip.in">syncclip.in</a>, paste the key, note the sync code. Then, on the VM, open syncclip.in in its own browser, enter the same code, and retrieve the key.</p>
+      <h4>4. Set it in the VM terminal (hidden prompt, never a file)</h4>
+      <pre><code>read -rsp "Bedrock API key: " AWS_BEARER_TOKEN_BEDROCK; echo
+export AWS_BEARER_TOKEN_BEDROCK
+export AWS_REGION=us-east-1
+export BEDROCK_MODEL_ID="&lt;exact trainer-approved model ID&gt;"</code></pre>
+      <h4>5. Run the one bounded call</h4>
+      <pre><code>uv run python W2D2/snippets/bedrock_claim_classifier.py CLM-424063</code></pre>
+      <p>Success prints the claim, the model's one-word urgency classification, and a deterministic (non-model) authorization decision. Do not loop this call.</p>
+      <h4>Clean up</h4>
+      <pre><code>unset AWS_BEARER_TOKEN_BEDROCK AWS_REGION BEDROCK_MODEL_ID</code></pre>
+      <p>Then delete the syncclip.in note, and if you generated a long-term key, revoke/let it expire rather than reusing it in a later session. Full sandbox constraints (4-hour lifetime, region lock, no resource provisioning) and troubleshooting: <a href="../VM-Clouds/_AWS_SANDBOX_SETUP.html">VM-Clouds/_AWS_SANDBOX_SETUP.html</a> — it documents this exact API-key flow.</p>
+    </div>
+  </details>
+
+  <p><b>Do this, variation A — the classification call (10 min).</b> Run the command from step 5 above on <code>CLM-424063</code> (low reserve amount) and read the output together.</p>
+  <p><b>Do this, variation B — trigger the escalation path, for contrast (8 min).</b> Run it again on <code>CLM-255335</code> (the $423,312 commercial_package claim):</p>
+  <pre><code>uv run python W2D2/snippets/bedrock_claim_classifier.py CLM-255335</code></pre>
+  <div class="callout instructor">
+    <b class="tag">Debrief — compare A and B</b>
+    <code>CLM-424063</code>'s decision should come straight from the model's urgency classification. <code>CLM-255335</code>'s reserve amount exceeds the deterministic threshold in code — it should escalate to a human <i>regardless of what the model says</i>. That's the trust-boundary concept made concrete: the model advises, code decides.
+  </div>
+
+  <p><b>Learners repeat (14 min).</b> Pick one more claim and predict, before running it, whether the deterministic gate or the model's classification will end up driving the decision — then run it and check. Optional stretch: point your Day 2 AM <code>crew_scaffold.py</code>'s CrewAI agents at this same Bedrock model (CrewAI supports a Bedrock-backed LLM config) and run <code>.kickoff()</code> for real, closing yesterday's structure-only loop.</p>
+</div>
+
+<h2 id="topic-05">Topic 05 · Handoffs &amp; shared state</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">5</span><span class="step-title">Passing context safely between agents/sessions</span><span class="step-time">~20 min</span></div>
+  <p><b>Concept (6 min).</b> A handoff should carry exactly what the receiving agent needs — provenance, the relevant facts — and nothing else. Leaking a full conversation history or private scratch reasoning into a handoff is both a context-bloat problem and, for anything sensitive, a real information-boundary problem.</p>
+  <ul class="concept-list">
+    <li><b>A good handoff is a typed contract, not a context dump.</b> The same discipline as Day 1's tool-output schemas applies here: define exactly what crosses the boundary.</li>
+  </ul>
+
+  <p><b>Instructor drives live, variation A — a clean handoff (10 min).</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Dispatch a subagent to research claim CLM-597471's coverage, but brief it
+with ONLY the claim_id and the specific question — nothing else about our
+earlier conversation today. Show me exactly what handoff payload it
+received.</code></pre>
+  </div>
+  <p><b>Instructor drives live, variation B — a leaky handoff, for contrast (6 min).</b></p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Now dispatch a subagent for the same task, but this time tell it "here's
+our full conversation so far, use whatever's relevant" instead of a
+specific brief. Compare the size and content of what it received against
+variation A.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    Variation B's subagent received far more than it needed — including, potentially, unrelated claims or internal reasoning that has nothing to do with its job. That's the handoff-hygiene failure mode this topic warns about, even though nothing "broke."
+  </div>
+
+  <p><b>Learners repeat (3 min).</b> Write a one-line rule for what a handoff brief should always include and always exclude, based on what you just saw.</p>
+</div>
+
+<h2 id="topic-06">Topic 06 · Single vs. multi-agent</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">6</span><span class="step-title">Start single. Add agents only when isolation or parallelism pays for the overhead.</span><span class="step-time">~15 min</span></div>
+  <p><b>Concept (5 min).</b> Everything today has a cost: more context, more coordination, more places to fail. The right default is a single agent; multi-agent earns its place only when a task genuinely benefits from context isolation (Day 2 AM Topic 03) or real parallelism (today's Topic 01) — not by default "because it sounds more sophisticated."</p>
+
+  <p><b>Do this, variation A — single-agent baseline (8 min).</b> <span class="where-tag where-claude">Claude Code chat panel</span> — time it:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Resolve claim CLM-748422 yourself, end to end, without dispatching any
+subagent.</code></pre>
+  </div>
+  <p><b>Do this, variation B — the multi-agent version, for comparison (5 min).</b> Re-run Topic 01's supervisor/worker pattern on the same claim and compare wall-clock time and turn count against variation A.</p>
+  <div class="callout">
+    <b class="tag">Debrief</b>
+    For a single, moderately-complex claim, the single-agent run is very likely faster and simpler with no accuracy loss — multi-agent's advantage shows up on genuinely parallelizable or isolation-sensitive work, not on a routine single case. Naming that plainly is the actual skill this topic is testing.
+  </div>
+
+  <p><b>Learners repeat (2 min).</b> State, in one sentence, the specific condition under which you'd reach for multi-agent on this project going forward.</p>
+</div>
+</section>
+
+<section id="appbuild">
+  <h2>App build (19:00–19:30) · Day 2 of the progressive insurance app</h2>
+  <p>This slot extends yesterday's seed pipeline, <code>resolve_email(email_id)</code>, with today's concepts rather than replacing it: today you split the single Day 1 agent into a triage/grounding handoff — Bedrock-or-stub urgency classification through a deterministic authorization gate (Topic 04's trust boundary), then an independent re-confirmation of grounding through the network-MCP server (Topic 02) and A2A agent (Topic 03) you already stood up this afternoon.</p>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">App</span><span class="step-title">Build <code>my_day2_resolve.py</code> on top of your Day 1 file</span><span class="step-time">~18 min</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <p>Direct Claude Code to build your <b>own</b> new file — do not overwrite anything under <code>app/</code>:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Create app/my_day2_resolve.py, importing resolve_email from my own
+app/my_day1_resolve.py (yesterday's file) rather than rewriting it. Wrap it
+in a new resolve_email(email_id: str) that:
+1. Calls yesterday's resolve_email first, unchanged, to get the claim_id
+   and grounding result.
+2. If a claim_id was found, classify its urgency: if AWS_BEARER_TOKEN_BEDROCK
+   and BEDROCK_MODEL_ID are BOTH set in the environment, make exactly one
+   Bedrock Converse call classifying LOW/MEDIUM/HIGH from the claim's
+   loss_type and reserve_usd, and record urgency_source="bedrock". If
+   either is missing, fall back to a clearly-labeled deterministic stub
+   (e.g. reserve_usd thresholds) and record urgency_source="stub-no-credentials"
+   -- either path is fine, we're proving the pipeline shape, not requiring
+   live AWS access.
+3. Run that urgency through a deterministic authorization gate that I write
+   in plain code -- the model's label only ever informs the decision, code
+   decides the action. Same trust boundary as this afternoon's Topic 04.
+4. Independently re-confirm the claim is grounded by calling, in-process,
+   the plain lookup functions behind the network-MCP server and the A2A
+   server I built this afternoon (Topics 02/03) -- a second, separate check,
+   not a second walk through step 1's own lookup path.
+5. Return everything from step 1 plus model_urgency, urgency_source,
+   authorization_decision, network_grounding_check, and a2a_status_check.
+Run it: uv run python -m app.my_day2_resolve CLN-001</code></pre>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">App</span><span class="step-title">Confirm both standalone servers still answer for real</span><span class="step-time">~7 min</span></div>
+    <span class="where-tag where-vm">VM terminal</span>
+    <p>The pipeline above calls the network-MCP and A2A lookup logic in-process for speed — but the real network/A2A exercise is those two servers answering over an actual port. Restart your own two servers from this afternoon in separate terminals (or the verified <code>app/</code> equivalents, same ports):</p>
+    <pre><code>uv run python -m app.claims_network   # Streamable HTTP MCP, http://127.0.0.1:8766/mcp
+uv run python -m app.claims_a2a       # A2A agent, http://127.0.0.1:5055/.well-known/agent.json</code></pre>
+    <p>Then, in a third terminal or back in Claude Code chat, confirm both round trips for real:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Confirm the claims-network MCP server answers a real initialize handshake
+at http://127.0.0.1:8766/mcp, then fetch the A2A agent card at
+http://127.0.0.1:5055/.well-known/agent.json and use an A2AClient to ask
+it "What is the status of CLM-424063?". Show me the raw replies from both.</code></pre>
+    </div>
+  </div>
+
+  <div class="checkpoint">
+    <b class="tag">Checkpoint</b>
+    <code>uv run python -m app.day2_resolve CLN-001</code> adds, on top of yesterday's fields: <code>"urgency_source": "stub-no-credentials"</code> and <code>"model_urgency": "LOW"</code> (verified in an environment with no AWS credentials set — expect <code>"bedrock"</code> instead if you completed Topic 04's setup), <code>"authorization_decision": "route_to_standard_queue"</code>, a populated <code>network_grounding_check</code> object, and <code>"a2a_status_check": "CLM-424063: status=open, route_queue=fnol_intake"</code>. The MCP initialize handshake at <code>http://127.0.0.1:8766/mcp</code> and the A2A card + <code>.ask()</code> round trip above are both real, verified responses, not mocked. One honest nuance worth a minute of discussion, not a bug to fix: the stub heuristic classifies CLM-424063 as LOW purely from its <code>reserve_usd</code> ($5,834), while the claim's own ground-truth <code>urgency</code> field in <code>claims.db</code> says HIGH — it's a vandalism/police-report case, and a dollar-only rule has no way to see that. That gap is exactly the case for live Bedrock (or a human) in the loop instead of a naive threshold.
+  </div>
+
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>A complete, tested version is at <a href="../app/day2_resolve.py"><code>app/day2_resolve.py</code></a> (the orchestration), <a href="../app/bedrock_urgency.py"><code>app/bedrock_urgency.py</code></a> (Bedrock-or-stub urgency and the authorization gate), <a href="../app/claims_network.py"><code>app/claims_network.py</code></a>, and <a href="../app/claims_a2a.py"><code>app/claims_a2a.py</code></a> (the standalone network/A2A servers) — verified against <code>CLN-001</code> / <code>CLM-424063</code> exactly as above. Use it to compare after you've built your own, not as the first attempt. Day 3's PM app-build slot picks up from here and adds real RAG grounding, a semantic cache, and a fraud signal.</p>
+  </details>
+</section>
+
+<section id="homework">
+  <h2>Logistics thread — homework</h2>
+  <div class="homework-block">
+    <h3>Extend the network server to logistics</h3>
+    <p>Add a second network MCP server (or a second tool on the same one), <code>get_order_and_shipment_network</code>, exposing yesterday's logistics lookup over Streamable HTTP the same way you did for insurance today. Confirm it responds correctly for <code>ORD-3007</code> (the ungrounded air-freight case) before W2D3 AM.</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">Week 2 · Day 2 PM · Claude Code edition — multi-agent, MCP &amp; A2A, insurance thread primary</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

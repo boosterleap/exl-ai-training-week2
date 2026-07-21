@@ -1,0 +1,35 @@
+{
+  "_comment": "Small knowledge graph for the Day 3 GraphRAG exercise. Extends claims.db with an address dimension and ONE deliberate multi-hop fraud signal: CLM-424063 and CLM-100234 share an address despite different claimants/policies/named_insureds -- a connection plain vector search over claim text would not surface, but a 2-hop graph traversal (claim -> address -> other claims) does. CLM-100234/POL-100234/Kevin Park are synthetic, added only to this graph fixture -- they do not exist in claims.db.",
+  "nodes": [
+    {"id": "CLM-424063", "type": "claim", "loss_type": "property", "urgency": "high"},
+    {"id": "CLM-748422", "type": "claim", "loss_type": "property", "urgency": "medium"},
+    {"id": "CLM-255335", "type": "claim", "loss_type": "commercial", "urgency": "medium"},
+    {"id": "CLM-100234", "type": "claim", "loss_type": "property", "urgency": "medium"},
+    {"id": "POL-787532354", "type": "policy", "product": "homeowners"},
+    {"id": "POL-930881789", "type": "policy", "product": "commercial_property"},
+    {"id": "POL-441002118", "type": "policy", "product": "commercial_package"},
+    {"id": "POL-100234", "type": "policy", "product": "homeowners"},
+    {"id": "Jennifer Garcia", "type": "claimant"},
+    {"id": "Michael Miller", "type": "claimant"},
+    {"id": "David Taylor", "type": "claimant"},
+    {"id": "Kevin Park", "type": "claimant"},
+    {"id": "ADDR-6650-broadway", "type": "address", "label": "6650 Broadway"},
+    {"id": "ADDR-2850-main", "type": "address", "label": "2850 Main St"}
+  ],
+  "edges": [
+    {"source": "Jennifer Garcia", "target": "POL-787532354", "relation": "holds"},
+    {"source": "POL-787532354", "target": "CLM-424063", "relation": "has_claim"},
+    {"source": "CLM-424063", "target": "ADDR-6650-broadway", "relation": "located_at"},
+
+    {"source": "Michael Miller", "target": "POL-930881789", "relation": "holds"},
+    {"source": "POL-930881789", "target": "CLM-748422", "relation": "has_claim"},
+    {"source": "CLM-748422", "target": "ADDR-2850-main", "relation": "located_at"},
+
+    {"source": "David Taylor", "target": "POL-441002118", "relation": "holds"},
+    {"source": "POL-441002118", "target": "CLM-255335", "relation": "has_claim"},
+
+    {"source": "Kevin Park", "target": "POL-100234", "relation": "holds"},
+    {"source": "POL-100234", "target": "CLM-100234", "relation": "has_claim"},
+    {"source": "CLM-100234", "target": "ADDR-6650-broadway", "relation": "located_at"}
+  ]
+}

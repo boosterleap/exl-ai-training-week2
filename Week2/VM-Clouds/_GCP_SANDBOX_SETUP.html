@@ -195,14 +195,16 @@
   </style>
 </head>
 <body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
   <header class="hero">
-    <span class="eyebrow">Week 2 · GCP Cloud Shell runbook</span>
+    <span class="eyebrow">Week 2 · GCP Cloud Shell runbook · learner hands-on this cohort</span>
     <h1>Run Google ADK on Vertex AI</h1>
-    <p class="lede">Essential project, API, and model-access checks for the Google ADK primer using the authenticated GCP sandbox.</p>
+    <p class="lede">Essential project, API, and model-access checks for running Google ADK using your authenticated GCP sandbox. Every learner works through this during Day 2 AM's framework-landscape topic — follow the numbered steps yourself in Cloud Shell.</p>
     <div class="hero-meta">
       <span>Four-hour sandbox</span>
       <span>Assigned project only</span>
       <span>Vertex AI · ADC</span>
+      <span>Learner hands-on this cohort</span>
     </div>
   </header>
 
@@ -214,7 +216,7 @@
         <a href="#command-context">Where commands run</a>
         <a href="#auth">1. Verify identity</a>
         <a href="#project">2. Pin the project</a>
-        <a href="#environment">3. Configure Week2/.env</a>
+        <a href="#environment">3. Set up demo environment</a>
         <a href="#check">4. Run one check</a>
         <a href="#primer">5. Run the primer</a>
         <a href="#cleanup">6. Clean up</a>
@@ -234,17 +236,21 @@
           <li>Use Vertex AI with Google credentials—never an API key or service-account key.</li>
           <li>Do not create projects, change billing, or alter IAM.</li>
         </ul>
+        <p class="small">Naming note (current as of July 2026): Google rebranded the Vertex AI console area as the <strong>Gemini Enterprise Agent Platform</strong> in April 2026 (Cloud Next '26). The underlying APIs (<code>aiplatform.googleapis.com</code>), ADC auth model, and <code>google-adk</code> package are unchanged — only the console navigation label moved. Claude models are also now available directly in this Model Garden alongside Gemini, interesting context for the framework-landscape topic, though this cohort's one hands-on outside-Claude-Code call stays on AWS Bedrock to keep the week bounded.</p>
       </section>
 
       <section id="command-context">
         <div class="step-label">Command context</div>
         <h2>Run GCP commands in GCP Cloud Shell</h2>
-        <p>Open the assigned GCP sandbox in the browser, select <strong>Activate Cloud Shell</strong> in the Google Cloud console, and run every <code>gcloud</code> command in that Cloud Shell terminal.</p>
+        <p>Open the assigned GCP sandbox in the browser, select <strong>Activate Cloud Shell</strong> in the Google Cloud console, and run every command below — including the venv setup and the Python check — in that Cloud Shell terminal, not your local terminal.</p>
         <ul>
-          <li><strong>GCP Cloud Shell:</strong> inspect the sandbox account, select the project, enable/check APIs, and test Vertex access.</li>
+          <li><strong>GCP Cloud Shell:</strong> inspect the sandbox account, select the project, enable/check APIs, set up the demo venv, and test Vertex access.</li>
           <li><strong>Google Cloud console:</strong> check the project selector and <strong>APIs &amp; Services → Enabled APIs &amp; services</strong>.</li>
-          <li><strong>Ubuntu VM:</strong> continue normal Week 2 work, but do not assume the separate GCP identity is available there.</li>
+          <li><strong>Your local machine (Windows or the Ubuntu VM):</strong> continue normal Week 2 work, but do not assume the separate GCP identity is available there.</li>
         </ul>
+        <div class="callout">
+          <strong>No Windows/PowerShell variant needed here.</strong> Unlike the Azure guide (which runs in your own local shell), every command on this page runs inside GCP's hosted Cloud Shell, which is always a Linux/bash environment — the same whether your local machine is Windows or the Ubuntu VM. Copy the <code>bash</code> commands below as-is regardless of your local OS.
+        </div>
       </section>
 
       <section id="auth">
@@ -285,36 +291,24 @@ gcloud config set project "$GOOGLE_CLOUD_PROJECT"</code></pre>
 
       <section id="environment">
         <div class="step-label">Step 3</div>
-        <h2>Prepare the curriculum in Cloud Shell</h2>
-        <p>Clone the repository in GCP Cloud Shell. Git prompts for username <code>boosterleap</code> and the trainer-provided repository PAT:</p>
-        <pre><code>git config --global credential.helper 'cache --timeout=14400'
-git clone https://github.com/boosterleap/exl-ai-training-week2.git
-cd exl-ai-training-week2/Week2
-
-python3 -m venv ~/exl-week2-gcp-venv
-source ~/exl-week2-gcp-venv/bin/activate
-python -m pip install uv
-uv pip install "pydantic&gt;=2.0" "jupyterlab&gt;=4.0" "ipykernel&gt;=6.29" \
-  "google-adk&gt;=2.4,&lt;3.0" "google-genai&gt;=2.9,&lt;3.0" \
-  "google-auth&gt;=2.38,&lt;3.0"
-python -m ipykernel install --user \
-  --name exl-week2-gcp-venv \
-  --display-name "Python (EXL Week 2 GCP)"</code></pre>
-        <p>If the repository already exists in Cloud Shell, enter it and run <code>git pull</code> instead of cloning again.</p>
-        <p>Copy <code>.env.example</code> to <code>.env</code>, open that file in the Cloud Shell Editor, and set these values. Use the sandbox-admin-approved model and location if they differ from the defaults shown.</p>
-        <pre><code>cp .env.example .env</code></pre>
-        <pre><code>GOOGLE_CLOUD_PROJECT=REPLACE_WITH_EXACT_ASSIGNED_PROJECT_ID
-GOOGLE_CLOUD_LOCATION=global
-GOOGLE_ADK_MODEL=gemini-3.1-flash-lite
-GOOGLE_GENAI_USE_VERTEXAI=true
-GOOGLE_GENAI_USE_ENTERPRISE=true</code></pre>
-        <p>Do not add a Google API key. Keep <code>Week2/.env</code> private.</p>
+        <h2>Set up a throwaway environment for the demo</h2>
+        <p><code>google-adk</code> is not installed in the course's <code>ai_agent_env</code> conda environment (confirmed in the pre-course check) — that's expected, since the rest of Week 2 never needs it. For this exercise, install it into a small scratch venv in Cloud Shell rather than touching the course environment:</p>
+        <pre><code>python3 -m venv ~/gcp-demo-venv
+source ~/gcp-demo-venv/bin/activate
+pip install "google-adk&gt;=2.4,&lt;3.0" "google-genai&gt;=2.9,&lt;3.0" "google-auth&gt;=2.38,&lt;3.0"</code></pre>
+        <p>Set the configuration directly in the shell — no repo <code>.env</code> file needed for this exercise:</p>
+        <pre><code>export GOOGLE_CLOUD_PROJECT="REPLACE_WITH_EXACT_ASSIGNED_PROJECT_ID"
+export GOOGLE_CLOUD_LOCATION=global
+export GOOGLE_ADK_MODEL="&lt;sandbox-admin-approved Gemini model&gt;"
+export GOOGLE_GENAI_USE_VERTEXAI=true
+export GOOGLE_GENAI_USE_ENTERPRISE=true</code></pre>
+        <p>Do not set <code>GOOGLE_API_KEY</code> or <code>GEMINI_API_KEY</code> — either can route the call away from Vertex AI.</p>
       </section>
 
       <section id="check">
         <div class="step-label">Step 4</div>
         <h2>Run one minimal check</h2>
-        <p>In GCP Cloud Shell at the <code>Week2</code> root, confirm the identity, project, and Vertex AI API:</p>
+        <p>In Cloud Shell, confirm the identity, project, and Vertex AI API:</p>
         <pre><code>gcloud auth list --filter=status:ACTIVE --format='value(account)'
 gcloud config get-value project
 gcloud services list --enabled \
@@ -322,19 +316,26 @@ gcloud services list --enabled \
   --format='value(config.name)' \
   --project="$GOOGLE_CLOUD_PROJECT"</code></pre>
         <p>The output must show the assigned sandbox account, the assigned project ID, and <code>aiplatform.googleapis.com</code>. Cloud Shell supplies ADC to Google client libraries; do not run a cross-sandbox login flow or download credential files.</p>
-        <p>After the API is enabled, the first bounded model cell in the primer checks the remaining requirements: Vertex permission, selected model availability, location, quota, and billing. A <code>403</code> indicates missing access; a <code>404</code> usually indicates an unavailable model/location; a <code>429</code> indicates quota or capacity. Send the exact error and project ID to the sandbox administrator.</p>
+        <p>A <code>403</code> on the next step indicates missing access; a <code>404</code> usually indicates an unavailable model/location; a <code>429</code> indicates quota or capacity. Send the exact error and project ID to the sandbox administrator.</p>
       </section>
 
       <section id="primer">
         <div class="step-label">Step 5</div>
-        <h2>Run the existing Google ADK primer</h2>
-        <p>From GCP Cloud Shell, load <code>.env</code> and start Jupyter on the supported web-preview port:</p>
-        <pre><code>set -a
-source .env
-set +a
-unset GOOGLE_API_KEY GEMINI_API_KEY
-jupyter lab --no-browser --ip=0.0.0.0 --port=8080</code></pre>
-        <p>Select <strong>Web Preview → Preview on port 8080</strong>, open <a href="../W2D2/W2D2AM/_GOOGLE_ADK_PRIMER.ipynb">Google ADK 2.x primer</a>, select the <code>exl-week2-gcp-venv</code> kernel, and run it in order. Its bounded provider call is the smoke test.</p>
+        <h2>Run one bounded ADK call, live</h2>
+        <p>No pre-built primer notebook ships in this cohort's materials. A minimal ADK agent call is enough to make the point — write and run it live rather than opening a notebook:</p>
+        <pre><code>python -c "
+from google.adk.agents import Agent
+from google.adk.runners import InMemoryRunner
+
+agent = Agent(name='demo_agent', model='$GOOGLE_ADK_MODEL',
+               instruction='Answer in one sentence.')
+runner = InMemoryRunner(agent=agent)
+for event in runner.run(user_id='demo', session_id='demo',
+                         new_message='What is the ADK isolation spectrum in one sentence?'):
+    if event.content and event.content.parts:
+        print(event.content.parts[0].text)
+"</code></pre>
+        <p>Confirm the exact ADK runner API against the installed <code>google-adk</code> version before class — minor API shapes shift between releases; treat this as a starting point to verify once, not a guaranteed-stable snippet. Stop after one successful response.</p>
         <div class="callout">
           <strong>Need command details?</strong> Run <code>gcloud config set --help</code> or <code>gcloud services --help</code> in Cloud Shell. For account, project, API, quota, model, billing, or permission issues, use the sandbox administrator/support contact in the training portal.
         </div>
@@ -344,9 +345,9 @@ jupyter lab --no-browser --ip=0.0.0.0 --port=8080</code></pre>
         <div class="step-label">Step 6 · Finish before timeout</div>
         <h2>Revoke and stop</h2>
         <ol class="checklist">
-          <li>Stop Jupyter with <kbd>Ctrl</kbd>+<kbd>C</kbd> and close Cloud Shell.</li>
+          <li>Stop the running script and close Cloud Shell.</li>
           <li>Do not revoke or export the sandbox-managed Cloud Shell identity.</li>
-          <li>Delete <code>Week2/.env</code> from Cloud Shell if the sandbox home directory will persist beyond the exercise.</li>
+          <li><code>rm -rf ~/gcp-demo-venv</code> if the sandbox home directory will persist beyond the exercise.</li>
           <li>Stop the sandbox in the portal; allow 15–20 minutes for cleanup.</li>
         </ol>
       </section>
@@ -355,7 +356,8 @@ jupyter lab --no-browser --ip=0.0.0.0 --port=8080</code></pre>
   </div>
 
   <footer>
-    EXL Campus Hire · GCP learner sandbox · Use the assigned project, location, and sandbox-admin-approved model.
+    EXL Campus Hire · Week 2 · Claude Code edition · GCP sandbox — learner setup guide. Use the assigned project, location, and sandbox-admin-approved model.
   </footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
 </body>
 </html>

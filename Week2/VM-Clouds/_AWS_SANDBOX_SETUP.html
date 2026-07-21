@@ -141,6 +141,7 @@
   </style>
 </head>
 <body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
   <header class="hero">
     <p class="eyebrow">EXL Campus Hire · Week 2</p>
     <h1>AWS Bedrock sandbox learner runbook</h1>
@@ -175,74 +176,70 @@
           </div>
         </div>
         <div class="callout danger">
-          <strong>Do not provision resources.</strong> Use the assigned sandbox only, make one bounded inference request, and never place credentials in <code>.env</code>, code, chat, screenshots, or Git.
+          <strong>Do not provision resources.</strong> Use the assigned sandbox only, make one bounded inference request, and never place credentials in a file, code, chat, screenshots, or Git.
         </div>
       </section>
 
       <section id="command-context">
         <h2>Run commands on the Ubuntu VM</h2>
         <p>Open the repository in VS Code, select <strong>Terminal → New Terminal</strong>, and run every command block below in that Ubuntu terminal:</p>
-        <pre><code>source /home/labuser/venv/bin/activate
-cd /home/labuser/Desktop/Persistent_Folder/exl-ai-training-week2-shared/exl-ai-training-week2/Week2
+        <pre><code>conda activate ai_agent_env
+cd /home/labuser/Desktop/Persistent_Folder/exl-ai-training-week2-claude
 pwd</code></pre>
-        <p><code>pwd</code> must end in <code>exl-ai-training-week2/Week2</code>. Use the browser only for the training sandbox portal and AWS console.</p>
+        <p>Use the browser only for the training sandbox portal and AWS console — never for running code.</p>
       </section>
 
       <section id="authenticate">
-        <h2>2. Authenticate with supplied temporary credentials</h2>
+        <h2>2. Sign in, then generate your own Bedrock API key</h2>
         <div class="callout warning">
-          <strong>The sandboxes are separate.</strong> An AWS console or AWS CloudShell session does not authenticate the Ubuntu VM. The VM requires its own short-lived access key, secret access key, and session token (or another administrator-approved VM credential process).
+          <strong>The sandboxes are separate.</strong> Signing in to the AWS console does not authenticate the Ubuntu VM. You generate a key in the console, then move it to the VM yourself (step 4).
         </div>
-        <p>In the VS Code terminal, use this flow only when the training portal supplies a temporary access key, secret key, and session token. Hidden prompts keep values off-screen and out of shell history.</p>
-        <pre><code>unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_PROFILE
-read -rsp "Temporary access key ID: " AWS_ACCESS_KEY_ID; echo
-read -rsp "Temporary secret access key: " AWS_SECRET_ACCESS_KEY; echo
-read -rsp "Temporary session token: " AWS_SESSION_TOKEN; echo
-export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
-export AWS_REGION=us-east-1 AWS_DEFAULT_REGION=us-east-1 AWS_PAGER=""</code></pre>
-        <div class="callout warning">
-          Follow the exact credential type and sign-in instructions shown in the sandbox portal. If it does not supply all three temporary values above, stop and contact the sandbox administrator/support contact for a VM-compatible credential method. Do not copy CloudShell credential files, and do not combine or invent authentication flows.
+        <p class="small">Current as of July 2026: Amazon Bedrock API keys (launched July 2025) are the current, simplest auth path — a single bearer-token string, not a three-part access-key/secret/session-token set.</p>
+        <ol class="steps">
+          <li>Sign in to the AWS sandbox console with the login credentials provided to you. Confirm the region selector reads <strong>US East (N. Virginia) / us-east-1</strong>.</li>
+          <li>Go to <strong>Bedrock → Model catalog</strong>, find the Anthropic Claude model your trainer specifies (e.g. <code>anthropic.claude-sonnet-4-6</code> — see the confirmed model list below), and confirm/request access. A one-line use case ("AI-assisted claims triage for a training exercise") is normally approved in under a minute.</li>
+          <li>In the Bedrock console left navigation, select <strong>API keys</strong>.</li>
+          <li>Choose the <strong>Long-term API keys</strong> tab (simplest for a multi-hour workshop; short-term keys expire with your console session) → <strong>Generate long-term API keys</strong> → set a short expiration (a few hours is plenty) → generate.</li>
+          <li>Copy the key value immediately — it is shown once.</li>
+        </ol>
+        <div class="callout">
+          <strong>Confirmed Bedrock models in this sandbox</strong> (from the sandbox resource sheet): <code>anthropic.claude-sonnet-4-6</code>, <code>anthropic.claude-haiku-4-5-20251001-v1:0</code>, <code>anthropic.claude-opus-4-6-v1</code>, <code>anthropic.claude-opus-4-7</code>, <code>anthropic.claude-opus-4-8</code>. Use the exact ID your trainer specifies — do not guess a suffix.
         </div>
       </section>
 
       <section id="identity">
-        <h2>3. Confirm identity and region</h2>
-        <pre><code>test "$AWS_REGION" = "us-east-1" &amp;&amp; aws sts get-caller-identity --region us-east-1</code></pre>
-        <p>Confirm the account and role match the sandbox details shown in the browser. If either is unexpected, do not invoke Bedrock; clear the variables and contact the sandbox administrator.</p>
+        <h2>3. Confirm you're in the right account before generating anything</h2>
+        <p>Before generating the key, check the account ID / role shown in the AWS console top-right against the sandbox details shown in the training portal. If they don't match, stop and contact the sandbox administrator — do not generate a key in the wrong account.</p>
       </section>
 
       <section id="target">
-        <h2>4. Obtain <code>BEDROCK_MODEL_ID</code></h2>
-        <p>Use the exact model ID, inference-profile ID, or ARN supplied by the sandbox administrator. If instructed to discover it, list visible targets in the VS Code terminal and have the administrator confirm the invocation target—never guess a suffix or regional prefix.</p>
-        <pre><code>aws bedrock list-foundation-models \
-  --region us-east-1 \
-  --query 'modelSummaries[?modelLifecycle.status==`ACTIVE`].[modelId,modelName,inferenceTypesSupported]' \
-  --output table</code></pre>
-        <p>In VS Code, open <code>Week2/.env</code> (copy <a href="../.env.example"><code>.env.example</code></a> if needed) and set only these canonical values:</p>
-        <pre><code>AWS_REGION=us-east-1
-BEDROCK_MODEL_ID=&lt;exact admin-approved target&gt;
-BEDROCK_TIMEOUT_SECONDS=60
-BEDROCK_MAX_TOKENS=256</code></pre>
-        <p class="small">AWS credentials do not belong in <code>Week2/.env</code>.</p>
+        <h2>4. Move the key to the VM, then set the model target</h2>
+        <p>The AWS sandbox browser and the VM are separate machines with no shared clipboard. In the <strong>same AWS sandbox browser tab</strong>: open <a href="https://syncclip.in">syncclip.in</a>, paste the key in, note the sync code. Then, on the VM, open syncclip.in in its own browser, enter the same code, and retrieve the key.</p>
+        <p>Back in the VS Code terminal on the VM, set it via a hidden prompt — never paste it into a file:</p>
+        <pre><code>read -rsp "Bedrock API key: " AWS_BEARER_TOKEN_BEDROCK; echo
+export AWS_BEARER_TOKEN_BEDROCK
+export AWS_REGION=us-east-1
+export BEDROCK_MODEL_ID="&lt;exact trainer-approved model ID&gt;"</code></pre>
+        <p class="small">Boto3 and the AWS SDKs read <code>AWS_BEARER_TOKEN_BEDROCK</code> automatically when constructing a Bedrock client — no separate config file, no <code>aws configure</code> step.</p>
       </section>
 
       <section id="verify">
         <h2>5. Run one curriculum verification</h2>
-        <p>From the VS Code terminal at the <code>Week2</code> root, run the existing bounded gateway once. It pins <code>us-east-1</code>, disables automatic retries, and makes one Converse request.</p>
-        <pre><code>uv run --env-file .env python W2D2/W2D2PM/d2pmt4c03_bedrock_gateway.py</code></pre>
-        <p>Success prints a classification, deterministic authorization decision, usage, provider request ID, and latency. Do not rerun merely to change model wording. Review the <a href="../W2D2/W2D2PM/d2pmt4c03_bedrock_gateway.py">curriculum script</a> rather than copying a separate smoke-test program.</p>
+        <p>From the repo root on the VM, run the reference script once. It pins <code>us-east-1</code>, makes exactly one Converse request, and applies a deterministic (non-model) authorization gate.</p>
+        <pre><code>uv run python W2D2/snippets/bedrock_claim_classifier.py CLM-424063</code></pre>
+        <p>Success prints the claim, the model's one-word urgency classification, and the authorization decision. Do not loop this call. Review <a href="../W2D2/snippets/bedrock_claim_classifier.py">the reference script</a> and <a href="../W2D2/W2D2PM.html#topic-04">the full Day 2 PM walkthrough</a> rather than writing a separate smoke-test program.</p>
         <div class="callout">
-          <strong>Need command details?</strong> Run <code>aws help</code>, <code>aws sts help</code>, or <code>aws bedrock help</code> in the Ubuntu terminal. For identity, access, model availability, or permission issues, use the sandbox administrator/support contact in the training portal.
+          <strong>Need command details?</strong> Run <code>aws help</code> or <code>aws bedrock help</code> in the Ubuntu terminal. For identity, access, model availability, or permission issues, use the sandbox administrator/support contact in the training portal.
         </div>
       </section>
 
       <section id="cleanup">
         <h2>6. Unset, log out, and stop</h2>
-        <pre><code>unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
-unset AWS_PROFILE AWS_DEFAULT_PROFILE AWS_REGION AWS_DEFAULT_REGION AWS_PAGER
-unset BEDROCK_MODEL_ID BEDROCK_TIMEOUT_SECONDS BEDROCK_MAX_TOKENS</code></pre>
+        <pre><code>unset AWS_BEARER_TOKEN_BEDROCK AWS_REGION BEDROCK_MODEL_ID</code></pre>
         <ol class="steps">
+          <li>Clear the syncclip.in note you used to move the key.</li>
           <li>Close the terminal and log out of the AWS console.</li>
+          <li>If you generated a long-term key, don't reuse it in a later session — let it expire or revoke it in the Bedrock console.</li>
           <li>Choose <strong>Stop Sandbox</strong> in the training portal and confirm.</li>
           <li>Do not restart the sandbox to watch cleanup.</li>
         </ol>
@@ -251,5 +248,6 @@ unset BEDROCK_MODEL_ID BEDROCK_TIMEOUT_SECONDS BEDROCK_MAX_TOKENS</code></pre>
   </div>
 
   <footer>Learner runbook · One bounded Bedrock request · us-east-1 only</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
 </body>
 </html>

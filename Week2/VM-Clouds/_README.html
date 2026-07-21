@@ -111,6 +111,7 @@
   </style>
 </head>
 <body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
   <header class="hero">
     <h1>VM and Cloud Sandbox Guides</h1>
     <p>Fast setup for Day 2: prepare the Ubuntu VM first, then open only the provider guide required for your session.</p>
@@ -144,8 +145,8 @@
     <section id="sessions">
       <h2>Day 2 session map</h2>
       <ul>
-        <li><strong>Day 2 AM:</strong> GCP for the Google ADK primer; Azure for the Microsoft Agent Framework primer.</li>
-        <li><strong>Day 2 PM, Topic 4:</strong> AWS for the Bedrock enterprise-integration exercise.</li>
+        <li><strong>Day 2 AM:</strong> GCP (Google ADK) and Azure (Microsoft Agent Framework) are <strong>instructor-demo only</strong> this cohort — the instructor runs the linked guides live during the framework-landscape topic; learners watch, no learner setup needed for either.</li>
+        <li><strong>Day 2 PM, Topic 4:</strong> AWS is the one <strong>hands-on</strong> cloud exercise — every learner completes the Bedrock guide themselves.</li>
       </ul>
     </section>
 
@@ -153,10 +154,13 @@
       <h2>Shared safeguards</h2>
       <div class="callout warning">
         <ul>
-          <li>Store only application API keys required by a guide in the private <code>Week2/.env</code>; AWS temporary credentials stay in the shell and GCP uses ADC.</li>
+          <li>No secret is ever written to a file in the shared repo — the AWS Bedrock key (the one learner-facing secret this week) is exported directly into the terminal session for that one exercise and unset afterward; GCP uses ADC (no key at all); Azure's key is instructor-only.</li>
           <li>Never commit secrets, tokens, credentials, or key files.</li>
           <li>Stop the cloud sandbox as soon as the exercise ends.</li>
         </ul>
+      </div>
+      <div class="callout">
+        <strong>Moving a secret from a cloud sandbox browser to the VM:</strong> the sandboxes share no clipboard. Use <a href="https://syncclip.in">syncclip.in</a> — paste the value into it from the cloud sandbox browser tab, note the sync code, then retrieve it on the VM's own browser with the same code. The AWS guide walks through this exact sequence at the point it's needed.
       </div>
     </section>
 
@@ -165,22 +169,22 @@
       <div class="cards">
         <article class="card">
           <h3>Ubuntu VM</h3>
-          <p>Complete this first.</p>
+          <p>Complete this first — every learner, before Day 1.</p>
           <a class="button" href="_VM_SANDBOX_SETUP.html">Open VM guide</a>
         </article>
         <article class="card">
-          <h3>GCP sandbox</h3>
-          <p>For the Day 2 AM Google session.</p>
+          <h3>GCP sandbox <span style="font-weight:400;font-size:0.85em;color:#8a5700;">(instructor-demo only)</span></h3>
+          <p>For the Day 2 AM Google session — instructor runs this live, no learner action.</p>
           <a class="button" href="_GCP_SANDBOX_SETUP.html">Open GCP guide</a>
         </article>
         <article class="card">
-          <h3>Azure sandbox</h3>
-          <p>For the Day 2 AM Microsoft session.</p>
+          <h3>Azure sandbox <span style="font-weight:400;font-size:0.85em;color:#8a5700;">(instructor-demo only)</span></h3>
+          <p>For the Day 2 AM Microsoft session — instructor runs this live, no learner action.</p>
           <a class="button" href="_AZURE_SANDBOX_SETUP.html">Open Azure guide</a>
         </article>
         <article class="card">
-          <h3>AWS sandbox</h3>
-          <p>For Day 2 PM, Topic 4.</p>
+          <h3>AWS sandbox <span style="font-weight:400;font-size:0.85em;color:#166534;">(hands-on, every learner)</span></h3>
+          <p>For Day 2 PM, Topic 4 — every learner completes this themselves.</p>
           <a class="button" href="_AWS_SANDBOX_SETUP.html">Open AWS guide</a>
         </article>
       </div>
@@ -188,7 +192,8 @@
   </main>
 
   <footer>
-    Week 2 · Day 2 · VM and cloud sandbox preparation
+    Week 2 · Claude Code edition · Day 2 · VM and cloud sandbox preparation
   </footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
 </body>
 </html>

@@ -109,6 +109,7 @@
   </style>
 </head>
 <body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
   <header class="hero">
     <h1>Ubuntu VM Sandbox Setup</h1>
     <p>Use the Ubuntu VM and its installed VS Code for Week 2 notebooks and scripts. Keep the repository persistent, credentials separate, and provider sessions short-lived.</p>
@@ -128,83 +129,88 @@
     <section id="purpose">
       <h2>1. What the Ubuntu VM is for</h2>
       <div class="steps">
-        <p>Use the Ubuntu VM to run Git, Python, course notebooks, cloud CLIs, and the installed VS Code. Use your Windows browser only for the training portal and cloud consoles.</p>
+        <p>The VM is where <strong>Claude Code</strong> lives — it's already installed in VS Code (extension + CLI) and already logged in via subscription. Claude Code, driven from this VM, is the primary hands-on tool for the entire week; the VM also runs Git, Python, and the cloud CLIs needed for the one AWS exercise. Use your Windows browser only for the training portal and cloud consoles — never for running code.</p>
       </div>
       <div class="callout danger">
-        <strong>Never paste or commit secrets.</strong> Keep passwords, tokens, and keys out of code, notebooks, Git, chat, screenshots, and command examples.
+        <strong>Never paste or commit secrets.</strong> Keep passwords, tokens, and keys out of code, files, Git, chat, screenshots, and command examples.
       </div>
     </section>
 
     <section id="setup">
-      <h2>2. Set up the repository and Week 2 environment</h2>
+      <h2>2. Set up the repository and environment</h2>
 
       <h3>Use the persistent folder and clone the repository</h3>
-      <p>Create the shared Week 2 folder once. If the repository is already present, skip the <code>git clone</code> command.</p>
-<pre><code>mkdir -p /home/labuser/Desktop/Persistent_Folder/exl-ai-training-week2-shared
-cd /home/labuser/Desktop/Persistent_Folder/exl-ai-training-week2-shared
+      <p>Create the shared folder once. If the repository is already present, skip the <code>git clone</code> command.</p>
+<pre><code>mkdir -p /home/labuser/Desktop/Persistent_Folder/exl-ai-training-week2-claude
+cd /home/labuser/Desktop/Persistent_Folder/exl-ai-training-week2-claude
 git config --global credential.helper store
-git clone https://github.com/boosterleap/exl-ai-training-week2.git</code></pre>
-      <p>When Git prompts, use username <code>boosterleap</code> and the PAT supplied privately by the trainer as the password. Do not type the PAT into the clone URL, save it in this guide, or share it.</p>
+git clone &lt;REPO-URL-CONFIRMED-BY-TRAINER&gt; .</code></pre>
       <div class="callout warning">
-        The fine-grained PAT is restricted to this training repository and is saved on the assigned VM so subsequent pulls do not prompt again. Do not run <code>git init</code> in the shared parent folder; <code>git clone</code> initializes the repository.
+        <strong>Confirm the exact clone URL and any PAT with your trainer before Day 1</strong> — it is not filled in here on purpose, since the hosting location for this cohort's repo should be confirmed rather than guessed. Do not type a PAT into the clone URL itself, save it in this guide, or share it; use a stored credential helper as shown.
       </div>
 
-      <h3>Create and activate the shared Python environment</h3>
-      <p>Create the environment once. On later visits, run only the <code>source</code> and <code>cd</code> commands before installing updated requirements.</p>
-<pre><code>python -m venv /home/labuser/venv
-source /home/labuser/venv/bin/activate
-cd /home/labuser/Desktop/Persistent_Folder/exl-ai-training-week2-shared/exl-ai-training-week2/Week2
-uv pip install -r requirements.txt</code></pre>
+      <h3>Activate the pre-installed environment — do not create a new one</h3>
+      <p>The VM's Python environment for this course is a <strong>conda environment named <code>ai_agent_env</code></strong>, already populated with everything the week's exercises need (LangGraph, CrewAI, MCP, python-a2a, LanceDB, boto3, and more). Do not run <code>python -m venv</code> or build a separate environment — activate the existing one:</p>
+<pre><code>conda activate ai_agent_env
+python --version
+claude --version
+claude auth status</code></pre>
+      <div class="callout warning">
+        <code>base</code> is the conda environment active by default on a fresh terminal and is <strong>not</strong> the right one — it's missing almost every course package. Always run <code>conda activate ai_agent_env</code> first, every session.
+      </div>
+      <p>If a package genuinely appears to be missing from <code>ai_agent_env</code> (confirmed missing before Day 1: <code>sentence-transformers</code>, <code>diskcache</code>, <code>psycopg2-binary</code>, <code>redis</code>, <code>neo4j</code>, <code>presidio-analyzer</code>, <code>presidio-anonymizer</code>, <code>pytest</code>, <code>mlflow</code>), install it into that same environment once, before Day 1:</p>
+<pre><code>conda activate ai_agent_env
+uv pip install sentence-transformers diskcache psycopg2-binary redis neo4j presidio-analyzer presidio-anonymizer pytest mlflow</code></pre>
 
-      <h3>Create and protect <code>.env</code></h3>
-<pre><code>cp .env.example .env
-chmod 600 .env</code></pre>
-      <p>Add required values only in <code>Week2/.env</code>. Never display its contents or commit it.</p>
+      <h3>No <code>.env</code> file is required this cohort</h3>
+      <p>Claude Code needs no API key (it's already logged in via subscription). The one place this week that does need a secret — the AWS Bedrock exercise in Day 2 PM — exports its key directly into the terminal session for that one command and never writes it to a file. See the <a href="_AWS_SANDBOX_SETUP.html">AWS sandbox guide</a> when you reach that exercise.</p>
     </section>
 
     <section id="checks">
       <h2>3. Run minimal checks</h2>
-      <p>Run each command from the activated <code>Week2</code> environment:</p>
-<pre><code>pwd
+      <p>Run each command from a terminal with <code>ai_agent_env</code> active:</p>
+<pre><code>conda activate ai_agent_env
+pwd
 python --version
-git status --short
-git check-ignore .env</code></pre>
+claude auth status
+git status --short</code></pre>
       <div class="callout success">
-        <code>pwd</code> should end in <code>exl-ai-training-week2/Week2</code>, Python should come from <code>/home/labuser/venv</code>, and <code>git check-ignore .env</code> should print <code>.env</code>.
+        Python should report from inside <code>ai_agent_env</code> (check with <code>which python</code> — the path should contain <code>ai_agent_env</code>, not <code>base</code>), and <code>claude auth status</code> should show <code>"loggedIn": true</code>. If either is wrong, stop and get the instructor before Day 1 starts.
       </div>
     </section>
 
     <section id="vscode">
-      <h2>4. Open Week 2 in VS Code</h2>
-<pre><code>source /home/labuser/venv/bin/activate
-cd /home/labuser/Desktop/Persistent_Folder/exl-ai-training-week2-shared/exl-ai-training-week2/Week2
+      <h2>4. Open the repo in VS Code</h2>
+<pre><code>conda activate ai_agent_env
+cd /home/labuser/Desktop/Persistent_Folder/exl-ai-training-week2-claude
 code .</code></pre>
-      <p>Open the required notebook in VS Code and select <code>/home/labuser/venv/bin/python</code> as its Python interpreter or notebook kernel.</p>
+      <p>Open the Claude Code panel in VS Code (or use the <code>claude</code> CLI in the integrated terminal) — this is the tool you'll use for essentially every hands-on exercise this week. There are no Jupyter notebooks to select a kernel for in this cohort's materials; everything is a plain <code>.py</code> script run from the terminal or driven directly through Claude Code.</p>
     </section>
 
     <section id="providers">
-      <h2>5. Follow the cloud guide for the current lab</h2>
+      <h2>5. Cloud sandboxes — only one is hands-on this week</h2>
       <div class="callout warning">
         <strong>Cloud and VM sandboxes are separate.</strong> Signing in to an AWS, Azure, or GCP browser sandbox does not automatically authenticate tools or Python code on the Ubuntu VM. Follow the selected provider guide to establish VM-compatible access.
       </div>
-      <p>Start only the provider sandbox needed for the exercise:</p>
       <ul>
-        <li><a href="_AWS_SANDBOX_SETUP.html">AWS sandbox guide</a></li>
-        <li><a href="_AZURE_SANDBOX_SETUP.html">Azure sandbox guide</a></li>
-        <li><a href="_GCP_SANDBOX_SETUP.html">GCP sandbox guide</a></li>
+        <li><a href="_AWS_SANDBOX_SETUP.html">AWS sandbox guide</a> — <strong>hands-on</strong>, learners complete this themselves for the Day 2 PM Bedrock exercise.</li>
+        <li><a href="_AZURE_SANDBOX_SETUP.html">Azure sandbox guide</a> — instructor-demo only this cohort; learners do not need to complete this.</li>
+        <li><a href="_GCP_SANDBOX_SETUP.html">GCP sandbox guide</a> — instructor-demo only this cohort; learners do not need to complete this.</li>
       </ul>
-      <p>Use only the assigned learner account and the authentication method in the selected guide.</p>
+      <div class="callout">
+        <strong>Moving a secret from a cloud sandbox browser to the VM:</strong> the two are separate machines with no shared clipboard. Use <a href="https://syncclip.in">syncclip.in</a> — open it in the cloud sandbox browser tab, paste the value in, note the sync code; open it again in the VM's browser, enter the same code, retrieve the value; paste it into a hidden terminal prompt, never into a file. The AWS guide walks through this step by step at the one point this week it's needed.
+      </div>
     </section>
 
     <section id="cleanup">
       <h2>6. Minimal cleanup</h2>
       <ol>
-        <li>Save work in the persistent Code Vault repository.</li>
-        <li>Save notebooks and close VS Code.</li>
+        <li>Save work in the persistent repository.</li>
+        <li>Close VS Code.</li>
         <li>Run <code>git status --short</code> and confirm no secret files are tracked.</li>
-        <li>Run <code>deactivate</code>.</li>
+        <li>Run <code>conda deactivate</code>.</li>
         <li>After the final training session, remove the saved Git credential with <code>rm -f ~/.git-credentials</code> and <code>git config --global --unset credential.helper</code>.</li>
-        <li>Stop the active cloud sandbox and then the VM through the training portal.</li>
+        <li>Stop the active cloud sandbox (if one is running) and then the VM through the training portal.</li>
       </ol>
       <div class="callout warning">
         Cloud sandbox cleanup deletes cloud resources. Keep reusable, non-secret work in the persistent repository.
@@ -214,7 +220,8 @@ code .</code></pre>
   </main>
 
   <footer>
-    Week 2 · Day 2 · Ubuntu VM sandbox setup
+    Week 2 · Claude Code edition · Ubuntu VM sandbox setup
   </footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
 </body>
 </html>

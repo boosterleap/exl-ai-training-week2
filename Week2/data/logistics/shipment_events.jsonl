@@ -7,3 +7,18 @@
 {"event_id": "EVT-MSKU456-001", "container_id": "MSKU456", "timestamp": "2026-07-13T10:00:00Z", "location": "Rotterdam", "status": "loaded", "detail": "Electronics pallet secured"}
 {"event_id": "EVT-MSKU456-002", "container_id": "MSKU456", "timestamp": "2026-07-15T07:30:00Z", "location": "North Sea", "status": "in_transit", "detail": "On schedule"}
 {"event_id": "EVT-MSKU789-001", "container_id": "MSKU789", "timestamp": "2026-07-12T16:45:00Z", "location": "Chicago Rail Yard", "status": "held", "detail": "Awaiting documentation — bill of lading mismatch"}
+{"event_id": "EVT-MSKU321-001", "container_id": "MSKU321", "timestamp": "2026-07-10T05:00:00Z", "location": "Port of Santos", "status": "loaded", "detail": "Packaged foods container secured"}
+{"event_id": "EVT-MSKU321-002", "container_id": "MSKU321", "timestamp": "2026-07-11T09:20:00Z", "location": "Atlantic Ocean", "status": "in_transit", "detail": "On schedule"}
+{"event_id": "EVT-MSKU321-003", "container_id": "MSKU321", "timestamp": "2026-07-19T13:00:00Z", "location": "Port of Santos", "status": "customs_cleared", "detail": "Released for outbound inspection"}
+{"event_id": "EVT-MSKU321-004", "container_id": "MSKU321", "timestamp": "2026-07-19T16:40:00Z", "location": "Port of Santos Yard 4", "status": "damaged", "detail": "Water ingress found in cargo hold during outbound inspection; contents partially spoiled"}
+{"event_id": "EVT-MSKU321-005", "container_id": "MSKU321", "timestamp": "2026-07-20T08:00:00Z", "location": "Port of Santos Yard 4", "status": "claim_filed", "detail": "Damage survey requested; photos and surveyor report pending"}
+{"event_id": "EVT-MSKU654-001", "container_id": "MSKU654", "timestamp": "2026-07-08T07:00:00Z", "location": "Port of Long Beach", "status": "loaded", "detail": "Apparel container secured"}
+{"event_id": "EVT-MSKU654-002", "container_id": "MSKU654", "timestamp": "2026-07-09T11:15:00Z", "location": "Long Beach Rail Interchange", "status": "in_transit", "detail": "Transferred to intermodal rail"}
+{"event_id": "EVT-MSKU654-003", "container_id": "MSKU654", "timestamp": "2026-07-16T02:00:00Z", "location": "unknown", "status": "missing_scan", "detail": "No terminal scan recorded for 6 days past expected interchange; last confirmed location Long Beach Rail Interchange"}
+{"event_id": "EVT-MSKU987-001", "container_id": "MSKU987", "timestamp": "2026-07-05T06:30:00Z", "location": "Norfolk Rail Yard", "status": "loaded", "detail": "Auto parts container secured"}
+{"event_id": "EVT-MSKU987-002", "container_id": "MSKU987", "timestamp": "2026-07-06T09:00:00Z", "location": "Rail corridor", "status": "in_transit", "detail": "On schedule"}
+{"event_id": "EVT-MSKU987-003", "container_id": "MSKU987", "timestamp": "2026-07-08T15:45:00Z", "location": "Atlanta Rail Yard", "status": "arrived", "detail": "Container offloaded on schedule"}
+{"event_id": "EVT-MSKU987-004", "container_id": "MSKU987", "timestamp": "2026-07-09T10:00:00Z", "location": "Atlanta DC", "status": "delivered", "detail": "Signed for by consignee; no exceptions noted"}
+{"event_id": "EVT-AWB551-001", "container_id": "AWB-551", "timestamp": "2026-07-18T04:00:00Z", "location": "Doha Hamad International", "status": "loaded", "detail": "Medical devices air waybill accepted"}
+{"event_id": "EVT-AWB551-002", "container_id": "AWB-551", "timestamp": "2026-07-18T09:30:00Z", "location": "In flight", "status": "in_transit", "detail": "On schedule"}
+{"event_id": "EVT-AWB551-003", "container_id": "AWB-551", "timestamp": "2026-07-18T14:10:00Z", "location": "Doha Hamad International", "status": "arrived", "detail": "Awaiting customs release"}

@@ -181,10 +181,13 @@
   </style>
 </head>
 <body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
   <header>
     <span class="pill">Ubuntu • 4-hour training sandbox</span>
+    <span class="pill" style="background:#e6f4ea;color:#1a6b34;">Learner hands-on this cohort</span>
     <h1>Azure Sandbox Setup</h1>
-    <p>Connect the Week 2 curriculum to a sandbox-admin-provided standalone Azure OpenAI deployment using API-key authentication.</p>
+    <p>Self-provision a standalone Azure OpenAI resource in your assigned sandbox subscription and connect to it using API-key authentication. Every learner runs this during Day 2 AM's framework-landscape topic — follow the numbered steps yourself in your own sandbox.</p>
+    <p><em>Scope note: this exercises Azure OpenAI's raw model-serving API directly (via the <code>openai</code> Python package) — it does <strong>not</strong> install or exercise the Microsoft Agent Framework orchestration SDK itself, which stays at awareness level this cohort. You're calling the model endpoint Agent Framework would sit on top of, not the framework itself.</em></p>
   </header>
 
   <div class="layout">
@@ -192,10 +195,11 @@
       <strong>On this page</strong>
       <a href="#rules">1. Sandbox limits</a>
       <a href="#command-context">Where steps run</a>
-      <a href="#instructor">2. Administrator setup</a>
-      <a href="#env">3. Configure access</a>
-      <a href="#verify">4. Verify once</a>
-      <a href="#cleanup">5. Finish safely</a>
+      <a href="#instructor">2. Create the resource</a>
+      <a href="#deploy">3. Deploy a model</a>
+      <a href="#env">4. Configure access</a>
+      <a href="#verify">5. Verify once</a>
+      <a href="#cleanup">6. Finish safely</a>
     </nav>
 
     <main>
@@ -213,81 +217,164 @@
 
       <section id="command-context">
         <h2>Where to complete each step</h2>
-        <p>Open the repository in VS Code on the Ubuntu VM. Use <strong>Terminal → New Terminal</strong> to activate the environment and confirm the working folder:</p>
-        <pre><code>source /home/labuser/venv/bin/activate
-cd /home/labuser/Desktop/Persistent_Folder/exl-ai-training-week2-shared/exl-ai-training-week2/Week2
+        <p>Three different places show up across this guide — know which is which:</p>
+        <ul>
+          <li><strong>Azure Cloud Shell</strong> (the <strong>&gt;_</strong> icon in <code>portal.azure.com</code>, or Cloud Shell reached from the sandbox) — verified live as the reliable place to run the Azure CLI commands in Step 3 (<code>az login</code>, <code>list-models</code>, <code>deployment create</code>). It's pre-authenticated to your sandbox identity, so no separate credential setup is needed there.</li>
+          <li><strong>The Ubuntu VM</strong> — the standard place learners run the Step 5 verification script, alongside the rest of Week 2's work. Use the bash commands throughout this guide.</li>
+          <li><strong>Your own local machine</strong> — this guide's troubleshooting was verified this way, but it's not the expected path for the session. Use the PowerShell commands on Windows, bash on macOS/Linux, if you do work here.</li>
+        </ul>
+        <p>Open the repository in VS Code, use <strong>Terminal → New Terminal</strong>, and activate the environment first. Commands below are given for both shells — use whichever matches your terminal.</p>
+        <div class="grid">
+          <div class="card">
+            <h3>Ubuntu VM (bash)</h3>
+            <pre><code>conda activate ai_agent_env
+cd /home/labuser/Desktop/Persistent_Folder/exl-ai-training-week2-claude
 pwd</code></pre>
-        <p><code>pwd</code> must end in <code>exl-ai-training-week2/Week2</code>. Edit <code>Week2/.env</code> and run the primer in VS Code. Use the browser only for the training sandbox portal and Azure portal.</p>
+          </div>
+          <div class="card">
+            <h3>Windows (PowerShell)</h3>
+            <pre><code>conda activate ai_agent_env
+cd D:\path\to\your\repo
+pwd</code></pre>
+          </div>
+        </div>
+        <p>Use the browser only for the training sandbox portal and Azure portal.</p>
       </section>
 
       <section id="instructor">
-        <h2>2. Sandbox administrator setup</h2>
+        <h2>2. Create the resource (portal.azure.com)</h2>
         <div class="callout">
-          <strong>Learners do not provision Azure resources.</strong> The sandbox administrator creates one standalone Azure OpenAI S0 resource and a small classroom model deployment in an allowed region.
+          <strong>Current as of July 2026: this is a five-minute self-serve step.</strong> You provision the resource yourself in the portal — no separate sandbox-administrator hand-off is needed for this simple path.
         </div>
-        <p>The sandbox administrator or training portal supplies each learner with:</p>
-        <ul>
-          <li>the standalone resource endpoint,</li>
-          <li>an API key,</li>
-          <li>the exact deployment name, and</li>
-          <li>an API-version override only if the installed client requires one.</li>
-        </ul>
+        <ol class="steps">
+          <li>In <strong>portal.azure.com</strong>, select <strong>Create a resource</strong> and search for <strong>Azure OpenAI</strong>. Microsoft now surfaces a consolidated <strong>"Foundry"</strong> resource ahead of it in search results — ignore that one; select the plain <strong>Azure OpenAI</strong> entry, then <strong>Create</strong>.</li>
+          <li><strong>Basics</strong> tab: Subscription = assigned sandbox subscription; Resource group = the pre-created sandbox group; Region = East US, East US 2, West US, or West US 2; Name = any descriptive name (e.g. <code>exl-azure-openai-instance</code>); Pricing tier = <strong>S0</strong> (currently the only tier Azure offers for new resources).</li>
+          <li><strong>Network</strong> tab: <strong>All networks, including the internet, can access this resource</strong> is fine for this classroom exercise.</li>
+          <li><strong>Tags</strong> tab: leave empty.</li>
+          <li><strong>Review + create</strong> → <strong>Create</strong>. Once deployment finishes, select <strong>Go to resource</strong>.</li>
+        </ol>
+        <div class="callout danger">
+          <strong>Verified live, July 2026: creating the resource does NOT auto-deploy a model</strong>, despite what it may look like in the portal. <code>az cognitiveservices account deployment list</code> returns <code>[]</code> immediately after creation. Every call against the resource will 404 until you complete Step 3 below — don't skip it.
+        </div>
+        <p class="small">Naming note: Microsoft has been folding "Azure AI Foundry" branding into <strong>Microsoft Foundry</strong> (portal at <code>ai.azure.com</code>). A standalone Azure OpenAI resource like this one still supports plain API-key auth — no Foundry project is required for this exercise.</p>
+      </section>
+
+      <section id="deploy">
+        <h2>3. Deploy a model (Azure CLI — the reliable path)</h2>
+        <div class="callout">
+          <strong>Verified live, July 2026: skip hunting for a "Deployments" blade in the classic portal — it isn't there.</strong> Model deployment management moved to the Foundry portal (<code>ai.azure.com</code>) and, on some resources, isn't exposed in the classic <code>portal.azure.com</code> resource blade at all (Resource Management only shows Keys and Endpoint, Encryption, Resource Upgrade, Pricing tier, Networking, Identity — no Deployments item). The Azure CLI works every time and doesn't depend on which portal layout you land on.
+        </div>
+        <p><strong>Default to Azure Cloud Shell</strong> (browser-based, no local install) via the <strong>&gt;_</strong> icon in the top bar of <code>portal.azure.com</code> — it's authenticated automatically to your sandbox identity, and it's what was used to verify every command below. Only use a locally-installed Azure CLI if you specifically need to (Cloud Shell covers this exercise fully):</p>
+        <pre><code>az login
+az account list --output table</code></pre>
+        <p><strong>Step 3a — list models actually available to this resource</strong> (don't guess a model/version — quota and region availability vary):</p>
+        <pre><code>az cognitiveservices account list-models --name YOUR-RESOURCE-NAME --resource-group YOUR-RESOURCE-GROUP --output table</code></pre>
+        <p>Pick a row where <code>LifecycleStatus</code> is <strong>GenerallyAvailable</strong> — rows marked <code>Deprecating</code>/<code>Deprecated</code> still list, but Azure rejects <em>new</em> deployments against them. For a cheap, fast, one-off classroom call, prefer a small "mini"/"nano" tier chat model over a full flagship model.</p>
+        <p><strong>Step 3b — create the deployment:</strong></p>
+        <pre><code>az cognitiveservices account deployment create --name YOUR-RESOURCE-NAME --resource-group YOUR-RESOURCE-GROUP --deployment-name class-mini --model-name MODEL_NAME_FROM_LIST --model-version "MODEL_VERSION_FROM_LIST" --model-format OpenAI --sku-capacity "1" --sku-name "GlobalStandard"</code></pre>
+        <div class="callout warning">
+          <strong>Verified live, July 2026: <code>--sku-name "Standard"</code> was rejected</strong> for a current model with <code>(InvalidResourceProperties) The specified SKU 'Standard' of account deployment is not supported by this model</code>. Newer models are often only offered via <strong>GlobalStandard</strong> — try that first for anything recent. (Per the sandbox rules in Step 1, Global Standard is a processing type, not a region violation — the resource itself stays in your allowed region regardless.)
+        </div>
+        <p><strong>Step 3c — confirm it stuck:</strong></p>
+        <pre><code>az cognitiveservices account deployment list --name YOUR-RESOURCE-NAME --resource-group YOUR-RESOURCE-GROUP --output table</code></pre>
+        <div class="callout danger">
+          <strong>Verified live, July 2026 — a naming trap to avoid:</strong> Azure uses "Deployments" for two unrelated things. The <strong>Resource Group → Deployments</strong> blade shows ARM provisioning history (auto-named things like <code>OpenAICreate-20260721030442</code> from when you created the resource) — that is <em>not</em> a model deployment name and will 404 on every API call if used as one. The value you actually want is the <code>--deployment-name</code> you chose in Step 3b (e.g. <code>class-mini</code>), confirmed in the Step 3c listing.
+        </div>
+        <p class="small">Bash line-continuation is <code>\</code>; PowerShell's is the backtick <code>`</code> — they are not interchangeable. If in doubt, keep the command on one line, which works in both.</p>
       </section>
 
       <section id="env">
-        <h2>3. Configure API-key access</h2>
+        <h2>4. Configure API-key access</h2>
         <div class="callout">
-          <strong>The sandboxes are separate.</strong> Signing in to the Azure portal does not authenticate the Ubuntu VM. Copy the standalone Azure OpenAI endpoint, deployment name, and API key from the assigned Azure sandbox into the private <code>Week2/.env</code> file on the VM.
+          <strong>The sandboxes are separate.</strong> Signing in to the Azure portal does not authenticate the Ubuntu VM. Get the key and endpoint from the resource's <strong>Keys and Endpoint</strong> blade (classic portal), and use the exact <code>--deployment-name</code> you set in Step 3b (e.g. <code>class-mini</code>) — not anything from a Resource Group "Deployments" list. Set these directly in your own terminal session — never in a file committed to the shared repo.
         </div>
-        <p>In VS Code, add or update these four canonical variables in <code>Week2/.env</code>:</p>
-        <pre><code>AZURE_OPENAI_API_KEY=PASTE-KEY-1-LOCALLY
-AZURE_OPENAI_ENDPOINT=https://YOUR-RESOURCE-NAME.openai.azure.com/
-AZURE_OPENAI_DEPLOYMENT=class-mini
-AZURE_OPENAI_API_VERSION=</code></pre>
+        <div class="grid">
+          <div class="card">
+            <h3>Ubuntu VM (bash)</h3>
+            <pre><code>read -rsp "Azure OpenAI API key: " AZURE_OPENAI_API_KEY; echo
+export AZURE_OPENAI_API_KEY
+export AZURE_OPENAI_ENDPOINT="https://YOUR-RESOURCE-NAME.openai.azure.com/"
+export AZURE_OPENAI_DEPLOYMENT="YOUR-DEPLOYMENT-NAME"</code></pre>
+          </div>
+          <div class="card">
+            <h3>Windows (PowerShell)</h3>
+            <pre><code>$secureKey = Read-Host "Azure OpenAI API key" -AsSecureString
+$env:AZURE_OPENAI_API_KEY = [System.Net.NetworkCredential]::new('', $secureKey).Password
+$env:AZURE_OPENAI_ENDPOINT = "https://YOUR-RESOURCE-NAME.openai.azure.com/"
+$env:AZURE_OPENAI_DEPLOYMENT = "YOUR-DEPLOYMENT-NAME"</code></pre>
+          </div>
+        </div>
         <ul>
-          <li>Use the exact values from the sandbox details. The deployment value is the deployment name, not necessarily the underlying model name.</li>
-          <li><code>AZURE_OPENAI_API_VERSION</code> is an optional override in the primer; leave its value blank unless the sandbox administrator or installed client requires a dated version.</li>
-          <li>API-key inference does <strong>not</strong> require Azure CLI or <code>az login</code>.</li>
+          <li>Paste Key 1 (or Key 2) at the prompt, and use the exact Endpoint and deployment name. The deployment value is the deployment name you chose, not necessarily the underlying model name.</li>
+          <li>Once the key/endpoint/deployment are set, running the actual chat completion does <strong>not</strong> require Azure CLI or <code>az login</code> — CLI was only needed in Step 3 to create the deployment, since the portal path for that was unreliable.</li>
+          <li>PowerShell's <code>read</code> equivalent is <code>Read-Host</code> — bash's <code>read -rsp</code> has no direct PowerShell counterpart, so the command shape differs even though the intent (masked, non-history input) is the same.</li>
         </ul>
-        <p>If learners have Azure portal access, check the endpoint under the assigned Azure OpenAI resource and the deployment name under its model deployments. If those pages are unavailable or values are missing, contact the sandbox administrator/support contact shown in the training portal.</p>
         <div class="callout danger">
-          <strong>Keep the key secret.</strong> Never print it, paste it into notebooks/chat/screenshots, or commit <code>Week2/.env</code>. Check <code>git status</code> before committing. Report an exposed key immediately so an administrator can rotate it.
+          <strong>Keep the key secret.</strong> Never print it, paste it into chat/screenshots, or commit it to any file. Report an exposed key immediately so an administrator can rotate it.
         </div>
       </section>
 
       <section id="verify">
-        <h2>4. Verify once with the curriculum primer</h2>
-        <ol class="steps">
-          <li>In VS Code, open <a href="../W2D2/W2D2AM/_MICROSOFT_AGENT_FRAMEWORK_PRIMER.ipynb"><code>W2D2/W2D2AM/_MICROSOFT_AGENT_FRAMEWORK_PRIMER.ipynb</code></a>.</li>
-          <li>Select <code>/home/labuser/venv/bin/python</code> as the notebook kernel.</li>
-          <li>Run its environment/configuration checks, then its single bounded Azure OpenAI verification example.</li>
-          <li>Stop after one successful response. Do not run loops, load tests, or repeated agent calls.</li>
-        </ol>
-        <p>The primer reads <code>Week2/.env</code>, validates the standalone <code>*.openai.azure.com</code> endpoint, and intentionally does not display the API key.</p>
+        <h2>5. Run one bounded verification, via Claude Code</h2>
+        <p>The script already exists at <code>W2D2/snippets/azure_openai_verify.py</code> — reads the three environment variables from Step 4, makes exactly one chat-completions call, and prints the result. Rather than pasting Python into the terminal yourself, open the <strong>Claude Code chat panel</strong> (Ubuntu VM, <code>ai_agent_env</code> conda environment, alongside the rest of Week 2's work) and prompt it directly:</p>
+        <pre><code>Run W2D2/snippets/azure_openai_verify.py and show me the result.
+If it errors, show me the exact error — don't guess at a fix without it.</code></pre>
+        <p class="small">The script reads from <code>os.environ</code> rather than shell-interpolating values, so it behaves identically regardless of which shell Claude Code runs it in. <code>api_version='2024-10-21'</code> (set inside the script) is confirmed working (GA, not preview) as of July 2026 — confirm against current docs if it's since aged out.</p>
+        <div class="callout warning">
+          <strong>Verified live, July 2026 — two model-tier gotchas:</strong>
+          <ul>
+            <li><code>max_tokens</code> is rejected on newer models (<code>gpt-5</code>-family and later) with <code>Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.</code> — the script uses <code>max_completion_tokens</code> already, for exactly this reason.</li>
+            <li>Reasoning-tier models spend part of the completion budget on hidden <code>reasoning_tokens</code> before producing visible text — a low <code>max_completion_tokens</code> (e.g. 60, even 300) can silently return <strong>empty content</strong> with <code>finish_reason: 'stop'</code> and no error, since reasoning tokens alone can exceed a tight budget before any visible text is written. The script's <code>600</code> leaves comfortable headroom for a one-sentence answer; check <code>resp.usage.completion_tokens_details.reasoning_tokens</code> if output ever looks blank.</li>
+            <li>On Windows, printing the response can raise <code>UnicodeEncodeError: 'charmap' codec can't encode character...</code> — the model's answer often contains characters (curly quotes, non-breaking hyphens) that Windows' legacy console codepage can't render, even though the API call itself succeeded. The script forces UTF-8 stdout to avoid this; if you see this error, the auth/deployment are fine — it's a print-time issue only.</li>
+          </ul>
+        </div>
+        <div class="callout warning">
+          <strong>Prompt note:</strong> avoid asking bare "what is Microsoft Agent Framework?" — verified live, models answer about the old, unrelated 1990s/2000s "Microsoft Agent" animated-character Windows SDK (Clippy-era), not the 2025+ AI agent orchestration framework this course means. The script's prompt disambiguates by date and description instead of relying on the bare product name.
+        </div>
+        <p>Stop after one successful response; this is a demo, not a loop.</p>
+        <div class="callout success">
+          <strong>What this confirms.</strong> The Azure OpenAI resource is wired end-to-end — authenticate, hit a real deployment, get a real completion back. That's the full extent of this exercise: a bounded connectivity check, not a build-out.
+          <p><b>Scope:</b> this call goes through the <code>openai</code> package straight to Azure OpenAI's model-serving API — it does not touch the Microsoft Agent Framework orchestration SDK itself (not installed this cohort, awareness-level only). You've called the model endpoint Agent Framework would sit on top of, not the framework.</p>
+          <p><b>Worth noticing:</b> how much of getting this working was on you by hand — the exact deployment name (not the ARM provisioning name), the SKU type, and even the parameter name changing between model generations (<code>max_tokens</code> → <code>max_completion_tokens</code>). Compare that to how little Claude Code/Claude Agent SDK exposes you to at this same layer.</p>
+        </div>
         <div class="callout">
-          <strong>Need configuration details?</strong> Check the training portal first, then the assigned resource in the Azure portal if access is available. For missing resources, deployments, keys, quota, or permissions, contact the sandbox administrator; the instructor cannot change sandbox configuration.
+          <strong>Need configuration details?</strong> Check the training portal first, then the assigned resource in the Azure portal. For missing resources, deployments, keys, quota, or permissions, contact the sandbox administrator.
         </div>
       </section>
 
       <section id="cleanup">
-        <h2>5. Finish safely</h2>
+        <h2>6. Finish safely</h2>
+        <div class="callout danger">
+          <strong>Only run the last step once you're done needing the resource.</strong> Clearing env vars, an optional <code>az logout</code>, and checking git status are all safe to do any time — none of them touch the resource. Stopping the sandbox is different: it triggers automatic cleanup that deletes every resource in it, including the one you just deployed. Do that step last, once nothing later in the session still needs this resource.
+          <p>The sandbox's four-hour clock started when it launched, not when you started using it. Check the training portal for time actually remaining against how much of the session you still need it for, and stop it (or extend it, if the platform allows) accordingly.</p>
+        </div>
         <ol class="steps">
-          <li>Stop notebooks, applications, and agents that can call the endpoint.</li>
+          <li>Stop any running script that can call the endpoint.</li>
           <li>
-            Clear exported shell values:
-            <pre><code>unset AZURE_OPENAI_API_KEY AZURE_OPENAI_ENDPOINT AZURE_OPENAI_DEPLOYMENT AZURE_OPENAI_API_VERSION</code></pre>
+            Clear the shell values you set:
+            <div class="grid">
+              <div class="card">
+                <h3>Ubuntu VM (bash)</h3>
+                <pre><code>unset AZURE_OPENAI_API_KEY AZURE_OPENAI_ENDPOINT AZURE_OPENAI_DEPLOYMENT</code></pre>
+              </div>
+              <div class="card">
+                <h3>Windows (PowerShell)</h3>
+                <pre><code>Remove-Item Env:AZURE_OPENAI_API_KEY, Env:AZURE_OPENAI_ENDPOINT, Env:AZURE_OPENAI_DEPLOYMENT</code></pre>
+              </div>
+            </div>
           </li>
-          <li>If you separately used Azure CLI, run <code>az logout</code>. It is not needed for this API-key exercise.</li>
-          <li>Keep the shared <code>Week2/.env</code> file; do not print or commit its contents.</li>
-          <li>Stop the sandbox before the four-hour deadline and allow 15–20 minutes for cleanup.</li>
+          <li>If you separately used Azure CLI outside Cloud Shell, run <code>az logout</code>. Not needed for the API-key exercise itself, and not needed for Cloud Shell (its session ends on its own).</li>
+          <li>Confirm nothing was committed — <code>git status --short</code> in the repo before closing.</li>
+          <li><strong>Once you no longer need the resource for anything else this session:</strong> stop the sandbox before the four-hour deadline and allow 15–20 minutes for cleanup. Manually deleting the resource first isn't necessary — stopping the sandbox deletes everything in it automatically.</li>
         </ol>
         <div class="callout success">
-          <strong>Done means:</strong> callers stopped, shell credentials cleared, optional CLI session logged out, secrets uncommitted, and sandbox stopped.
+          <strong>Done means:</strong> callers stopped, shell credentials cleared, optional CLI session logged out, secrets uncommitted, and — only when the resource is truly no longer needed — sandbox stopped.
         </div>
       </section>
     </main>
   </div>
 
-  <footer>EXL Campus Hire • Week 2 • Azure sandbox learner setup</footer>
+  <footer>EXL Campus Hire • Week 2 · Claude Code edition • Azure sandbox — learner setup guide</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
 </body>
 </html>

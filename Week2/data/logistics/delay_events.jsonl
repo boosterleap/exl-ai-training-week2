@@ -1,3 +1,5 @@
 {"event_id": "DEL-001", "container_id": "MSKU123", "lane": "logistics", "delay_hours": 18, "reason": "port_congestion", "severity": "medium", "recommended_action": "notify_customer_and_replan"}
 {"event_id": "DEL-002", "container_id": "MSKU456", "lane": "logistics", "delay_hours": 6, "reason": "weather", "severity": "low", "recommended_action": "monitor_only"}
 {"event_id": "DEL-003", "container_id": "MSKU789", "lane": "logistics", "delay_hours": 36, "reason": "customs_hold", "severity": "high", "recommended_action": "escalate_control_tower"}
+{"event_id": "DEL-004", "container_id": "MSKU321", "lane": "logistics", "delay_hours": 0, "reason": "cargo_damage", "severity": "high", "recommended_action": "escalate_claims_team"}
+{"event_id": "DEL-005", "container_id": "MSKU654", "lane": "logistics", "delay_hours": 144, "reason": "missing_scan", "severity": "critical", "recommended_action": "escalate_control_tower"}

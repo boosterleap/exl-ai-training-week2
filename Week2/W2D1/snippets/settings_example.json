@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(./data/**)",
+      "mcp__insurance-lookup__get_claim_and_policy"
+    ],
+    "ask": [
+      "Bash",
+      "Write",
+      "Edit"
+    ],
+    "deny": []
+  }
+}

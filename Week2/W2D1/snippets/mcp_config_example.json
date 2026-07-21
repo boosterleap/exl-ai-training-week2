@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "insurance-lookup": {
+      "command": "python",
+      "args": ["W2D1/snippets/insurance_lookup_server.py"]
+    }
+  }
+}

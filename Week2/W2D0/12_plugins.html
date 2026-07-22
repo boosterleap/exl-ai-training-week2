@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · 12 Plugins</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Topic 12 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="11_model_management.html" style="color:#cbd8ff;">← 11</a> · <a href="13_artifacts.html" style="color:#cbd8ff;">13 →</a></p>
+  <h1>Plugins — packaging skills/commands/agents for distribution</h1>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <p>A plugin bundles skills, commands, agents, and hooks into one installable, shareable unit — instead of hand-copying config files between machines or teammates, you install (or others install) the plugin.</p>
+    <ul class="concept-list">
+      <li><b>Where they come from.</b> Marketplaces (<code>claude plugin marketplace</code>) host installable plugins; you can also scaffold your own locally.</li>
+      <li><b>Why this matters for a team.</b> Everything you built in Topics 03–06 (a custom command, a subagent, a hook) could become one shared plugin instead of four separate manual setup steps for every new teammate.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">See what's installed</span></div>
+    <span class="where-tag where-vm">VM · terminal</span>
+    <pre><code>claude plugin list
+claude plugin marketplace --help</code></pre>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Scaffold your own</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel or terminal</span>
+    <pre><code>claude plugin init w2d0-demo-plugin</code></pre>
+    <p>This scaffolds a new plugin at <code>~/.claude/skills/w2d0-demo-plugin/</code>. Ask Claude Code to explain the scaffolded structure:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Look at what claude plugin init just scaffolded. Explain each file's
+purpose, and tell me how you'd add the /summarize-changes command from
+Topic 03 into this plugin instead of leaving it as a standalone project
+command.</code></pre>
+    </div>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You should be able to name which of Topics 03–06's artifacts (command, subagent, hook) could move into this plugin, and why bundling them helps a teammate who's never seen this repo before.
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Validate it</span></div>
+    <pre><code>claude plugin validate ~/.claude/skills/w2d0-demo-plugin</code></pre>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — 12 Plugins</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

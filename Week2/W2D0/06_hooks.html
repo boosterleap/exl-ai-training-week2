@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · 06 Hooks</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Topic 06 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="05_subagents_and_specs.html" style="color:#cbd8ff;">← 05</a> · <a href="07_context_management.html" style="color:#cbd8ff;">07 →</a></p>
+  <h1>Hooks — deterministic code at lifecycle events</h1>
+  <p>A hook is your own code running at a fixed point in Claude Code's loop — not a suggestion in a prompt, an actual guarantee.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <p>Hooks fire at named lifecycle events — <code>PreToolUse</code> (before a tool call), <code>PostToolUse</code> (after), <code>SessionStart</code>/<code>SessionEnd</code>, <code>UserPromptSubmit</code>, <code>Stop</code>/<code>SubagentStop</code> — and run a script you define, deterministically, every time. They're configured in <code>.claude/settings.json</code>.</p>
+    <ul class="concept-list">
+      <li><b>Pre vs. post.</b> A <code>PreToolUse</code> hook can inspect — and block — a call before it happens. A <code>PostToolUse</code> hook runs after, with the real result in hand: good for logging, redaction, or validating shape.</li>
+      <li><b>Why a hook beats "just ask the model nicely."</b> A prompt instruction can be forgotten under context pressure. A hook runs every single time, unconditionally — the same reliability argument behind every guardrail in Week 2.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Add a real <code>PreToolUse</code> logging hook</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Add a PreToolUse hook in .claude/settings.json that appends a one-line
+JSON log entry (timestamp, tool name) to W2D0/outputs/tool_log.jsonl every
+time any tool is about to be called. Show me the hook config and the small
+script it runs.</code></pre>
+    </div>
+    <p>Trigger a couple of tool calls (e.g. read any file), then check:</p>
+    <pre><code>cat W2D0/outputs/tool_log.jsonl</code></pre>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Real entries, one per tool call, written without you doing anything except using Claude Code normally.
+    </div>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title"><code>PostToolUse</code>, for contrast</span></div>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Now add a PostToolUse hook that, specifically for Read calls, appends how
+many characters were read to the same log line. Trigger it and show me the
+difference from the Pre-only entries above.</code></pre>
+    </div>
+    <div class="callout">
+      <b class="tag">Debrief</b>
+      <code>PreToolUse</code> ran before the result existed — good for deciding <i>whether</i> a call happens. <code>PostToolUse</code> ran after, with real data — good for what you do with what came back. This is exactly what powers Week 2 Day 4's local trace analyzer.
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">A blocking hook</span></div>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Add one more PreToolUse hook that BLOCKS any Bash command containing the
+string "rm -rf" outright, before it runs. Try to trigger it with a
+deliberately scary (but never-actually-run) example command and confirm it
+gets refused.</code></pre>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — 06 Hooks</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · Capstone Stage 1 · Setup &amp; EDA</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Capstone Stage 1 of 5 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="13_artifacts.html" style="color:#cbd8ff;">← Topic 13</a> · <a href="15_capstone_model_training.html" style="color:#cbd8ff;">Stage 2 →</a></p>
+  <h1>Capstone Stage 1 — Setup &amp; EDA</h1>
+  <p>Thirteen topics in, you've used Claude Code to build, test, and guard small pieces of software. Now you point it at a real dataset and direct it to build the first stage of a five-stage ML project end to end: load the data, characterize it, and hand off a clean file the next stage can trust.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <p>Exploratory data analysis is the step every rushed ML project skips and every reliable one doesn't. Before a model sees a single row, you need to know what you're actually feeding it.</p>
+    <ul class="concept-list">
+      <li><b>Missing values break training silently.</b> A model doesn't usually crash on a NaN — it either errors deep inside a library call with a confusing stack trace, or worse, it trains anyway with imputed garbage and you don't find out until predictions look wrong. Checking <code>isna().sum()</code> up front turns a mystery debugging session later into a one-line fact now.</li>
+      <li><b>Correlations tell you what the model is likely to lean on.</b> If one feature is strongly related to the target before you've trained anything, that's a preview of what a linear model will weight heavily — and a sanity check for later: if your trained model ends up ignoring a feature that looked highly correlated here, that's worth asking why.</li>
+      <li><b>Geography is an unusual dimension for tabular EDA, and this dataset has it.</b> Most tabular datasets give you a correlation matrix and you're done. Latitude and longitude aren't just two more numeric columns — they encode location, and location in California housing data captures things no single column does on its own (coastal proximity, metro-area effects). A correlation heatmap will underrate them; a map will not. That's a real reason to build both plots, not just one.</li>
+      <li><b>This stage is a contract with Stage 2, not a one-off report.</b> Whatever this script outputs — a saved dataframe with clean types and no missing values — is exactly what the model-training script in Stage 2 will read and trust. Sloppy EDA here becomes a debugging problem there.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">0</span><span class="step-title">Environment check + close the capstone library gap</span></div>
+    <span class="where-tag where-vm">VM · VS Code terminal</span>
+    <pre><code>conda activate ai_agent_env
+python -c "import sklearn, matplotlib, seaborn, streamlit, joblib; print('capstone libs OK')"</code></pre>
+    <details class="setup-guide" open>
+      <summary><span class="setup-tag lib">Library setup</span> If that import fails</summary>
+      <div class="setup-body">
+        <p class="freshness">scikit-learn, matplotlib, seaborn, streamlit, and joblib are not part of the baseline <code>ai_agent_env</code> install used in Week 2 Days 1–5 — this is the expected one-time install for the capstone, not a broken environment.</p>
+        <h4>Install (once per VM)</h4>
+        <pre><code>conda activate ai_agent_env
+uv pip install scikit-learn matplotlib seaborn streamlit joblib pytest
+python -c "import sklearn, matplotlib, seaborn, streamlit, joblib; print('capstone libs OK')"</code></pre>
+      </div>
+    </details>
+
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Direct Claude Code to build the EDA script</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>I'm starting Stage 1 of a capstone ML project. Build a Python script at
+W2D0/capstone/my_data_prep.py that does the following:
+
+1. Loads the California Housing dataset via
+   sklearn.datasets.fetch_california_housing(as_frame=True) — it's bundled
+   with scikit-learn, no download or API key needed. Turn it into a single
+   pandas dataframe (features + the MedHouseVal target column).
+2. Prints the shape, summary statistics (df.describe()), and a per-column
+   count of missing values, so I can eyeball data quality before doing
+   anything else.
+3. Saves a correlation heatmap of all numeric columns (I want to see how
+   strongly each feature relates to MedHouseVal) to
+   W2D0/capstone/outputs/correlation_heatmap.png.
+4. Saves a second plot: a scatter of Longitude (x) vs Latitude (y), points
+   colored by MedHouseVal, with a colorbar — this is a geographic view of
+   price, saved to W2D0/capstone/outputs/geographic_price.png.
+5. Saves the full dataframe to W2D0/capstone/outputs/housing.parquet so a
+   later script can load it directly instead of re-fetching.
+
+Use matplotlib with a headless-safe backend (Agg) since this runs on a VM
+with no display. Ask me before overwriting anything if outputs/ already
+has files in it.</code></pre>
+    </div>
+    <p>Let Claude Code write the script, explain its choices, and run it. If it proposes a plotting library other than matplotlib/seaborn, that's fine — the point is the outputs, not the exact tool.</p>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Predict, then verify</span></div>
+    <div class="callout predict">
+      <b class="tag">Predict first</b>
+      Before you run the script (or before you look at the heatmap if it's already run), write down a guess: which single feature do you expect correlates most strongly with <code>MedHouseVal</code>? And separately — do you expect the geographic scatter to show a smooth gradient, or distinct hot spots?
+    </div>
+    <span class="where-tag where-vm">VM terminal</span>
+    <pre><code>uv run python W2D0/capstone/my_data_prep.py</code></pre>
+    <p>Open both PNGs in <code>W2D0/capstone/outputs/</code> and compare against your guess. Then ask Claude Code directly:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Looking at the correlation heatmap you just generated, which feature has
+the strongest relationship with MedHouseVal, and does the geographic plot
+add any information that heatmap doesn't capture on its own?</code></pre>
+    </div>
+    <div class="callout">
+      <b class="tag">Debrief</b>
+      A correlation matrix collapses geography into two separate numbers (Latitude, Longitude) and misses their combined, non-linear effect on price — the kind of structure that only shows up when you actually plot points on a plane. That gap between what a correlation number tells you and what a map tells you is the whole reason this stage builds two plots instead of one.
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Confirm the handoff to Stage 2</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <p>Ask Claude Code to load <code>outputs/housing.parquet</code> back in and print its shape and dtypes, to confirm the round-trip actually preserved the data cleanly — that parquet file is what Stage 2 depends on.</p>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Your run should report 20640 rows across 9 columns (MedInc, HouseAge, AveRooms, AveBedrms, Population, AveOccup, Latitude, Longitude, MedHouseVal), zero missing values in every column, mean MedInc around 3.87 and mean MedHouseVal around 2.07, and a Latitude range of roughly 32.5–42.0 with Longitude roughly -124.35 to -114.31. <code>outputs/</code> should contain <code>correlation_heatmap.png</code>, <code>geographic_price.png</code>, and <code>housing.parquet</code>.
+    </div>
+  </div>
+
+  <p>Next: Stage 2 loads <code>housing.parquet</code> straight from this script's output and trains a model on it — whatever this stage got wrong, that one inherits.</p>
+
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>A tested version is at <a href="../W2D0/capstone/data_prep.py">capstone/data_prep.py</a> — verified end to end (20640 rows, correlation heatmap, geographic scatter, parquet export). Use it to compare, not as the first attempt.</p>
+  </details>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — Capstone Stage 1: Setup &amp; EDA</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

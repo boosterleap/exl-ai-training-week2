@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · Capstone Stage 3 · Streamlit UI</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Capstone Stage 3 of 5 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="15_capstone_model_training.html" style="color:#cbd8ff;">← Stage 2</a> · <a href="17_capstone_testing.html" style="color:#cbd8ff;">Stage 4 →</a></p>
+  <h1>Capstone Stage 3 — Streamlit UI</h1>
+  <p>Stage 2 left you a trained model sitting in a <code>.joblib</code> file — correct, but useless to anyone who isn't comfortable calling <code>model.predict()</code> from a Python shell. This stage directs Claude Code to wrap that model in a small Streamlit app: sliders in, a prediction out, no code required from whoever ends up using it.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <p>A model that only a developer can run isn't done — it's half-shipped. Streamlit closes that gap with a thin script that turns Python into a browser UI.</p>
+    <ul class="concept-list">
+      <li><b>A trained model is not a deliverable on its own.</b> The stakeholders who care about "what would this house be worth" are not going to open a notebook and call <code>predict()</code>. A UI is what turns a <code>model.joblib</code> file sitting in <code>outputs/</code> into something a non-technical person can actually use — move a few sliders, click a button, read a number.</li>
+      <li><b>Streamlit reruns the entire script top to bottom on every interaction.</b> Move one slider, and Streamlit doesn't just re-execute a callback — it re-executes the whole file from line one, including any expensive setup at the top. That's the mental model to hold before writing anything: every widget touch is effectively "run the script again."</li>
+      <li><b><code>st.cache_resource</code> exists specifically to survive that rerun model.</b> Without it, a function that loads the model file from disk would fire again on every single slider drag, reopening and deserializing <code>model.joblib</code> dozens of times in a session for no reason. <code>@st.cache_resource</code> tells Streamlit to run the load function once, keep the object alive across reruns, and hand back the cached instance every time after — so the expensive part happens once, not every time a slider ticks.</li>
+      <li><b>The shape of a Streamlit app is always the same loop: widgets in, state read, action, output.</b> Widgets (<code>st.slider</code>, <code>st.button</code>) declare inputs and hold their current value; you read those values back into a plain dict or dataframe row; a button gates the actual computation so it only happens on demand, not on every rerun; and the result renders with something like <code>st.metric</code>. Once you can name those four parts, most Streamlit apps — this one included — are just filling in the blanks.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Direct Claude Code to build the Streamlit app</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>I'm on Stage 3 of the capstone. Stage 2 saved a trained model to
+W2D0/capstone/outputs/model.joblib. Build a Streamlit app at
+W2D0/capstone/my_app.py that does the following:
+
+1. Loads the model from outputs/model.joblib using joblib, wrapped in a
+   function decorated with @st.cache_resource so it's only loaded once per
+   session, not on every widget interaction. If the file doesn't exist,
+   show an st.error telling me to run train_model.py first and st.stop().
+2. Shows a title ("California Housing — median value predictor") and a
+   short caption.
+3. Lays out one slider per feature for all 8 California Housing features
+   (MedInc, HouseAge, AveRooms, AveBedrms, Population, AveOccup, Latitude,
+   Longitude), with sensible min/max ranges and a reasonable default value
+   for each — split them across two st.columns so it isn't one long list.
+4. Has a "Predict median house value" button. On click, build a one-row
+   dataframe from the current slider values in the same column order the
+   model was trained on, call model.predict() on it, and display the
+   result with st.metric. The model's target is in $100k units, so scale
+   the raw prediction by 100 and show it as a dollar figure like "$204.9k".
+
+Keep it to one file, no extra pages or session-state complexity — this is
+meant to be a small, direct wrapper around the model.</code></pre>
+    </div>
+    <p>Let Claude Code choose the exact slider ranges and defaults — the important thing is that all 8 features are covered and the column order matches what the model expects. If it asks you what unit the target is in, tell it: the California Housing target is median house value in $100,000s, and the UI should present it as a $k figure for readability.</p>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Run it and try it in a browser</span></div>
+    <span class="where-tag where-vm">VM terminal</span>
+    <p><code>streamlit</code> is already installed in the <code>ai_agent_env</code> conda environment from Stage 1's setup, so there's nothing extra to install here.</p>
+    <pre><code>uv run streamlit run W2D0/capstone/my_app.py</code></pre>
+    <p>Streamlit prints a local URL (typically <code>http://localhost:8501</code>) — open it. You should see the title, the caption, 8 sliders arranged in two columns, and a predict button. Move a couple of sliders and confirm nothing predicts until you actually click the button.</p>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Compare two contrasting profiles</span></div>
+    <div class="callout predict">
+      <b class="tag">Predict first</b>
+      Before you touch the sliders, recall Stage 1's correlation heatmap: which feature had the strongest relationship with <code>MedHouseVal</code>? Write down which direction you expect the prediction to move if you push that feature toward its high end versus its low end, holding everything else fixed.
+    </div>
+    <p>Now try it for real. Set up a "high-income coastal" profile — high <code>MedInc</code>, latitude/longitude near the coast (e.g. around the Bay Area or LA) — click predict and note the value. Then, without touching anything else, drag <code>MedInc</code> down to a low value and predict again. Repeat with a "low-income inland" profile (lower income, longitude further east). Does the swing in predicted value line up with what the Stage 1 heatmap told you about <code>MedInc</code>'s correlation with the target?</p>
+    <div class="callout">
+      <b class="tag">Debrief</b>
+      This is the same signal from Stage 1's correlation heatmap, just made interactive: if <code>MedInc</code> was the strongest correlate of <code>MedHouseVal</code>, dragging it should move the prediction more than any single other slider. A UI doesn't teach the model anything new — it just makes the relationships you found in EDA tangible enough to poke at.
+    </div>
+
+    <div class="step-head"><span class="step-num">4</span><span class="step-title">Why the rerun model matters here</span></div>
+    <p>Ask Claude Code to point out, in the file it just wrote, exactly which line only runs once per session versus which lines rerun on every slider move. It should be able to point at the <code>@st.cache_resource</code>-decorated load function as the one thing that survives reruns, and everything below <code>st.title</code> as re-executing top to bottom every time a widget changes.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      The app should show the title "California Housing — median value predictor", a caption, exactly 8 sliders across two columns, and one "Predict median house value" button. Clicking predict with reasonable inputs should render a real number via <code>st.metric</code> — the reference implementation produced <code>$204.9k</code> on its default slider values. This <code>my_app.py</code> is exactly what Stage 4 will exercise headlessly with <code>streamlit.testing.v1.AppTest</code>, so if it runs cleanly here, Stage 4's automated test has something real to check.
+    </div>
+  </div>
+
+  <p>Next: Stage 4 wraps this app in an automated headless test — no browser required — to make sure it keeps producing a real prediction on every run, not just this one.</p>
+
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>A tested version is at <a href="../W2D0/capstone/app.py">capstone/app.py</a> — verified with <code>streamlit.testing.v1.AppTest</code> (headless, no browser needed): title renders, 8 sliders and 1 button are present, and clicking the button produced a real prediction of <code>$204.9k</code> in the test run. Use it to compare, not as the first attempt.</p>
+  </details>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — Capstone Stage 3: Streamlit UI</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

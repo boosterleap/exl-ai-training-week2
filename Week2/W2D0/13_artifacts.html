@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · 13 Artifacts</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Topic 13 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="12_plugins.html" style="color:#cbd8ff;">← 12</a> · <a href="14_capstone_setup_and_eda.html" style="color:#cbd8ff;">Capstone →</a></p>
+  <h1>Artifacts — publishing a shareable page directly from Claude Code</h1>
+  <p>The last foundational topic before the capstone — and you'll use this exact capability for the Streamlit demo's write-up.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <p>An Artifact is a rendered, hosted web page (or document) Claude Code can publish directly — useful for a dashboard, a report, or a demo page you want to share without setting up your own hosting. It starts private; you choose whether to share it further.</p>
+    <ul class="concept-list">
+      <li><b>Different from a file in your repo.</b> A file is code/content you and your team read in an editor. An artifact is something you'd hand a stakeholder a link to — rendered, presentable, no setup required on their end.</li>
+      <li><b>Updatable in place.</b> Republishing to the same artifact updates it at the same URL — you don't get a new link every time you fix something.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Publish something real</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Build a short one-page summary of everything we've covered in W2D0 Topics
+00-12 (a title per topic, one line each), styled cleanly, and publish it as
+an artifact.</code></pre>
+    </div>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You should get back a real, shareable link — open it and confirm it renders correctly, not just a local file path.
+    </div>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Update it in place</span></div>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Add one more line to that same summary artifact noting today's date, and
+republish it to the SAME url, not a new one.</code></pre>
+    </div>
+    <p>Confirm the link from step 1 now shows the updated content, rather than getting a second, different link.</p>
+  </div>
+</section>
+
+<section id="next">
+  <h2>Next: the capstone</h2>
+  <div class="step">
+    <p>You now have the full toolkit — memory, config, commands, skills, subagents, hooks, context management, MCP, GitHub/git automation, model choice, plugins, and artifacts. The capstone (14–18) uses essentially all of it, building one real project end to end: <a href="14_capstone_setup_and_eda.html">start with Stage 1 — setup &amp; EDA →</a></p>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — 13 Artifacts</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

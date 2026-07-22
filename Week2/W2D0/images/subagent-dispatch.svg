@@ -1,0 +1,30 @@
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,-apple-system,Segoe UI,sans-serif">
+  <defs>
+    <marker id="arrows2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#536179"/>
+    </marker>
+  </defs>
+  <rect width="720" height="220" fill="#ffffff"/>
+  <rect x="20" y="70" width="180" height="60" rx="8" fill="#eef3ff" stroke="#2446a8"/>
+  <text x="110" y="95" text-anchor="middle" font-size="12" font-weight="700" fill="#172d70">Main session</text>
+  <text x="110" y="113" text-anchor="middle" font-size="10" fill="#536179">your conversation</text>
+  <path d="M200,90 C240,90 240,60 280,60" stroke="#536179" stroke-width="2" fill="none" marker-end="url(#arrows2)"/>
+  <path d="M200,110 C240,110 240,140 280,140" stroke="#536179" stroke-width="2" fill="none" marker-end="url(#arrows2)"/>
+
+  <rect x="280" y="30" width="200" height="60" rx="8" fill="#fef3c7" stroke="#92400e"/>
+  <text x="380" y="55" text-anchor="middle" font-size="12" font-weight="700" fill="#92400e">Subagent A</text>
+  <text x="380" y="73" text-anchor="middle" font-size="10" fill="#92400e">isolated context, own brief</text>
+
+  <rect x="280" y="110" width="200" height="60" rx="8" fill="#fef3c7" stroke="#92400e"/>
+  <text x="380" y="135" text-anchor="middle" font-size="12" font-weight="700" fill="#92400e">Subagent B</text>
+  <text x="380" y="153" text-anchor="middle" font-size="10" fill="#92400e">isolated context, own brief</text>
+
+  <path d="M480,60 C530,60 530,90 570,90" stroke="#536179" stroke-width="2" fill="none" marker-end="url(#arrows2)"/>
+  <path d="M480,140 C530,140 530,110 570,110" stroke="#536179" stroke-width="2" fill="none" marker-end="url(#arrows2)"/>
+
+  <rect x="570" y="75" width="130" height="50" rx="8" fill="#e7f7ee" stroke="#278653"/>
+  <text x="635" y="97" text-anchor="middle" font-size="11" font-weight="700" fill="#166534">distilled result</text>
+  <text x="635" y="113" text-anchor="middle" font-size="10" fill="#166534">back to main</text>
+
+  <text x="360" y="200" text-anchor="middle" font-size="12" fill="#536179">only the distilled result returns — the subagent's own detailed work never floods your main context</text>
+</svg>

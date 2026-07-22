@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · 07 Context Management</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Topic 07 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="06_hooks.html" style="color:#cbd8ff;">← 06</a> · <a href="08_mcp_servers_and_tools.html" style="color:#cbd8ff;">08 →</a></p>
+  <h1>Understanding context, and manual compaction</h1>
+  <p>Everything Claude Code "knows" right now is exactly what's in its context window — nothing more, nothing magic.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <p>The context window is a real, finite budget: your system prompt, <code>CLAUDE.md</code>, every message, every tool call and result. As a session runs long, Claude Code automatically summarizes older turns to keep going — that's compaction, and it's lossy by design. <code>/compact</code> lets you trigger it on your own schedule instead of waiting for the automatic threshold.</p>
+    <ul class="concept-list">
+      <li><b>Why trigger it manually.</b> Compacting right after finishing a noisy sub-task (e.g. a long debugging session) clears the noise while it's still fresh, rather than losing detail unpredictably later mid-task.</li>
+      <li><b>What survives compaction and what doesn't.</b> Artifacts — <code>CLAUDE.md</code>, files written to disk — survive because they're re-read fresh, not carried in conversational memory. Anything that only exists as "something we discussed 40 turns ago" is exactly what compaction risks losing.</li>
+    </ul>
+  </div>
+  <figure class="concept-figure">
+    <img src="images/context-compaction.svg" alt="A long session with full context gets compacted, trading detail for room to continue">
+    <figcaption>Lossy by design — put anything durable into an artifact, not just the conversation.</figcaption>
+  </figure>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Check your current context usage</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <pre><code>/context</code></pre>
+    <p>(If your build doesn't expose this directly, ask: "roughly how full is your current context window?")</p>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Deliberately generate some noise, then compact</span></div>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Read every .html file in W2D0/ one at a time and give me a one-sentence
+summary of each (this is just to fill context — don't overthink it).</code></pre>
+    </div>
+    <p>Then:</p>
+    <pre><code>/compact</code></pre>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Ask immediately afterward: "summarize what we just did in the last few turns" — it should still know the gist, but likely not word-for-word detail. That gap is compaction, made visible.
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Prove the artifact-survives-compaction claim</span></div>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Append one line to CLAUDE.md noting that we tested /compact in W2D0 Topic
+07. Then run /compact again immediately. Now tell me: is that line still on
+disk, and would a BRAND NEW session (not just a compacted one) still see
+it?</code></pre>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — 07 Context Management</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

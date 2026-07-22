@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · 02 Settings &amp; Permission Modes</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Topic 02 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="01_claude_md_and_config.html" style="color:#cbd8ff;">← 01</a> · <a href="03_slash_commands.html" style="color:#cbd8ff;">03 →</a></p>
+  <h1><code>.claude/settings.json</code> &amp; permission modes</h1>
+  <p>Where configuration actually lives, and the real six permission modes — verified straight from <code>claude --help</code>, not paraphrased from memory.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <p><b>Settings scope, same layering idea as Topic 01.</b> <code>~/.claude/settings.json</code> is user-scoped (applies everywhere). A project's <code>.claude/settings.json</code> is meant to be shared/committed; <code>.claude/settings.local.json</code> is your personal, gitignored overrides for that same project — you've had one of these in this very repo all week.</p>
+    <ul class="concept-list">
+      <li><b>The six real permission modes</b> (from <code>claude --help</code>'s <code>--permission-mode</code> flag): <code>plan</code> (read/analyze/propose, no edits), <code>manual</code> (asks before every sensitive action), <code>acceptEdits</code> (file edits auto-approved, other tools still ask), <code>auto</code> and <code>dontAsk</code> (fewer prompts, policy still applies), and <code>bypassPermissions</code> (no prompts at all — sandboxes with no internet access only).</li>
+      <li><b>This is the exact mechanism behind Week 2's <code>allow</code>/<code>ask</code>/<code>deny</code> rules.</b> A permission mode is the default posture; <code>allow</code>/<code>ask</code>/<code>deny</code> rules in settings refine it per tool.</li>
+      <li><b><code>claude doctor</code> and <code>--safe-mode</code> exist for exactly this layering's failure mode.</b> When settings from multiple scopes combine unexpectedly, <code>--safe-mode</code> disables all customizations (CLAUDE.md, skills, hooks, MCP, commands, agents) so you can tell whether a problem is your config or something else.</li>
+    </ul>
+  </div>
+  <figure class="concept-figure">
+    <img src="images/permission-modes.svg" alt="Six permission modes from plan (safest, no edits) through manual, acceptEdits, auto/dontAsk, to bypassPermissions (no prompts, sandbox only)">
+    <figcaption>Less friction on the right, less safety net — choose deliberately.</figcaption>
+  </figure>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Look at your own settings, at both scopes</span></div>
+    <span class="where-tag where-vm">VM · terminal</span>
+    <pre><code>cat ~/.claude/settings.json 2>&1 || echo "none yet"
+cat .claude/settings.local.json 2>&1 || echo "none yet"</code></pre>
+    <p>If either is missing, that's fine — they're both opt-in and get created the first time something needs them.</p>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Try <code>plan</code> mode for real</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <p>Switch to plan mode (check <code>/help</code> or your model/mode picker for the current shortcut) and ask it to make a small, real edit:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Add a one-line comment to the top of CLAUDE.md noting today's date.</code></pre>
+    </div>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      In <code>plan</code> mode it should propose the change and explain it, but not actually write the file. Switch back to your normal mode and re-run the same prompt — now it should actually edit.
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Run <code>claude doctor</code></span></div>
+    <pre><code>claude doctor</code></pre>
+    <p>Read what it checks. This is your first stop any time a hook, MCP server, or custom command you configure later in this track doesn't behave as expected.</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — 02 Settings &amp; Permission Modes</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

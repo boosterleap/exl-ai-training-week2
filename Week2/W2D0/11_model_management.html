@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · 11 Model Management</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Topic 11 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="10_git_sync_automation.html" style="color:#cbd8ff;">← 10</a> · <a href="12_plugins.html" style="color:#cbd8ff;">12 →</a></p>
+  <h1>Model management — switching, fallback, and cost visibility</h1>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <p>Model choice is a per-session (or per-task) dial, not a one-time setup decision. Claude Code exposes it as a setting (<code>~/.claude/settings.json</code>'s <code>"model"</code> key), a CLI flag, and an in-session switch.</p>
+    <ul class="concept-list">
+      <li><b>Depth vs. speed, the same tradeoff from Week 2 Day 1.</b> A deeper-reasoning model costs more and is slower per turn; a faster one is cheaper but may need more explicit guidance on hard judgment calls.</li>
+      <li><b>Fallback exists for reliability, not just preference.</b> <code>--fallback-model</code> lets a session automatically retry on a different model if the primary is overloaded or unavailable — a real production concern, not a hypothetical.</li>
+      <li><b>Cost is visible, not hidden.</b> The same <code>/cost</code>-style reporting you used all through Week 2 works here too — check it before assuming a workflow is cheap.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Check your current default</span></div>
+    <span class="where-tag where-vm">VM · terminal</span>
+    <pre><code>cat ~/.claude/settings.json | grep -i model || echo "no explicit model set — using the account default"</code></pre>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Compare two models on the same task</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <p>If your setup lets you switch models mid-session (check your model picker or <code>/model</code>), give both the same genuinely ambiguous task:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Here's a deliberately underspecified request: "make the config better."
+Without asking me a clarifying question, tell me what you'd actually do
+and why. (Run this once per model you're comparing.)</code></pre>
+    </div>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Compare: did the faster model barrel ahead with an assumption, while the deeper one flagged the ambiguity or asked first? Neither is universally "better" — it's a task-fit decision.
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Read your own cost</span></div>
+    <pre><code>/cost</code></pre>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — 11 Model Management</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

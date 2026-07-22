@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · Capstone Stage 2 · Model Training</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Capstone Stage 2 of 5 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="14_capstone_setup_and_eda.html" style="color:#cbd8ff;">← Stage 1</a> · <a href="16_capstone_streamlit_ui.html" style="color:#cbd8ff;">Stage 3 →</a></p>
+  <h1>Capstone Stage 2 — Model Training</h1>
+  <p>Stage 1 gave you a clean <code>outputs/housing.parquet</code> and a feel for which features move the target. Now you turn Claude Code loose on the actual modeling: train a simple baseline, train something stronger, compare them honestly, and persist the winner plus its scores so later stages can consume them without re-running anything.</p>
+</header>
+
+<main>
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <ul class="concept-list">
+      <li><b>Always start with a baseline.</b> <code>LinearRegression</code> is fast, has no hyperparameters to tune, and gives you a number to beat. If a fancier model can't clear that bar, the extra complexity isn't earning its keep. Training a baseline first isn't busywork — it's the control in the experiment.</li>
+      <li><b>MAE and R2 tell you different things — report both.</b> Mean Absolute Error is in the target's own units (here, $100,000s), so it reads as "on average, how far off is a prediction" — easy to explain to a non-technical stakeholder. R2 is unitless and tells you what fraction of the variance in house values the model actually explains, which is what you want when comparing model architectures against each other. A model can look fine on one metric and mediocre on the other, so pick the winner on the metric your grading rule cares about (here, MAE), but log both.</li>
+      <li><b>Why random forests tend to beat linear regression on this dataset:</b> housing prices don't move linearly with latitude/longitude — coastal proximity, local price clusters, and non-linear interactions between rooms/income/location are exactly the kind of structure a tree ensemble can carve up with splits, and a linear model can't represent no matter how well it's fit.</li>
+      <li><b>Persist metrics as structured JSON, not print statements.</b> A print statement is for you, right now, reading a terminal. A <code>metrics.json</code> file is for every future consumer of this pipeline — Stage 3's Streamlit app wants to display the score, and Stage 4 will write an automated test that loads this file and asserts a quality floor on it. If the numbers only ever existed in scrollback, none of that downstream automation is possible.</li>
+      <li><b>Unit gotcha worth remembering now:</b> <code>MedHouseVal</code>, the target column, is expressed in units of $100,000s (a value of <code>2.05</code> means a $205,000 home). Your model's raw predictions will be in the same units — Stage 3's UI multiplies by 100 to show a human-readable "$204.9k". If you see a prediction like <code>2.05</code> printed with no context later, this is why.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Have Claude Code build the training script</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>In W2D0/capstone, write a script called my_train_model.py that:
+1. Loads outputs/housing.parquet (produced by Stage 1's data prep script)
+2. Splits it into train/test sets (80/20, use a fixed random_state so it's
+   reproducible) using MedHouseVal as the target and the other columns as
+   features
+3. Trains two models for comparison: a plain LinearRegression baseline, and
+   a RandomForestRegressor(n_estimators=200, max_depth=12)
+4. Evaluates both on the test set with MAE (mean absolute error) and R2,
+   and prints a comparison table showing which one wins
+5. Picks the model with the lower MAE as the winner
+6. Saves the winning model to outputs/model.joblib with joblib
+7. Writes outputs/metrics.json containing the MAE and R2 for BOTH models
+   plus a "best_model" key naming which one won -- something like
+   {"best_model": "random_forest", "linear_regression": {"mae": ..., "r2": ...},
+   "random_forest": {"mae": ..., "r2": ...}}
+
+Don't overwrite anything in capstone/ that already exists -- this is a new
+file, my_train_model.py.</code></pre>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Predict before you run</span></div>
+    <span class="where-tag where-vm">Your own judgment call</span>
+    <div class="callout predict">
+      Before you run the script, write down a guess: which model do you expect to win, LinearRegression or RandomForestRegressor, and why? Think about what geographic features like latitude/longitude actually mean for house prices — is that relationship a straight line?
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Run it and compare against the real numbers</span></div>
+    <span class="where-tag where-vm">VM terminal</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Run</div>
+      <pre><code>uv run python W2D0/capstone/my_train_model.py</code></pre>
+    </div>
+    <p>Check your printed MAE/R2 against the verified reference run: LinearRegression → MAE=0.5332, R2=0.5758. RandomForestRegressor → MAE=0.3456, R2=0.7921. Random Forest wins on both metrics — lower error, higher explained variance. If your script's numbers are close to these (exact values can drift slightly depending on train/test split randomness), your predict-then-verify guess was testable and you now know why: the forest can model the non-linear geography effect that a straight line fundamentally cannot.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">4</span><span class="step-title">Confirm the artifacts Stage 3 will need</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Show me the contents of outputs/metrics.json and confirm outputs/model.joblib
+exists. Explain what "best_model" points to and why it was chosen.</code></pre>
+    </div>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You should have <code>outputs/model.joblib</code> (the fitted Random Forest) and <code>outputs/metrics.json</code> with both models' scores plus <code>"best_model": "random_forest"</code>. Verified reference numbers: LinearRegression MAE=0.5332/R2=0.5758, RandomForestRegressor MAE=0.3456/R2=0.7921 — Random Forest selected on lower MAE. Stage 3's Streamlit app will load <code>model.joblib</code> directly to serve predictions, and will multiply raw predictions by 100 to display them in dollars (remember: MedHouseVal is in $100k units). Stage 4's automated test will read <code>metrics[metrics["best_model"]]["mae"]</code> and <code>["r2"]</code> from your JSON and check them against a quality floor of MAE ≤ 0.60 and R2 ≥ 0.55 — the reference numbers clear that floor comfortably, so if your script's structure matches, you're in good shape for later.
+    </div>
+  </div>
+
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>A tested version is at <a href="../W2D0/capstone/train_model.py">capstone/train_model.py</a> — verified end to end (Random Forest selected, MAE=0.3456, R2=0.7921). Use it to compare, not as the first attempt.</p>
+  </details>
+</section>
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — Capstone Stage 2: Model Training</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

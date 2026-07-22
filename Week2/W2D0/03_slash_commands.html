@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · 03 Slash Commands</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Topic 03 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="02_settings_and_modes.html" style="color:#cbd8ff;">← 02</a> · <a href="04_skills.html" style="color:#cbd8ff;">04 →</a></p>
+  <h1>Slash commands — built-in and custom</h1>
+  <p>The fastest way to repeat a multi-step instruction without retyping it.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <p><b>Built-in commands</b> are typed directly in the chat panel — things like <code>/help</code>, <code>/compact</code> (Topic 07), <code>/agents</code>, <code>/mcp</code>. <b>Custom commands</b> are your own — a markdown file that becomes a reusable, named prompt template, scoped project- or user-wide the same way <code>CLAUDE.md</code> and settings are.</p>
+    <ul class="concept-list">
+      <li><b>Why bother, if you could just type the prompt again?</b> A custom command is versioned (checked into the repo, so your whole team gets it), and can take arguments — turning a paragraph you'd retype every time into <code>/review-pr 142</code>.</li>
+      <li><b>Project- vs user-scoped, the same pattern as everything else.</b> A command that only makes sense for this repo's conventions belongs at project scope (shared, committed). A command you want in every project you touch belongs at user scope.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Tour the built-ins</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <p>Type <code>/help</code> and skim what's available. Try <code>/agents</code> (you'll use it for real in Topic 05) and <code>/mcp</code> (Topic 08) just to see their empty-state output for now.</p>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Have Claude Code build you a real custom command</span></div>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Create a project-scoped custom slash command called /summarize-changes that,
+when run, looks at `git diff` for the current working tree and writes a
+short, plain-English summary of what changed. Show me exactly what file you
+created and where, and explain the project- vs user-scope convention you
+used.</code></pre>
+    </div>
+    <div class="callout">
+      <b class="tag">What to look for</b>
+      Claude Code should create a markdown file under a project-scoped commands location (not your home directory) and explain how it would differ if you'd asked for a user-scoped one instead.
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Use it</span></div>
+    <p>Make a small, harmless edit to any file (e.g. add a blank line somewhere), then run your new command:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>/summarize-changes</code></pre>
+    </div>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      It should describe your actual pending change, not a generic answer — confirming the command is really reading live repo state, not just returning canned text. Revert your throwaway edit afterward (<code>git checkout -- &lt;file&gt;</code>) if you don't want it kept.
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — 03 Slash Commands</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

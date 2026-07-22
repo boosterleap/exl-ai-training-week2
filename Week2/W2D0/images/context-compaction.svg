@@ -1,0 +1,21 @@
+<svg viewBox="0 0 740 220" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,-apple-system,Segoe UI,sans-serif">
+  <defs>
+    <marker id="arrowcc" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#536179"/>
+    </marker>
+  </defs>
+  <rect width="740" height="220" fill="#ffffff"/>
+  <rect x="20" y="30" width="330" height="60" rx="8" fill="#eef3ff" stroke="#2446a8"/>
+  <text x="185" y="55" text-anchor="middle" font-size="12" font-weight="700" fill="#172d70">Long session, full context</text>
+  <text x="185" y="75" text-anchor="middle" font-size="10" fill="#536179">every turn, every tool result, verbatim</text>
+  <path d="M350,60 L400,60" stroke="#536179" stroke-width="2" marker-end="url(#arrowcc)"/>
+  <text x="375" y="50" text-anchor="middle" font-size="10" fill="#7c2d12">/compact</text>
+
+  <rect x="400" y="30" width="320" height="60" rx="8" fill="#f0fdf4" stroke="#278653"/>
+  <text x="560" y="55" text-anchor="middle" font-size="12" font-weight="700" fill="#166534">Compacted session</text>
+  <text x="560" y="75" text-anchor="middle" font-size="10" fill="#166534">older turns summarized, room to keep going</text>
+
+  <text x="370" y="140" text-anchor="middle" font-size="12" fill="#7c2d12" font-weight="700">compaction is lossy by design — detail traded for space</text>
+  <text x="370" y="165" text-anchor="middle" font-size="12" fill="#536179">anything you'll need later belongs in an artifact (CLAUDE.md, a file), not just the conversation</text>
+  <text x="370" y="190" text-anchor="middle" font-size="11" fill="#536179">automatic compaction happens near the context limit — /compact triggers it on your own schedule instead</text>
+</svg>

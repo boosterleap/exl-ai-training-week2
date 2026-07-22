@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · Capstone Stage 4 · Automated Testing</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Capstone Stage 4 of 5 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="16_capstone_streamlit_ui.html" style="color:#cbd8ff;">← Stage 3</a> · <a href="18_capstone_deployment.html" style="color:#cbd8ff;">Stage 5 →</a></p>
+  <h1>Capstone Stage 4 — Automated Testing</h1>
+  <p>Stages 1-3 gave you a data-prep script, a trained model, and a Streamlit UI that runs when you click it yourself. None of that proves the pipeline still works after the next change. In this stage you have Claude Code build a pytest suite that checks the data, checks the model against a numeric quality floor, and drives the UI headlessly — so "it works" becomes something a machine can verify in seconds, not something you re-click by hand.</p>
+</header>
+
+<main>
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <ul class="concept-list">
+      <li><b>"It ran without crashing" is not a test.</b> A script that finishes with exit code 0 can still have silently produced an empty dataframe, a model with negative R², or a UI with a dead button. ML pipelines fail quietly far more often than they fail loudly — the whole point of a test suite here is to turn silent failure into a red X.</li>
+      <li><b>Data-sanity tests catch corruption before it reaches the model.</b> Does <code>housing.parquet</code> exist, does it have rows, are there missing values, is <code>Latitude</code> actually inside California's real range? These are cheap, deterministic checks — they don't need the model at all, and they're your first line of defense against a broken upstream step poisoning everything downstream.</li>
+      <li><b>A quality floor is a different kind of test than a unit test on pure logic.</b> <code>assert add(2, 2) == 4</code> has one correct answer. A trained model's MAE will drift slightly every time you retrain — different random seed, different train/test split, a newly added row. So instead of asserting an exact number, you assert the metric stays on the acceptable side of a declared threshold (<code>MAE &lt;= 0.60</code>, <code>R2 &gt;= 0.55</code>). This is the same discipline as the retrieval-eval quality gates from Week 2 Day 4 — a numeric bar the system must clear, not a fixed answer it must match exactly. Non-determinism is expected; regression below the floor is not.</li>
+      <li><b>A headless UI smoke test catches integration bugs that unit tests miss.</b> The data can be clean and the model can clear its floor, and the Streamlit app can still crash on load because of a typo in a widget key, or the predict button can silently do nothing. <code>streamlit.testing.v1.AppTest</code> runs the actual app script in a simulated session — no browser, no human clicking — and lets you assert on real widget state: how many sliders rendered, what the button click produced, whether an exception was raised. It's the cheapest way to catch "the pieces work alone but not together."</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Have Claude Code build the test suite</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>I want an automated pytest suite for my California Housing capstone at
+W2D0/capstone/. Create W2D0/capstone/test_capstone.py with these checks:
+
+1. Data sanity (Stage 1 output, outputs/housing.parquet):
+   - the file exists (fail with a clear message telling me to run data_prep.py
+     if it's missing)
+   - the dataframe has rows and zero missing values
+   - Population and MedHouseVal are strictly positive
+   - Latitude falls within California's real range (roughly 32-42)
+
+2. Model quality floor (Stage 2 output, outputs/metrics.json):
+   - the file exists (tell me to run train_model.py if missing)
+   - load it, look up metrics["best_model"], and assert its MAE is at or
+     below a MAX_ACCEPTABLE_MAE constant and its R2 is at or above a
+     MIN_ACCEPTABLE_R2 constant -- declare both constants near the top of
+     the file so they're easy to find and tune
+   - also assert outputs/model.joblib exists
+
+3. Streamlit UI smoke tests (Stage 3 app, using streamlit.testing.v1.AppTest,
+   no live browser):
+   - AppTest.from_file() the app, run it, assert no exception was raised,
+     and assert the expected number of input sliders and the predict button
+     are present
+   - a second test that clicks the predict button and asserts no exception
+     and that a prediction metric is rendered
+
+Use clear assertion messages that tell me which earlier stage to re-run if
+something's missing. Then run it for me with `uv run pytest W2D0/capstone/test_capstone.py -v`
+and show me the results.</code></pre>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Run it and read the real output</span></div>
+    <span class="where-tag where-vm">VM terminal</span>
+    <p>Let Claude Code run the command, or run it yourself:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Command</div>
+      <pre><code>uv run pytest W2D0/capstone/test_capstone.py -v</code></pre>
+    </div>
+    <p>Read the output test-by-test, not just the pass/fail summary line. Each test name should tell you exactly which stage and which guarantee it's checking — that's the payoff of naming them <code>test_data_was_prepared</code>, <code>test_model_meets_quality_floor</code>, <code>test_streamlit_app_loads_without_error</code>, and so on, rather than <code>test_1</code>, <code>test_2</code>. If a warning count shows up (numpy/joblib deprecation noise is normal and harmless at this stage), that's separate from pass/fail — don't confuse the two.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Break the quality floor on purpose</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <p>A quality-floor test is only meaningful if you've watched it actually fail. Temporarily tighten the bar past what your model can clear, then put it back:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Temporarily change MAX_ACCEPTABLE_MAE in test_capstone.py to 0.10 -- an
+unreasonably strict floor my model can't clear. Run the test suite so I can
+see test_model_meets_quality_floor fail with its assertion message, then
+change it back to the original value and re-run to confirm everything passes
+again.</code></pre>
+    </div>
+    <p>Look closely at the failure: the assertion message should tell you the actual MAE, the floor it missed, and nothing else needs to break for this one test to go red. That's the exercise's real point — this is exactly the mechanism that would block a genuinely regressed model from shipping. A floor that never fails in practice isn't proving anything; you just proved this one does.</p>
+    <div class="callout warning">
+      <b>Don't leave the floor tightened.</b> Confirm <code>MAX_ACCEPTABLE_MAE</code> and <code>MIN_ACCEPTABLE_R2</code> are back to their original values and the full suite is green again before moving on.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">4</span><span class="step-title">Checkpoint — this is what gates Stage 5</span></div>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      The reference run of this exact suite: <b>6 tests, all passing</b>, 600 warnings (harmless numpy/joblib deprecation notices, not failures), in <b>5.77s</b>. Your run should land in the same shape — 6 green tests in a few seconds. Stage 5 (deployment) assumes this suite passes; a red test here is the signal to fix Stage 1-3 before anything ships, not a formality to skip past.
+    </div>
+  </div>
+
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>A tested version is at <a href="../W2D0/capstone/test_capstone.py">capstone/test_capstone.py</a> — verified: <code>pytest -v</code> → 6 passed in ~5.8s. Use it to compare, not as the first attempt.</p>
+  </details>
+</section>
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — Capstone Stage 4: Automated Testing</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

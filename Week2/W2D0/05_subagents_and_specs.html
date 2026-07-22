@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · 05 Subagents &amp; Specs</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Topic 05 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="04_skills.html" style="color:#cbd8ff;">← 04</a> · <a href="06_hooks.html" style="color:#cbd8ff;">06 →</a></p>
+  <h1>Subagents — defining, dispatching, and the spec format</h1>
+  <p>You've already used subagents throughout Week 2 (the Agent tool). This topic is how to <i>define your own</i>, not just use the built-in ones.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <p>A subagent is a named, reusable specialist with its own isolated context — you dispatch it with a specific brief, it does its work independently (possibly reading many files or running many commands), and only a distilled result comes back to your main session. You define one as a markdown file with frontmatter — the "spec" — describing its name, when to use it, and what tools it's allowed.</p>
+    <ul class="concept-list">
+      <li><b>Why isolation is the whole point.</b> A subagent doing a long, detail-heavy investigation would otherwise flood your main session's context with intermediate noise — this is Day 2's exact isolation-spectrum argument, now from the defining side instead of the using side.</li>
+      <li><b>The spec format matters because it's how Claude Code decides <i>when</i> to reach for a subagent automatically.</b> A vague description gets it invoked at the wrong times (or never); a precise one — including a few concrete example situations — gets it invoked exactly when it should be.</li>
+      <li><b>Project- vs. user-scoped, again.</b> A subagent tightly coupled to this repo's conventions belongs at project scope; a general-purpose one (e.g. "code reviewer") belongs at user scope so it follows you everywhere.</li>
+    </ul>
+  </div>
+  <figure class="concept-figure">
+    <img src="images/subagent-dispatch.svg" alt="Main session dispatches two isolated subagents, each returns only a distilled result">
+    <figcaption>Only the distilled result returns — the detailed work stays isolated.</figcaption>
+  </figure>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">See what's already defined</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel or CLI</span>
+    <pre><code>/agents</code></pre>
+    <p>or, non-interactively:</p>
+    <pre><code>claude agents --json 2>&1 | head -c 400</code></pre>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Define your own subagent</span></div>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Define a project-scoped subagent called "doc-freshness-checker" whose job
+is: given a markdown file, check whether it references any file paths that
+no longer exist in the repo, and report exactly which ones are stale. Write
+the spec file with a clear description of when you should be invoked
+(including one concrete example), and tell me where you put it.</code></pre>
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Dispatch it for real</span></div>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Dispatch doc-freshness-checker on this file: W2D0/00_orientation.html.
+Show me exactly what it reports.</code></pre>
+    </div>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You should see a real, isolated dispatch (not just Claude Code doing the check itself in-context) and a distilled report back — the same shape as every subagent dispatch you've watched all through Week 2, except this time you wrote the spec.
+    </div>
+
+    <div class="step-head"><span class="step-num">4</span><span class="step-title">Probe the isolation boundary</span></div>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Dispatch doc-freshness-checker again, and ask it (as part of the brief):
+"what was the first thing we discussed in this W2D0 session, from memory
+only?" Report exactly what it says.</code></pre>
+    </div>
+    <p>It shouldn't know — the same isolation test from Week 2 Day 2, now run against a subagent you defined yourself.</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — 05 Subagents &amp; Specs</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

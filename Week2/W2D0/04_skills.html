@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · 04 Skills</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Topic 04 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="03_slash_commands.html" style="color:#cbd8ff;">← 03</a> · <a href="05_subagents_and_specs.html" style="color:#cbd8ff;">05 →</a></p>
+  <h1>Skills — packaged, invocable expertise</h1>
+  <p>Week 2 Day 2's isolation spectrum named three levels: skills (in-context), subagents (isolated), agent teams (separate processes). This is the first one, in practice.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <p>A skill is a packaged set of instructions for a particular kind of task — a checklist, a repo-specific workflow, a review procedure — that Claude Code can load and follow, invoked either automatically (when the task matches) or explicitly by name. Unlike a subagent, a skill runs <b>in your current context</b> — no isolation, no separate session.</p>
+    <ul class="concept-list">
+      <li><b>Skill vs. custom slash command.</b> A slash command is a fixed prompt template you trigger by name. A skill is closer to a reusable procedure Claude Code can recognize it should apply, with its own instructions loaded in — more like handing it a runbook than a canned message.</li>
+      <li><b>Skill vs. subagent (the real decision point).</b> Use a skill when the task should stay in your current conversation's context — you want the result woven into what you're already doing. Reach for a subagent (Topic 05) specifically when you want isolation — a big, noisy sub-task that shouldn't pollute your main context.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">See what's already available</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>What skills do you currently have available in this session? List them and
+one line on what each is for.</code></pre>
+    </div>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Watch one get used, in-context</span></div>
+    <p>Ask for something that plausibly matches one of the skills you just saw listed (or a general one like reviewing a diff, writing commit messages, or building a visualization, depending on what's available) and watch whether Claude Code explicitly invokes it:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Review the changes I made to CLAUDE.md in Topic 02 as if preparing a short
+code-review comment. If a skill applies here, use it and tell me which one.</code></pre>
+    </div>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Whether or not a skill fires, you should be able to tell from the transcript — this is exactly the kind of thing to look for when deciding later whether your own repeated task belongs as a skill, a custom command (Topic 03), or a subagent (Topic 05).
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Decide: skill, command, or subagent?</span></div>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>I want something that always double-checks any Python file I edit for
+missing type hints before considering the edit done. Would you implement
+that as a skill, a custom slash command, or a subagent? Justify the choice
+against the other two.</code></pre>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — 04 Skills</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

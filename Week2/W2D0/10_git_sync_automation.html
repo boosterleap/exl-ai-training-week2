@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · 10 Automated Git Sync</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Topic 10 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="09_github_automation.html" style="color:#cbd8ff;">← 09</a> · <a href="11_model_management.html" style="color:#cbd8ff;">11 →</a></p>
+  <h1>Automated git sync — keeping local and remote honest without manual ceremony</h1>
+  <p>Different from Topic 09: this is about your own local repo hygiene, not GitHub's issue/PR layer.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <p>"Git sync automation" means using a hook (Topic 06) to commit — and optionally push — automatically at a natural checkpoint, like the end of a Claude Code task, instead of remembering to run <code>git add/commit/push</code> yourself every time.</p>
+    <ul class="concept-list">
+      <li><b>Commit and push are different risk levels.</b> An auto-commit is local and reversible — safe to automate freely. An auto-push changes what your team sees — treat it as an explicit opt-in, never a silent default.</li>
+      <li><b>The <code>Stop</code> hook is the natural trigger.</b> It fires when Claude Code finishes responding — a clean checkpoint to check <code>git status</code> and commit anything meaningful, before the next task starts and the diff gets harder to describe well.</li>
+      <li><b>Commit message quality still matters even when it's automatic.</b> A hook-generated commit that just says "auto-commit" is worse than no automation — have Claude Code write a real, scoped message describing what actually changed.</li>
+    </ul>
+  </div>
+  <figure class="concept-figure">
+    <img src="images/git-sync-flow.svg" alt="A Stop hook checks git status and auto-commits with a clear message; push stays an explicit opt-in step">
+    <figcaption>Commit is safe to automate. Push is a team-visible action — opt in explicitly.</figcaption>
+  </figure>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Build an auto-commit <code>Stop</code> hook</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Add a Stop hook that runs when I finish a turn: if `git status --short`
+shows uncommitted changes under W2D0/, stage them and commit with a message
+you write summarizing the actual diff. Do NOT push. Show me the hook
+config.</code></pre>
+    </div>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Trigger it for real</span></div>
+    <p>Make a small, real change (e.g. ask Claude Code to add one bullet point to this file's concept section), and watch what happens once it finishes:</p>
+    <pre><code>git log --oneline -3</code></pre>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      A new commit should exist with a real, specific message — not "auto-commit" — and <code>git status</code> should be clean.
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Confirm push stayed manual</span></div>
+    <pre><code>git status
+git log origin/main..HEAD --oneline 2>&1 || echo "check your actual branch name"</code></pre>
+    <p>Your new commit should exist locally but not yet be pushed — confirming the hook respected the commit/push risk boundary.</p>
+
+    <div class="step-head"><span class="step-num">4</span><span class="step-title">Decide when you'd add auto-push</span></div>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Under what specific conditions would auto-pushing (not just auto-committing)
+be safe to enable here — a personal scratch branch? Never on main? Give me
+a one-sentence policy.</code></pre>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — 10 Automated Git Sync</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

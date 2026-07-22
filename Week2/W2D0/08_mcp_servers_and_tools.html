@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · 08 MCP Servers &amp; Tools</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Topic 08 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="07_context_management.html" style="color:#cbd8ff;">← 07</a> · <a href="09_github_automation.html" style="color:#cbd8ff;">09 →</a></p>
+  <h1>MCP servers &amp; tools — a first look</h1>
+  <p>A light primer — Week 2 Days 1–2 go much deeper (in-process vs. network servers, Streamable HTTP, permission gating). Here, just the registration mechanics.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <p>MCP (Model Context Protocol) is how Claude Code gets custom tools beyond its built-ins. A server exposes one or more tools; you register it once, and Claude Code decides when to call it based on your request and the tool's description.</p>
+    <ul class="concept-list">
+      <li><b>Readymade vs. custom.</b> A readymade server (e.g. a Sentry or GitHub integration) is someone else's server you point at. A custom one is your own script exposing whatever your task needs — you'll build one for real in Week 2 Day 1.</li>
+      <li><b>One registration command either way.</b> <code>claude mcp add</code> handles both — an HTTP URL for a hosted server, or a local command for your own stdio script.</li>
+    </ul>
+  </div>
+  <figure class="concept-figure">
+    <img src="images/mcp-basics.svg" alt="Claude Code connects to either a readymade hosted MCP server or a custom local one, both via the same registration command">
+    <figcaption>Same registration mechanism, whether readymade or your own.</figcaption>
+  </figure>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">See what's registered right now</span></div>
+    <span class="where-tag where-vm">VM · terminal</span>
+    <pre><code>claude mcp list</code></pre>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Build and register a tiny custom one</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Build a minimal local MCP server (stdio, using mcp.server.fastmcp.FastMCP)
+at W2D0/snippets/wordcount_server.py with one tool, count_words(text: str),
+that returns the word count. Register it with `claude mcp add`, restart if
+needed, and confirm it's listed.</code></pre>
+    </div>
+    <pre><code>claude mcp list
+claude mcp get wordcount-server</code></pre>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      <code>claude mcp get</code> should show it approved and connected (not "⏸ Pending approval").
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Use it</span></div>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Use the count_words tool on the text of W2D0/00_orientation.html's intro
+paragraph and tell me the result.</code></pre>
+    </div>
+    <p>You'll do this again, for real, with a genuinely useful tool grounded in real data, on Week 2 Day 1 PM.</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — 08 MCP Servers &amp; Tools</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

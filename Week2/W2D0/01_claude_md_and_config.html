@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · 01 CLAUDE.md &amp; Hierarchical Config</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Topic 01</p>
+  <h1>CLAUDE.md &amp; the <code>.claude</code> folder — hierarchical discovery</h1>
+  <p>You've already been using <code>CLAUDE.md</code> all through Week 2 without necessarily knowing how Claude Code finds it, or that it isn't the only one that can exist.</p>
+</header>
+
+<nav class="page-nav" aria-label="W2D0 sequence">
+  <a href="00_orientation.html">00 Orientation</a>
+  <a href="01_claude_md_and_config.html">01 CLAUDE.md</a>
+  <a href="02_settings_and_modes.html">02 Settings/modes</a>
+  <a href="03_slash_commands.html">03 Slash commands</a>
+</nav>
+
+<main>
+
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <p><b>What it is.</b> <code>CLAUDE.md</code> is project memory — plain markdown, read at the start of every session. It's not the only scope: a <b>user-scoped</b> <code>~/.claude/CLAUDE.md</code> applies to every project you open, and nested project subdirectories can carry their own, more specific <code>CLAUDE.md</code> too.</p>
+    <ul class="concept-list">
+      <li><b>They combine, they don't override.</b> User-level, project-root, and subdirectory <code>CLAUDE.md</code> files all load together when relevant — think of it as layered context that gets more specific as you go deeper, not a single winner-takes-all file.</li>
+      <li><b>The <code>.claude</code> folder is the sibling for everything else.</b> Settings, custom commands, subagent definitions, and hooks configuration all live under a project's <code>.claude/</code> directory (or the user-level <code>~/.claude/</code>) — <code>CLAUDE.md</code> is just the plain-text memory piece.</li>
+      <li><b>Why this matters practically.</b> A user-level <code>CLAUDE.md</code> is the right place for "always write commit messages this way" (true across every project you touch). A project-level one is for "this specific repo's conventions" — which is what you've been extending all week.</li>
+    </ul>
+  </div>
+  <figure class="concept-figure">
+    <img src="images/claude-md-hierarchy.svg" alt="CLAUDE.md hierarchy: user-scoped, project root, and subdirectory files all load together">
+    <figcaption>Every applicable level loads together — more specific context, not an override.</figcaption>
+  </figure>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Confirm what's already loading for this repo</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel, in this repo</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Read the project's CLAUDE.md. Summarize, in 2-3 bullets, what you now know
+about this project that you wouldn't know from the file tree alone.</code></pre>
+    </div>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Check whether a user-level CLAUDE.md exists for you</span></div>
+    <span class="where-tag where-vm">VM · terminal</span>
+    <pre><code>ls -la ~/.claude/CLAUDE.md 2>&1 || echo "no user-level CLAUDE.md yet"</code></pre>
+    <div class="callout">
+      <b class="tag">If it doesn't exist yet</b>
+      That's normal — it's opt-in. Ask Claude Code to create one with one durable personal preference (e.g. "always explain your plan before editing more than one file") and confirm it now applies in a brand-new session in a completely different directory, not just this repo.
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Observe layering directly</span></div>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Without me telling you, list every CLAUDE.md-shaped source of context you
+currently have loaded for this session — project-level, user-level, or
+otherwise — and where each one physically lives on disk.</code></pre>
+    </div>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You should get back at least the project's own <code>CLAUDE.md</code>, plus your user-level one if you created it in step 2 — both, not just one.
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — 01 CLAUDE.md &amp; Hierarchical Config</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

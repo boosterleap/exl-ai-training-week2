@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · Capstone Stage 5 · Deployment</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Capstone Stage 5 of 5 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="17_capstone_testing.html" style="color:#cbd8ff;">← Stage 4</a></p>
+  <h1>Capstone Stage 5 — Deployment</h1>
+  <p>Stages 1-4 gave you a data-prep script, a trained model, a Streamlit UI, and a green pytest suite proving all three still work together. Everything so far has run directly on your VM, inside your own Python environment. In this final stage you package it into a container image that runs the same way anywhere Docker runs — no "works on my machine," no separately-installed dependencies, one artifact that carries the model and the app together.</p>
+</header>
+
+<main>
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <ul class="concept-list">
+      <li><b>A container ships the model and the UI as one unit, not two things that have to stay in sync.</b> A bare Python script assumes whoever runs it already has the right interpreter, the right package versions, and the right trained model file sitting nearby. A container image bundles all of that — code, dependencies, and the model artifact — into something you can hand to anyone (or any server) and it just runs, identically, every time.</li>
+      <li><b>Baking the model in at build time is a deliberate choice, not the only option.</b> The Dockerfile runs <code>data_prep.py</code> and <code>train_model.py</code> during the image build, so the trained model is already inside the image before it ever starts. The tradeoff: the image is bigger and a retrain means a rebuild, but the container never needs live internet access or training compute at runtime — it just serves. The update cycle becomes explicit and repeatable: retrain → rebuild → redeploy, not "hope the container can reach the data source when it boots."</li>
+      <li><b>A non-root user is baseline hygiene, not an exotic hardening step.</b> By default a container runs as root, which means a compromised or buggy process inside it has root-level reach inside that container. Creating an unprivileged <code>appuser</code> and switching to it with <code>USER appuser</code> before the app runs costs one line and closes off a whole class of unnecessary risk — it's a habit worth having even for a training exercise like this one.</li>
+      <li><b>A healthcheck lets Docker (and anything orchestrating it) know the app is actually serving, not just that the process is alive.</b> Streamlit exposes its own <code>/_stcore/health</code> endpoint for exactly this. <code>HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1</code> polls it periodically — a process that's technically running but wedged will show up as unhealthy instead of silently looking fine.</li>
+    </ul>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Honesty note</b>
+    Every other reference file in this capstone was actually run and its output quoted in the guide. This one is different, and you should know that going in. The reference <code>Dockerfile</code> in <code>W2D0/capstone/</code> was written by the course author but <b>not build-tested</b> — there was no Docker daemon available on the authoring machine. It follows a standard, well-established pattern (slim base image, non-root user, model baked in at build time), so there's good reason to expect it works, but "should work" and "verified" are not the same claim, and this guide won't pretend otherwise. Your VM has Docker confirmed installed and running, so when you build this for real in the next section, <b>that build is the first actual verification this Dockerfile has ever had</b>. If something in it needs fixing, that's the exercise working as intended, not a sign you did something wrong.
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Have Claude Code build the Dockerfile and requirements.txt</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>I want to containerize my California Housing capstone at W2D0/capstone/ for
+deployment. Create W2D0/capstone/requirements.txt and W2D0/capstone/Dockerfile.
+
+requirements.txt should pin the libraries this project actually uses: pandas,
+numpy, scikit-learn, matplotlib, seaborn, joblib, streamlit, pytest -- with
+sensible minimum versions, not exact pins.
+
+Dockerfile should:
+- start FROM python:3.12-slim
+- set a working directory, copy requirements.txt in, and pip install it
+  before copying any application code (so dependency layers cache separately
+  from code changes)
+- copy data_prep.py, train_model.py, and app.py in
+- bake the trained model into the image at BUILD time by running
+  `python data_prep.py && python train_model.py` as a RUN step -- the
+  container should never need to fetch data or train a model at runtime
+- create a non-root user and switch to it before the app runs
+- EXPOSE 8501 and add a HEALTHCHECK against Streamlit's own
+  /_stcore/health endpoint
+- ENTRYPOINT that runs `streamlit run app.py` bound to 0.0.0.0:8501 so it's
+  reachable from outside the container
+
+Explain each section as you write it so I understand why it's ordered the
+way it is, not just what it does.</code></pre>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Build the image for real — this is the actual verification</span></div>
+    <span class="where-tag where-vm">VM terminal</span>
+    <p>This Dockerfile has never been built before. Running the build here is not a formality on top of already-verified instructions — it <i>is</i> the test. Watch the build log; if a step fails, that's real information, not noise to scroll past.</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Command</div>
+      <pre><code>cd W2D0/capstone
+docker build -t housing-capstone .</code></pre>
+    </div>
+    <p>Pay attention to the <code>RUN python data_prep.py && python train_model.py</code> step in particular — that's the line doing the real work of baking the model into the image, and it's the step most likely to surface something the Dockerfile got wrong (a missing dependency, a path assumption, an ordering issue). If it fails, describe the error to Claude Code and have it fix the Dockerfile, then rebuild.</p>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Run the container and confirm it works</span></div>
+    <span class="where-tag where-vm">VM terminal</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Command</div>
+      <pre><code>docker run -p 8501:8501 housing-capstone</code></pre>
+    </div>
+    <p>Open <code>http://localhost:8501</code> in a browser, move a slider, click predict, and confirm you get a real prediction back — the same UI from Stage 3, now running entirely inside the container with no local Python environment involved. That end-to-end path, from a cold <code>docker build</code> to a working prediction in the browser, is what turns "the Dockerfile looks reasonable" into "the Dockerfile works."</p>
+
+    <p>If you want an extra gate before you'd call this deployable, this is also where Stage 4's test suite earns its keep: run <code>pytest W2D0/capstone/test_capstone.py -v</code> against the same project before you build the image, so you know the data, model, and UI were already sound going in. A container faithfully packages whatever you hand it — it doesn't fix a broken pipeline, it just ships it more conveniently.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      <code>docker build</code> completes without error, <code>docker run</code> starts the container and Streamlit is reachable at <code>http://localhost:8501</code>, and moving a slider and clicking predict inside the browser returns a real prediction from the model baked into the image — not a cached page, not an error trace.
+    </div>
+  </div>
+
+  <details class="instructor-reveal">
+    <summary>Reference files (only if the build gets stuck)</summary>
+    <p>Reference files are at <a href="../W2D0/capstone/Dockerfile">capstone/Dockerfile</a> and <a href="../W2D0/capstone/requirements.txt">capstone/requirements.txt</a> — a standard pattern, but genuinely unverified until you (or your VM) build it. Treat your own build as the real test, not this file.</p>
+  </details>
+</section>
+
+<section id="wrap">
+  <h2>Capstone complete</h2>
+  <div class="step">
+    <p>Five stages, one public dataset, one continuous thread: you took California Housing through exploratory data analysis, trained and evaluated a model against a numeric quality floor, wrapped it in a Streamlit UI, locked it down with an automated test suite, and packaged the whole thing into a container image you built and ran yourself. At every stage, Claude Code did the building — you directed it, read what it produced, and used the reference files only for comparison when something needed checking, never as a starting point to copy from.</p>
+    <p>That's the whole point of this course: the skill isn't any single script, it's knowing how to direct an agent through a real, multi-stage build and verify each stage before trusting the next one. If you want to revisit any topic that fed into this capstone, <a href="00_orientation.html">the W2D0 index</a> is the place to start.</p>
+  </div>
+</section>
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — Capstone Stage 5: Deployment</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

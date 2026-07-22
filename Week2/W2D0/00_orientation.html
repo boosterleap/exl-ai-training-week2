@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · 00 Orientation</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Claude Code Foundations · Self-paced, work through in order</p>
+  <h1>Orientation — what Claude Code is, and how W2D0 sets up the rest of the course</h1>
+  <p>Week 2 Days 1–5 assume you're already comfortable with Claude Code's own mechanics — hooks, subagents, permissions, MCP. This W2D0 track builds that comfort first, using this exact repository as the practice ground, then caps it with a real, deployed EDA + ML + Streamlit project built entirely through Claude Code.</p>
+</header>
+
+<nav class="page-nav" aria-label="W2D0 sequence">
+  <a href="00_orientation.html">00 Orientation</a>
+  <a href="01_claude_md_and_config.html">01 CLAUDE.md</a>
+  <a href="02_settings_and_modes.html">02 Settings/modes</a>
+  <a href="03_slash_commands.html">03 Slash commands</a>
+  <a href="04_skills.html">04 Skills</a>
+  <a href="05_subagents_and_specs.html">05 Subagents</a>
+  <a href="06_hooks.html">06 Hooks</a>
+  <a href="07_context_management.html">07 Context</a>
+  <a href="08_mcp_servers_and_tools.html">08 MCP</a>
+  <a href="09_github_automation.html">09 GitHub</a>
+  <a href="10_git_sync_automation.html">10 Git sync</a>
+  <a href="11_model_management.html">11 Models</a>
+  <a href="12_plugins.html">12 Plugins</a>
+  <a href="13_artifacts.html">13 Artifacts</a>
+  <a href="14_capstone_setup_and_eda.html">14+ Capstone</a>
+</nav>
+
+<main>
+
+<section id="what">
+  <h2>What Claude Code actually is</h2>
+  <div class="step">
+    <p>Claude Code is an agentic coding tool: you give it a goal in plain language, and it reads files, runs commands, edits code, and reports back — the same perceive/reason/act/observe loop Week 2 Day 1 covers in depth, except <i>you're</i> the one directing it instead of building a toy version of it. Every mechanic in this track — memory files, permissions, hooks, subagents, MCP — is a real, load-bearing part of how it operates, not a simplified teaching example.</p>
+    <ul class="concept-list">
+      <li><b>It's a real CLI and VS Code extension</b>, already installed and logged in on your VM via subscription — confirmed with <code>claude --version</code> and <code>claude auth status</code>.</li>
+      <li><b>Everything here is verified against the live CLI</b> (version 2.1.x as of this writing) — where a command's exact flags or output are shown, they were run for real, not guessed from documentation.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="check">
+  <h2>Before you start</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">0</span><span class="step-title">Environment check</span></div>
+    <span class="where-tag where-vm">VM · VS Code terminal</span>
+    <pre><code>conda activate ai_agent_env
+claude --version
+claude auth status
+claude doctor</code></pre>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      <code>claude auth status</code> should show <code>"loggedIn": true</code>. <code>claude doctor</code> checks the health of your installation and flags any config problems before you rely on them for the rest of this track.
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <h2>How to work through W2D0</h2>
+  <div class="step">
+    <ul class="concept-list">
+      <li><b>Self-paced, no fixed timing.</b> Work through 00–13 in order — each one builds on file conventions the previous one introduced. Budget roughly 15–25 min per topic.</li>
+      <li><b>Practice ground: this repository.</b> Rather than a throwaway sandbox, you'll configure real slash commands, hooks, and subagents <i>in this actual Week2-Claude repo</i> — you'll use some of them again in Week 2 Days 1–5.</li>
+      <li><b>The capstone (14–18) is the payoff.</b> A full EDA + ML + Streamlit project on the California Housing dataset, built stage by stage, tested, and deployed — entirely through Claude Code, with each stage's automation (git sync, testing) drawn directly from what 00–13 taught.</li>
+    </ul>
+    <div class="callout">
+      <b class="tag">A note on scope</b>
+      This track teaches Claude Code's own mechanics using generic, no-domain examples. It does not touch the insurance/logistics data used in Week 2 Days 1–5 — that's intentional, so this track stands alone as a Claude Code primer regardless of when you take it.
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — 00 Orientation</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

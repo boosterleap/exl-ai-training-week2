@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · 09 GitHub Operations Automation</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Topic 09 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="08_mcp_servers_and_tools.html" style="color:#cbd8ff;">← 08</a> · <a href="10_git_sync_automation.html" style="color:#cbd8ff;">10 →</a></p>
+  <h1>GitHub operations automation</h1>
+  <p>Claude Code drives the <code>gh</code> CLI directly — reading, triaging, and (with your approval) creating issues, PRs, and reviews.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept</h2>
+  <div class="step">
+    <p>Claude Code doesn't need a special GitHub integration — <code>gh</code>, the official GitHub CLI, is just another command it can run. If <code>gh auth status</code> shows you're logged in, Claude Code can read issues/PRs, open new ones, comment, and run reviews, all through normal Bash calls it already knows how to make.</p>
+    <ul class="concept-list">
+      <li><b>Read operations are always safe to explore freely</b> — listing issues/PRs, viewing a diff, checking CI status. <b>Write operations (creating an issue/PR, commenting, merging) are real and visible to your team</b> — treat them the way Week 2 treats any irreversible action: confirm the exact content before it goes out.</li>
+      <li><b>This is exactly the "actions visible to others" category</b> from how you should generally work with any agent — an opened issue or a pushed PR is not private scratch work.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Confirm access, read-only</span></div>
+    <span class="where-tag where-vm">VM · terminal</span>
+    <pre><code>gh auth status
+gh repo view --json name,description,defaultBranchRef</code></pre>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Have Claude Code triage, read-only</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Using gh, list the 5 most recently updated open issues (or pull requests,
+if there are no issues) in this repo, and give me a one-line triage note
+for each: what it's about and roughly how urgent it looks.</code></pre>
+    </div>
+    <div class="callout">
+      <b class="tag">If the repo has no issues/PRs yet</b>
+      That's fine — ask Claude Code to run <code>gh issue list</code>/<code>gh pr list</code> and confirm it correctly reports zero, rather than guessing.
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">A real write — only on a repo you control</span></div>
+    <p>If you have write access to a repo you're comfortable creating a test issue on (not a shared production repo), try:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Draft (don't create yet) a GitHub issue titled "W2D0 test issue — safe to
+close" with a one-paragraph body explaining it's a training exercise. Show
+me the exact title and body before you run gh issue create.</code></pre>
+    </div>
+    <p>Review what it drafted, then explicitly approve before it actually runs <code>gh issue create</code>. Close/delete the test issue afterward.</p>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      The draft-then-approve pattern here is the same approval-gate discipline from Week 2 Day 1 Topic 03 — a write action gets a look before it fires, every time.
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — 09 GitHub Operations Automation</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

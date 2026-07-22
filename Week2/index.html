@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 2 · Claude Code Edition — Course Index</title>
+<link rel="stylesheet" href="css/session-guide.css">
+<style>
+  main { max-width: 1080px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+  .group { margin: 0 0 2.4rem; }
+  .group h2 {
+    margin: 0 0 0.3rem; font-size: 1.3rem; color: var(--brand-dark);
+    display: flex; align-items: baseline; gap: 0.6rem;
+  }
+  .group .group-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.9rem; height: 1.9rem; border-radius: 50%;
+    background: var(--brand); color: #fff; font-size: 0.85rem; font-weight: 800;
+    flex: none;
+  }
+  .group .group-note { margin: 0 0 1rem; color: var(--muted); font-size: 0.95rem; max-width: 760px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; }
+  .card {
+    display: block; padding: 0.85rem 1rem; border-radius: 0.6rem;
+    background: var(--surface); border: 1px solid var(--border); text-decoration: none;
+    box-shadow: 0 1px 2px rgba(23,32,51,0.05); transition: box-shadow 0.15s, border-color 0.15s;
+  }
+  .card:hover { border-color: var(--brand); box-shadow: var(--shadow); }
+  .card .card-tag {
+    display: inline-block; margin: 0 0 0.35rem; font-size: 0.72rem; font-weight: 800;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand);
+  }
+  .card .card-title { display: block; color: var(--ink); font-weight: 600; font-size: 0.98rem; line-height: 1.35; }
+  .card .card-sub { display: block; margin-top: 0.2rem; color: var(--muted); font-size: 0.82rem; }
+  .index-footer { max-width: 1080px; margin: 0 auto; padding: 0 1.25rem 3rem; color: var(--muted); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <p class="eyebrow">Week 2 · Claude Code Edition</p>
+  <h1>Course index — every page, in chronological order</h1>
+  <p>One place to reach every guide in this repo, in the order they're meant to be worked through: instructor reference and environment setup first, then the self-paced W2D0 foundations track, then Week 2 Days 1–5 (AM/PM each). The progressive insurance app built across Days 1–5 lives in <code>app/</code> (see its own <a href="app/README.md" style="color:#ffe6b3;">README</a>) and isn't a guide page itself — each day's PM session links out to it.</p>
+</header>
+
+<main>
+
+<div class="group">
+  <h2><span class="group-num">·</span>Instructor reference</h2>
+  <p class="group-note">The master guide: schedule, provider/cost tables, per-day resources, and the full topic list every session below is built from.</p>
+  <div class="cards">
+    <a class="card" href="guide/week2_instructor_guide.html">
+      <span class="card-tag">Reference</span>
+      <span class="card-title">Week 2 · Instructor Guide</span>
+      <span class="card-sub">guide/week2_instructor_guide.html</span>
+    </a>
+  </div>
+</div>
+
+<div class="group">
+  <h2><span class="group-num">0</span>Environment &amp; cloud sandbox setup</h2>
+  <p class="group-note">Do this before Day 1: VM environment, then AWS (hands-on Bedrock), with Azure/GCP kept as instructor-demo-only references.</p>
+  <div class="cards">
+    <a class="card" href="VM-Clouds/_README.html">
+      <span class="card-tag">Start here</span>
+      <span class="card-title">VM &amp; Cloud Sandbox Guides — overview</span>
+      <span class="card-sub">VM-Clouds/_README.html</span>
+    </a>
+    <a class="card" href="VM-Clouds/_VM_SANDBOX_SETUP.html">
+      <span class="card-tag">Setup</span>
+      <span class="card-title">Ubuntu VM Sandbox Setup</span>
+      <span class="card-sub">VM-Clouds/_VM_SANDBOX_SETUP.html</span>
+    </a>
+    <a class="card" href="VM-Clouds/_AWS_SANDBOX_SETUP.html">
+      <span class="card-tag">Hands-on</span>
+      <span class="card-title">AWS Bedrock Sandbox — Learner Runbook</span>
+      <span class="card-sub">VM-Clouds/_AWS_SANDBOX_SETUP.html</span>
+    </a>
+    <a class="card" href="VM-Clouds/_AZURE_SANDBOX_SETUP.html">
+      <span class="card-tag">Instructor demo</span>
+      <span class="card-title">Azure Sandbox Setup — Ubuntu Learner Guide</span>
+      <span class="card-sub">VM-Clouds/_AZURE_SANDBOX_SETUP.html</span>
+    </a>
+    <a class="card" href="VM-Clouds/_GCP_SANDBOX_SETUP.html">
+      <span class="card-tag">Instructor demo</span>
+      <span class="card-title">GCP Sandbox Setup — Vertex AI from Cloud Shell</span>
+      <span class="card-sub">VM-Clouds/_GCP_SANDBOX_SETUP.html</span>
+    </a>
+  </div>
+</div>
+
+<div class="group">
+  <h2><span class="group-num">0</span>W2D0 — Claude Code foundations &amp; capstone</h2>
+  <p class="group-note">Self-paced, work through in order before Week 2 Day 1: Claude Code's own mechanics (topics 00–13), then a full EDA + ML + Streamlit capstone built stage by stage (14–18).</p>
+  <div class="cards">
+    <a class="card" href="W2D0/00_orientation.html"><span class="card-tag">00</span><span class="card-title">Orientation</span></a>
+    <a class="card" href="W2D0/01_claude_md_and_config.html"><span class="card-tag">01</span><span class="card-title">CLAUDE.md &amp; Hierarchical Config</span></a>
+    <a class="card" href="W2D0/02_settings_and_modes.html"><span class="card-tag">02</span><span class="card-title">Settings &amp; Permission Modes</span></a>
+    <a class="card" href="W2D0/03_slash_commands.html"><span class="card-tag">03</span><span class="card-title">Slash Commands</span></a>
+    <a class="card" href="W2D0/04_skills.html"><span class="card-tag">04</span><span class="card-title">Skills</span></a>
+    <a class="card" href="W2D0/05_subagents_and_specs.html"><span class="card-tag">05</span><span class="card-title">Subagents &amp; Specs</span></a>
+    <a class="card" href="W2D0/06_hooks.html"><span class="card-tag">06</span><span class="card-title">Hooks</span></a>
+    <a class="card" href="W2D0/07_context_management.html"><span class="card-tag">07</span><span class="card-title">Context Management</span></a>
+    <a class="card" href="W2D0/08_mcp_servers_and_tools.html"><span class="card-tag">08</span><span class="card-title">MCP Servers &amp; Tools</span></a>
+    <a class="card" href="W2D0/09_github_automation.html"><span class="card-tag">09</span><span class="card-title">GitHub Operations Automation</span></a>
+    <a class="card" href="W2D0/10_git_sync_automation.html"><span class="card-tag">10</span><span class="card-title">Automated Git Sync</span></a>
+    <a class="card" href="W2D0/11_model_management.html"><span class="card-tag">11</span><span class="card-title">Model Management</span></a>
+    <a class="card" href="W2D0/12_plugins.html"><span class="card-tag">12</span><span class="card-title">Plugins</span></a>
+    <a class="card" href="W2D0/13_artifacts.html"><span class="card-tag">13</span><span class="card-title">Artifacts</span></a>
+    <a class="card" href="W2D0/14_capstone_setup_and_eda.html"><span class="card-tag">Capstone 1</span><span class="card-title">Setup &amp; EDA</span></a>
+    <a class="card" href="W2D0/15_capstone_model_training.html"><span class="card-tag">Capstone 2</span><span class="card-title">Model Training</span></a>
+    <a class="card" href="W2D0/16_capstone_streamlit_ui.html"><span class="card-tag">Capstone 3</span><span class="card-title">Streamlit UI</span></a>
+    <a class="card" href="W2D0/17_capstone_testing.html"><span class="card-tag">Capstone 4</span><span class="card-title">Automated Testing</span></a>
+    <a class="card" href="W2D0/18_capstone_deployment.html"><span class="card-tag">Capstone 5</span><span class="card-title">Deployment</span></a>
+  </div>
+</div>
+
+<div class="group">
+  <h2><span class="group-num">1</span>Week 2 · Day 1</h2>
+  <p class="group-note">Claude Agent SDK primitives, via Claude Code itself. Insurance thread primary; the progressive app's Day 1 increment (grounded lookup) is built in the PM app-build slot.</p>
+  <div class="cards">
+    <a class="card" href="W2D1/W2D1AM.html">
+      <span class="card-tag">AM</span>
+      <span class="card-title">The Agentic Loop, via Claude Code</span>
+    </a>
+    <a class="card" href="W2D1/W2D1PM.html">
+      <span class="card-tag">PM</span>
+      <span class="card-title">Claude Agent SDK Primitives, on Your Own Claude Code</span>
+    </a>
+  </div>
+</div>
+
+<div class="group">
+  <h2><span class="group-num">2</span>Week 2 · Day 2</h2>
+  <p class="group-note">Frameworks and orchestration in the morning; multi-agent patterns, MCP, and A2A in the afternoon. Day 2's app increment adds the triage/grounding handoff.</p>
+  <div class="cards">
+    <a class="card" href="W2D2/W2D2AM.html">
+      <span class="card-tag">AM</span>
+      <span class="card-title">Frameworks, Scaffolding &amp; Orchestration Patterns</span>
+    </a>
+    <a class="card" href="W2D2/W2D2PM.html">
+      <span class="card-tag">PM</span>
+      <span class="card-title">Multi-Agent Systems, MCP &amp; A2A</span>
+    </a>
+  </div>
+</div>
+
+<div class="group">
+  <h2><span class="group-num">3</span>Week 2 · Day 3</h2>
+  <p class="group-note">Agentic RAG and GraphRAG in the morning; memory, real-time data, and cost in the afternoon. Day 3's app increment adds real RAG grounding, caching, and a fraud signal.</p>
+  <div class="cards">
+    <a class="card" href="W2D3/W2D3AM.html">
+      <span class="card-tag">AM</span>
+      <span class="card-title">Agentic RAG, GraphRAG &amp; Retrieval That Reasons</span>
+    </a>
+    <a class="card" href="W2D3/W2D3PM.html">
+      <span class="card-tag">PM</span>
+      <span class="card-title">Memory, Real-Time Data &amp; Cost</span>
+    </a>
+  </div>
+</div>
+
+<div class="group">
+  <h2><span class="group-num">4</span>Week 2 · Day 4</h2>
+  <p class="group-note">Guardrails and reference architecture in the morning; observability, evaluation, and cost in production in the afternoon. Day 4's app increment adds injection scanning and PII redaction.</p>
+  <div class="cards">
+    <a class="card" href="W2D4/W2D4AM.html">
+      <span class="card-tag">AM</span>
+      <span class="card-title">AI-DLC, Reference Architecture, Guardrails &amp; Security</span>
+    </a>
+    <a class="card" href="W2D4/W2D4PM.html">
+      <span class="card-tag">PM</span>
+      <span class="card-title">Observability, Evaluation &amp; Cost in Production</span>
+    </a>
+  </div>
+</div>
+
+<div class="group">
+  <h2><span class="group-num">5</span>Week 2 · Day 5</h2>
+  <p class="group-note">Agentic AI across the enterprise in the morning; delivery excellence, governance, and the capstone in the afternoon. Day 5's app increment closes the week: audit chain, autonomy gate, and the full 12-email pipeline run.</p>
+  <div class="cards">
+    <a class="card" href="W2D5/W2D5AM.html">
+      <span class="card-tag">AM</span>
+      <span class="card-title">Agentic AI Across the Enterprise</span>
+    </a>
+    <a class="card" href="W2D5/W2D5PM.html">
+      <span class="card-tag">PM</span>
+      <span class="card-title">Delivery Excellence, Governance &amp; Capstone</span>
+    </a>
+  </div>
+</div>
+
+</main>
+
+<p class="index-footer">31 pages total (1 instructor guide + 5 setup guides + 19 W2D0 pages + 10 Week 2 Day 1–5 AM/PM sessions), plus the progressive insurance app in <code>app/</code> that Days 1–5's PM sessions build up together.</p>
+
+<footer class="page-footer">Week 2 · Claude Code Edition — Course Index</footer>
+<script src="css/lab-readme.js"></script>
+</body>
+</html>

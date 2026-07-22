@@ -1,0 +1,12 @@
+also we need to plan W2D0 folder containing all the various claude code concepts like
+
+- CLAUDE.md file, .claude folder in various folders (heirarchical search), 
+- frequently used inbuilt and custom created slash commands,  skills, agents, specs, hooks, etc.; project scoped vs user scoped files/commands
+
+- some additional concepts like: modes (plan, manual, and other), understanding context, manual context compacting, subagents, github operations automation, models management, plugins, artifacts, mcp server and tools (readymade and custom), etc.
+
+- after explaining basic commands/examples, plan to build a full EDA+ML project with streamlit UI along with deployment. step by step developed through claude code commands through CLI and automating multiple micro-processes
+
+- arrange all contents in chronological order for their understanding and applicability in the planned project.
+
+- may be you can create multiple html files numbered in sequence in chronological order

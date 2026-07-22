@@ -1,0 +1,24 @@
+# Reference GitHub Actions eval gate for Day 4 PM Topic 05.
+# Copy to .github/workflows/eval-gate.yml at the repo root to activate.
+#
+# Runs the same deterministic, mocked checks as test_eval_gate.py on every
+# push -- no API key, no network call, so it's safe to run on every commit
+# without spending anything. A regression below the quality floor fails
+# the build, exactly the way test_eval_gate.py fails locally if you lower
+# MIN_INJECTION_SCORE/MIN_TRAJECTORY_SCORE below what the code achieves.
+name: eval-gate
+
+on: [push, pull_request]
+
+jobs:
+  eval-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install pytest
+      - name: Run eval-gated tests (deterministic, no API key)
+        run: pytest W2D4/snippets/test_eval_gate.py -v

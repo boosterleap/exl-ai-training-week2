@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 2 · Instructor Guide</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f7f6f3; color: #111; font-size: 17px; line-height: 1.6; }
+  .site-index-link { padding: 8px 40px; font-size: 14px; font-weight: 650; background: #fff; border-bottom: 1px solid #e0ddd6; }
+  .site-index-link a { color: #1a1a2e; text-decoration: none; }
+  .site-index-link.bottom { border-top: 1px solid #e0ddd6; border-bottom: none; text-align: center; color: #555; }
+  .page-header { background: #1a1a2e; color: #fff; padding: 32px 40px 28px; }
+  .page-header h1 { font-size: 27px; font-weight: 600; margin-bottom: 4px; }
+  .page-header .meta { font-size: 16px; color: #aaa; }
+  .page-header .tagline { font-size: 16px; color: #ccc; margin-top: 8px; max-width: 920px; }
+  .legend-bar { background: #fff; border-bottom: 1px solid #e0ddd6; padding: 12px 40px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; font-size: 14px; color: #555; position: sticky; top: 0; z-index: 10; }
+  .ls { display: inline-block; width: 26px; height: 13px; border-radius: 3px; vertical-align: middle; margin-right: 5px; }
+  .build-thread { margin: 24px 40px 0; background: linear-gradient(135deg, #1e3a5f 0%, #1a1a2e 100%); color: #fff; border-radius: 10px; padding: 18px 22px; }
+  .build-thread h2 { font-size: 17px; font-weight: 700; margin-bottom: 8px; color: #93c5fd; }
+  .build-thread p { font-size: 14px; color: #cbd5e1; line-height: 1.55; margin-bottom: 6px; }
+  .build-thread .ship-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .ship-pill { font-size: 14px; background: rgba(255,255,255,0.12); border: 0.5px solid rgba(255,255,255,0.25); padding: 4px 10px; border-radius: 20px; }
+  .delivery-tracks { margin: 20px 40px; background: #fff; border: 1px solid #e0ddd6; border-radius: 10px; padding: 16px 20px; }
+  .delivery-tracks h2 { font-size: 17px; font-weight: 700; color: #1a1a2e; margin-bottom: 10px; }
+  .delivery-tracks p { font-size: 14px; color: #555; margin-bottom: 8px; line-height: 1.55; }
+  .track-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+  .track-table th, .track-table td { border: 1px solid #e8e7e0; padding: 7px 10px; text-align: left; vertical-align: top; }
+  .track-table th { background: #fafaf7; font-weight: 600; }
+  .day-block { margin: 28px 40px; background: #fff; border: 1px solid #e0ddd6; border-radius: 10px; overflow: hidden; }
+  .day-header { padding: 14px 20px; border-bottom: 1px solid #e8e7e0; flex-wrap: wrap; }
+  .day-header-top { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .day-label { font-size: 16px; font-weight: 700; color: #fff; background: #1a1a2e; padding: 3px 12px; border-radius: 20px; }
+  .day-title { font-size: 18px; font-weight: 600; color: #1a1a2e; }
+  .ship-badge { font-size: 14px; padding: 3px 10px; border-radius: 12px; font-weight: 600; margin-left: auto; background: #dcfce7; color: #166534; border: 0.5px solid #86efac; }
+  .session-objectives { font-size: 14px; color: #555; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e8e7e0; line-height: 1.5; }
+  .session-objectives b { color: #333; }
+  .session { border-bottom: 1px solid #f0ede6; }
+  .session:last-child { border-bottom: none; }
+  .session-header { display: flex; align-items: center; gap: 10px; padding: 12px 20px 0; flex-wrap: wrap; }
+  .slot { font-size: 14px; font-weight: 700; padding: 3px 10px; border-radius: 4px; }
+  .concepts { background: #ede9fe; color: #4c1d95; }
+  .lab { background: #fce7f3; color: #9d174d; }
+  .session-title { font-size: 16px; font-weight: 600; color: #333; }
+  .session-meta { font-size: 14px; color: #888; padding: 4px 20px 0; }
+  .session-body { display: grid; grid-template-columns: 40% 60%; gap: 0; }
+  .col { padding: 14px 16px; border-right: 1px solid #f0ede6; min-width: 0; }
+  .col:last-child { border-right: none; }
+  .col-left { display: flex; flex-direction: column; gap: 0; }
+  .col-section { min-width: 0; }
+  .col-section + .col-section { margin-top: 14px; padding-top: 14px; border-top: 1px solid #f0ede6; }
+  .col-resources .pill { margin-top: 0; }
+  .col-label { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #999; margin-bottom: 8px; }
+  .implementation-path { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 7px; padding: 9px 11px; margin-bottom: 12px; }
+  .implementation-path h3 { font-size: 14px; color: #1a1a2e; margin-bottom: 4px; }
+  .implementation-path p, .implementation-path li { font-size: 13px; color: #555; line-height: 1.45; }
+  .implementation-path ol { margin: 5px 0 0 22px; }
+  .coverage-contract { margin: 20px 40px; background: #eff6ff; border: 1px solid #93c5fd; border-radius: 10px; padding: 14px 18px; }
+  .coverage-contract h2 { font-size: 17px; color: #1e3a8a; margin-bottom: 4px; }
+  .coverage-contract p { font-size: 14px; color: #334155; }
+  .concept-list { list-style: none; }
+  .concept-list li { font-size: 14px; color: #444; padding: 3px 0 3px 12px; position: relative; line-height: 1.45; }
+  .concept-list li::before { content: "›"; position: absolute; left: 0; color: #aaa; }
+  .pill { display: inline-block; font-size: 13px; padding: 2px 7px; border-radius: 4px; margin: 2px 2px 2px 0; background: #f1efe8; border: 0.5px solid #b4b2a9; color: #5f5e5a; }
+  .pick { background: #e1f5ee; color: #085041; border: 0.5px solid #5dcaa5; font-weight: 600; }
+  .pill-py { background: #fff7ed; color: #9a3412; border: 0.5px solid #fdba74; font-weight: 600; }
+  .pill-free { background: #dcfce7; color: #166534; border: 0.5px solid #86efac; font-size: 11px; font-weight: 600; }
+  .pill-paid { background: #fef2f2; color: #991b1b; border: 0.5px solid #fca5a5; font-size: 11px; font-weight: 600; }
+  .dataset-box, .platform-box { background: #fafaf7; border: 1px solid #e4e2d8; border-radius: 7px; padding: 9px 11px; margin-top: 8px; }
+  .platform-box { background: #f8fafc; border-color: #cbd5e1; }
+  .box-name { font-size: 14px; font-weight: 700; color: #1a1a2e; margin-bottom: 2px; }
+  .box-detail { font-size: 13px; color: #666; line-height: 1.45; }
+  .col-flow { padding: 14px 12px; }
+  .flow-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .flow-card {
+    display: block;
+    background: #fff; border: 1px solid #e4e2d8; border-radius: 8px;
+    padding: 10px 11px; min-height: 78px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    font-size: 14px; color: #333; line-height: 1.45;
+  }
+  .flow-card > .flow-app { display: block; margin-top: 3px; margin-bottom: 3px; }
+  .flow-card code { font-size: 13px; word-break: break-word; }
+  .flow-card:hover { border-color: #a5b4fc; box-shadow: 0 2px 6px rgba(30, 64, 175, 0.08); }
+  .flow-card--break { background: #fffbeb; border-color: #fde68a; min-height: 52px; }
+  .flow-card--assess { background: #f0fdf4; border-color: #86efac; grid-column: 1 / -1; min-height: 64px; }
+  .flow-card--event { background: #fff7ed; border-color: #fdba74; grid-column: 1 / -1; min-height: 64px; }
+  .flow-card:has(.flow-break):not(:has(.flow-app)) { background: #fffbeb; border-color: #fde68a; min-height: 52px; }
+  .flow-card:has(.flow-assess) { background: #f0fdf4; border-color: #86efac; grid-column: 1 / -1; min-height: 64px; }
+  .flow-card:has(.flow-event) { background: #fff7ed; border-color: #fdba74; grid-column: 1 / -1; min-height: 64px; }
+  .flow-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+  .flow-time { display: inline-block; font-size: 13px; font-weight: 700; color: #1e40af; background: #eff6ff; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+  .flow-break { display: inline-block; font-size: 13px; font-weight: 700; color: #92400e; background: #fef3c7; padding: 2px 7px; border-radius: 4px; }
+  .flow-assess { display: inline-block; font-size: 13px; font-weight: 700; color: #166534; background: #dcfce7; padding: 2px 7px; border-radius: 4px; }
+  .flow-lunch { display: inline-block; font-size: 13px; font-weight: 700; color: #6b21a8; background: #f3e8ff; padding: 2px 7px; border-radius: 4px; }
+  .flow-event { display: inline-block; font-size: 13px; font-weight: 700; color: #9a3412; background: #ffedd5; padding: 2px 7px; border-radius: 4px; }
+  .schedule-box { margin: 20px 40px; background: #fff; border: 1px solid #e0ddd6; border-radius: 10px; padding: 16px 20px; }
+  .schedule-box h2 { font-size: 17px; font-weight: 700; color: #1a1a2e; margin-bottom: 10px; }
+  .flow-app { font-weight: 600; color: #1a1a2e; font-size: 14px; line-height: 1.35; }
+  .flow-desc { font-size: 13px; color: #555; line-height: 1.45; flex: 1; }
+  .flow-meta { font-size: 13px; color: #666; margin-top: 8px; padding-top: 4px; border-top: 1px dashed #ebe8e0; line-height: 1.4; }
+  .flow-links { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+  .flow-links a { color: #1e40af; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 2px 5px; text-decoration: none; font-size: 12px; }
+  .instructor-note { background: #fffbea; border-left: 3px solid #f59e0b; padding: 8px 12px; font-size: 14px; color: #78510a; margin: 10px 20px 14px; line-height: 1.5; }
+  .pitfall-note { background: #fef2f2; border-left: 3px solid #ef4444; padding: 8px 12px; font-size: 14px; color: #7f1d1d; margin: 0 20px 14px; line-height: 1.5; }
+  .d-banking { background: #dbeafe; color: #1e3a8a; padding: 2px 10px; border-radius: 12px; font-size: 14px; font-weight: 500; }
+  .d-insurance { background: #fce7f3; color: #831843; padding: 2px 10px; border-radius: 12px; font-size: 14px; font-weight: 500; }
+  .d-healthcare { background: #d1fae5; color: #064e3b; padding: 2px 10px; border-radius: 12px; font-size: 14px; font-weight: 500; }
+  .d-supply { background: #ffedd5; color: #7c2d12; padding: 2px 10px; border-radius: 12px; font-size: 14px; font-weight: 500; }
+  .d-finance { background: #ede9fe; color: #3b0764; padding: 2px 10px; border-radius: 12px; font-size: 14px; font-weight: 500; }
+  .domain-badge { margin-left: auto; }
+  @media (max-width: 1200px) { .flow-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 1100px) { .flow-grid { grid-template-columns: 1fr; } .flow-card--assess, .flow-card--event, .flow-card:has(.flow-assess), .flow-card:has(.flow-event) { grid-column: 1; } }
+  @media (max-width: 900px) { .session-body { grid-template-columns: 1fr; } .col { border-right: none; border-bottom: 1px solid #f0ede6; } }
+</style>
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<div class="page-header">
+  <h1>Week 2 · Instructor Delivery Guide (Claude Code edition)</h1>
+  <div class="meta">EXL Campus Hires · Level 2: Agentic Deep Dive · Claude-Code-first delivery, no per-learner Anthropic API key · <a href="week1_instructor_guide.html" style="color:#93c5fd;">← Week 1</a> · <a href="week3_instructor_guide.html" style="color:#93c5fd;">Week 3 →</a></div>
+  <div class="tagline">Daily clock: <strong>11:00–15:00</strong> concept exploration · <strong>15:00–16:00</strong> lunch · <strong>16:00–20:00</strong> build lab. Each block is 4 hours with <strong>10–15 min revision</strong> (11:00 start) · <strong>10 min break</strong> mid-block · a short end-of-AM showcase (no formal grading) and a single <strong>30-min MCQ assessment</strong> at the end of PM (25–30 questions, owned by the assessment team, covering that day's 12 topics). Learners have no raw <code>ANTHROPIC_API_KEY</code> — the primary hands-on runtime is <strong>Claude Code itself</strong> (already logged in via subscription on the Ubuntu VM), with <strong>AWS Bedrock</strong> as the one practical outside-Claude-Code LLM call. Layout: <strong>40%</strong> concepts + resources · <strong>60%</strong> session flow. <strong>One cumulative codebase</strong>, two parallel domain threads.</div>
+</div>
+
+<div class="legend-bar">
+  <span><span class="ls" style="background:#ede9fe;"></span> Session 1 · 11:00–15:00</span>
+  <span><span class="ls" style="background:#f3e8ff;"></span> Lunch · 15:00–16:00</span>
+  <span><span class="ls" style="background:#fce7f3;"></span> Session 2 · 16:00–20:00</span>
+  <span><span class="ls" style="background:#dcfce7;"></span> <span class="pill-free">FREE</span> platform / account</span>
+  <span><span class="ls" style="background:#fef2f2;"></span> <span class="pill-paid">PAID</span> — sandbox-provisioned only (AWS Bedrock hands-on; GCP/Azure instructor-demo)</span>
+</div>
+
+<div class="build-thread">
+  <h2>Build thread · Automated Ticket / Delivery Resolution Assistant</h2>
+  <p>One shared repo per learner (`W2D1`…`W2D5` + root `CLAUDE.md`), extended daily on the <strong>Ubuntu VM</strong>, driven primarily by <strong>directing and inspecting Claude Code itself</strong> rather than writing raw API calls. Two parallel domains carry every day's topics: <strong>Insurance</strong> (primary — concept exploration + guided hands-on every session) resolves inbound claim/policy emails against `data/insurance/`; <strong>Logistics</strong> (exercise/homework) resolves delivery-exception emails against `data/logistics/`, transferring the same day's concept independently. Stack actually installed in the VM's `ai_agent_env`: <strong>LangGraph, CrewAI, AutoGen, MCP, python-a2a, Mem0, Chroma/LanceDB/Qdrant, NetworkX, boto3</strong>, plus Postgres+pgvector/Redis/Neo4j already running as live services. GCP Vertex/ADK and standalone Azure OpenAI are instructor-demo only (no matching packages installed; not required for learner hands-on).</p>
+  <div class="ship-row">
+    <span class="ship-pill">D1 → CLAUDE.md-scaffolded repo + first MCP lookup tool + configured permissions</span>
+    <span class="ship-pill">D2 → subagent-based triage + real MCP/A2A evidence + one Bedrock call</span>
+    <span class="ship-pill">D3 → local agentic RAG (LanceDB/pgvector) + GraphRAG + session memory</span>
+    <span class="ship-pill">D4 → guardrails + scored trajectory + green eval-gated CI</span>
+    <span class="ship-pill">D5 → demo-ready assistant + governance + capstone brief</span>
+  </div>
+</div>
+
+<div class="coverage-contract">
+  <h2>Week 2 topic coverage contract · 60 topics</h2>
+  <p>The programme PDF’s <strong>60 topics (10 sessions × 6 topics)</strong> are the authoritative coverage contract and are reproduced verbatim in every session below — unchanged from the original curriculum. What changed for this cohort is <strong>how</strong> each topic is delivered: no per-learner Anthropic API key, so wherever the original curriculum used a raw SDK/API script to demonstrate an agent-loop, tool, memory, or permission concept, this edition instead directs learners to operate and inspect <strong>Claude Code itself</strong> (which is built on those same primitives) or, where a topic needs a true outside call, uses the sandbox-provisioned <strong>AWS Bedrock</strong> path. The progressive implementation chains may combine multiple topics into one guided block for delivery, but no topic may be omitted. “Coverage/demo to verify” marks a visible implementation gap for later content-by-content review, not permission to skip the topic.</p>
+</div>
+
+<div class="schedule-box">
+  <h2>Daily timetable (all days)</h2>
+  <table class="track-table">
+    <tr><th>Clock</th><th>Segment</th><th>Duration</th><th>Notes</th></tr>
+    <tr><td><strong>11:00–11:15</strong></td><td>Day revision</td><td>15 min</td><td>Week bridge, yesterday recap, environment check (<code>conda activate ai_agent_env</code>) — <em>session 1 only</em></td></tr>
+    <tr><td><strong>11:15–14:45</strong></td><td>Concept exploration cycles</td><td>~210 min</td><td>3–4 short cycles per PDF topic pair: concept nugget (5–8 min) → instructor drives Claude Code live → learners repeat/extend solo or in pairs → quick showcase. Topics 01–06, insurance thread primary.</td></tr>
+    <tr><td><strong>13:00–13:10</strong></td><td>Break</td><td>10 min</td><td>Falls inside the cycle above, mid-session</td></tr>
+    <tr><td><strong>14:45–15:00</strong></td><td>AM showcase</td><td>15 min</td><td>1–2 learners demo what Claude Code did differently for them; no formal grading</td></tr>
+    <tr><td><strong>15:00–16:00</strong></td><td><span class="flow-lunch">Lunch</span></td><td>60 min</td><td>No instruction</td></tr>
+    <tr><td><strong>16:00–16:05</strong></td><td>Bridge</td><td>5 min</td><td>PM objectives, environment check, repo status</td></tr>
+    <tr><td><strong>16:05–19:30</strong></td><td>Build lab cycles</td><td>~205 min</td><td>Same cycle structure applied to the day's build lab; insurance thread guided, logistics thread as an in-session + homework exercise</td></tr>
+    <tr><td><strong>18:00–18:10</strong></td><td>Break</td><td>10 min</td><td>Falls inside the cycle above, mid-session</td></tr>
+    <tr><td><strong>19:30–20:00</strong></td><td><span class="flow-assess">Assessment</span></td><td>30 min</td><td>25–30 MCQs covering that day's 12 topics (AM + PM) — <em>one assessment slot per day, not per session</em></td></tr>
+  </table>
+  <p style="font-size: 14px;color:#666;margin-top:8px;">Days 2–5: shorten 11:00 revision to <strong>11:00–11:10</strong> (10 min) and add 5 min to the AM cycle block. Flow steps in each session guide use <strong>clock times</strong>; the full step-by-step (what to type, where to run it) lives in the linked <code>W2D#AM/PM</code> session guide, not in this instructor doc.</p>
+</div>
+
+<div class="delivery-tracks">
+  <h2>LLM/agent runtimes — one cumulative codebase</h2>
+  <p>No learner has a raw <code>ANTHROPIC_API_KEY</code> this week. VM setup starts before Day 1 with the <a href="../VM-Clouds/_README.html">VM and cloud sandbox landing page</a> and the <a href="../VM-Clouds/_VM_SANDBOX_SETUP.html">Ubuntu VM setup guide</a>; the environment top-up step (installing the few packages missing from <code>ai_agent_env</code> — <code>sentence-transformers</code>, <code>diskcache</code>, <code>psycopg2-binary</code>, <code>redis</code>, <code>neo4j</code>, <code>presidio-analyzer</code>/<code>presidio-anonymizer</code>, <code>pytest</code>, <code>mlflow</code>) runs once before Day 1 AM. GCP and Azure primers are instructor-demonstrated only — learners watch, they don't provision keys for those two.</p>
+  <table class="track-table">
+    <tr><th>Runtime</th><th>What it's used for</th><th>Auth</th><th>Curriculum role</th></tr>
+    <tr><td>Claude Code (in VS Code / CLI)</td><td>The primary hands-on vehicle all week: agentic loop, tools, MCP, memory/sessions, permissions, hooks, subagents — learners operate and inspect it directly rather than writing an equivalent script against a raw API</td><td>Already logged in via subscription OAuth on the VM (confirmed: <code>claude auth status</code> → <code>loggedIn: true</code>) — no key needed</td><td>Required, every session, Day 1 onward</td></tr>
+    <tr><td>AWS Bedrock</td><td>Boto3 <code>Converse</code> call against a Claude model, plus a bounded deterministic gateway-authorization exercise</td><td>Learner's own AWS sandbox login → generate an IAM access key → move it to the VM via <a href="#syncclip">syncclip.in</a> (sandboxes don't share a clipboard) → export in the VM terminal</td><td>Required Day 2 PM Topic 4 hands-on, in <code>us-east-1</code> — the one outside-Claude-Code LLM call learners make themselves</td></tr>
+    <tr><td>Vertex AI + Google ADK</td><td>Agent, tools, callbacks, sessions — instructor walkthrough only (no <code>google-adk</code>/<code>google-cloud-aiplatform</code> installed in <code>ai_agent_env</code>)</td><td>Instructor's own access; learners watch, no learner setup</td><td>Conceptual/demo-only, referenced at Day 2 AM framework-landscape topic</td></tr>
+    <tr><td>Standalone Azure OpenAI</td><td>Agent Framework client, tools, sessions, workflows — instructor walkthrough only (no framework packages installed)</td><td>Instructor's own access; learners watch, no learner setup</td><td>Conceptual/demo-only, referenced at Day 2 AM framework-landscape topic</td></tr>
+  </table>
+  <p id="syncclip" style="font-size: 14px;color:#555;margin-top:8px;"><strong>Cross-sandbox credential handoff:</strong> the Ubuntu VM, AWS, Azure, and GCP sandboxes are fully isolated — no shared clipboard between them. Wherever a secret needs to move from a cloud console to the VM: (1) generate it in the cloud sandbox browser, (2) open <a href="https://syncclip.in">syncclip.in</a> in that same browser tab, paste it in, and note the sync code, (3) open syncclip.in in the VM's browser, enter the same code, retrieve the text, (4) paste it into a hidden VM terminal prompt (never into a file, notebook cell, or chat) and clear the syncclip.in note afterward. This is the only credential-handoff pattern used this week — the full step-by-step lives in <a href="../VM-Clouds/_AWS_SANDBOX_SETUP.html">the AWS sandbox guide</a>.</p>
+</div>
+
+<div class="delivery-tracks">
+  <h2>Accounts &amp; cost policy</h2>
+  <table class="track-table">
+    <tr><th>Service</th><th>Cost</th><th>What learners need</th></tr>
+    <tr><td><strong>Claude Code subscription</strong></td><td><span class="pill-free">FREE</span> to the learner</td><td>Already logged in on the VM — nothing to provision; verify with <code>claude auth status</code></td></tr>
+    <tr><td><strong>AWS Bedrock</strong></td><td><span class="pill-paid">PAID</span> (sandbox-covered)</td><td>Assigned sandbox login, an IAM access key generated by the learner, <code>us-east-1</code>, and an exact discovered/admin-approved <code>BEDROCK_MODEL_ID</code> following the <a href="../VM-Clouds/_AWS_SANDBOX_SETUP.html">AWS sandbox guide</a></td></tr>
+    <tr><td><strong>GCP Vertex AI / Azure OpenAI</strong></td><td><span class="pill-paid">PAID</span> (sandbox-covered)</td><td>Instructor-only for this cohort — see the <a href="../VM-Clouds/_GCP_SANDBOX_SETUP.html">GCP</a> / <a href="../VM-Clouds/_AZURE_SANDBOX_SETUP.html">Azure</a> setup guides if demonstrating live; no learner action required</td></tr>
+    <tr><td><strong>GitHub</strong></td><td><span class="pill-free">FREE</span></td><td>Repo + Actions for the Day 4 eval gate (public repo or org free tier)</td></tr>
+    <tr><td><strong>Python (conda) + uv + Docker</strong></td><td><span class="pill-free">FREE</span></td><td>Already installed on the VM — activate <code>ai_agent_env</code>, do not use <code>base</code></td></tr>
+    <tr><td><strong>LanceDB, Chroma, Qdrant-client, NetworkX, DiskCache</strong></td><td><span class="pill-free">FREE</span> OSS</td><td>Chroma/LanceDB/Qdrant clients pre-installed; <code>diskcache</code> added in the pre-Day-1 top-up. No external vector-DB account needed.</td></tr>
+    <tr><td><strong>Postgres+pgvector, Redis, Neo4j</strong></td><td><span class="pill-free">FREE</span>, already running</td><td>Live system services on the VM (confirmed: pgvector 0.8.0, Redis 7.0.15, Neo4j active) — learners only add the matching Python client (<code>psycopg2-binary</code>/<code>pgvector</code>, <code>redis</code>, <code>neo4j</code>) and point at localhost</td></tr>
+    <tr><td><strong>Presidio, pytest, MLflow</strong></td><td><span class="pill-free">FREE</span> OSS</td><td>Added in the pre-Day-1 top-up (<code>presidio-analyzer</code>, <code>presidio-anonymizer</code>, <code>pytest</code>, <code>mlflow</code>) for the Day 4 guardrail/eval-gate and Day 5 ROI-logging exercises</td></tr>
+    <tr><td>Managed agent runtimes, deployment, databases, and Kubernetes</td><td><span class="pill-paid">PAID</span></td><td>Optional architecture context only: AgentCore, Foundry, Vertex AI Agent Builder, EKS/AKS/GKE, managed databases, and deployment services are not required for any lab</td></tr>
+  </table>
+  <p style="font-size: 14px;color:#555;margin-top:8px;">All cloud sandboxes begin automatic cleanup four hours after start; stopping also triggers 15–20 minutes of cleanup. Enforce the $10 credit ceiling, provider region constraints, and no hardcoded credentials. The one Bedrock call is a manual, bounded learner check and must not be scripted to re-run automatically.</p>
+</div>
+
+<!-- DAY 1 -->
+<div class="day-block">
+  <div class="day-header">
+    <div class="day-header-top">
+      <span class="day-label">Day 1</span>
+      <span class="day-title">Agentic Foundations, via Claude Code</span>
+      <span class="ship-badge">Ship: CLAUDE.md-scaffolded repo + first MCP lookup tool + configured permissions</span>
+    </div>
+    <div class="session-objectives"><b>Session objectives (Day 1):</b> Direct and inspect Claude Code to surface the agentic loop, reasoning patterns, tool contracts, layered memory, agent-vs-pipeline judgment, and guardrails on the insurance ticket-resolution thread; then treat Claude Code's own primitives (MCP tools, message blocks, sessions, permissions, cost reporting) as the Day 1 PM lab, building the first real lookup tool and configuring real permissions. No raw <code>ANTHROPIC_API_KEY</code> is used — one short instructor-run LangGraph+Anthropic demo (instructor's own machine) shows the explicit graph form for comparison.</div>
+  </div>
+
+  <div class="session">
+    <div class="session-header">
+      <span class="slot concepts">CONCEPTS</span>
+      <span class="session-title">The agentic loop, reasoning, tools, memory &amp; guardrails — observed live in Claude Code</span>
+      <span class="domain-badge d-insurance">Insurance · primary</span>
+      <span class="domain-badge d-supply">Logistics · exercise</span>
+    </div>
+    <p class="session-meta"><strong>11:00–15:00</strong> · revision 11:00–11:15 · break 13:00–13:10 · showcase 14:45–15:00 (no formal assessment)</p>
+    <div class="session-body">
+      <div class="col col-left">
+        <div class="col-section">
+        <div class="col-label">PDF topic coverage contract 01–06</div>
+        <ul class="concept-list">
+          <li><b>01</b> The agentic loop, in depth — perceive → reason → act → observe; why an agent is a distributed system where the LLM is the planner / executor, not just a prompt.</li>
+          <li><b>02</b> Reasoning &amp; planning patterns — ReAct, plan-and-execute, reflection / self-critique and tree-of-thought; reasoning (“thinking”) models and extended thinking in 2026.</li>
+          <li><b>03</b> Tools as contracts — function calling with JSON-Schema arguments, input / output validation, idempotent side-effects and explicit time / cost budgets.</li>
+          <li><b>04</b> Memory, layered — working context vs summaries, artifacts and long-term preferences; “memory ≠ a vector DB”; the lost-in-the-middle effect.</li>
+          <li><b>05</b> Agent vs pipeline — use an agent for open-ended, unpredictable steps; a hardcoded workflow is cheaper and faster when you can script it.</li>
+          <li><b>06</b> Failure modes &amp; guardrails (intro) — hallucinated tool calls, loops and runaway cost — the case for deterministic control points.</li>
+        </ul>
+        </div>
+        <div class="col-section col-resources">
+        <div class="col-label">Libraries · datasets · platforms</div>
+        <span class="pill pick">Claude Code (VS Code + CLI)</span>
+        <span class="pill">langgraph</span>
+        <span class="pill-py">no API key needed</span>
+        <div class="dataset-box">
+          <div class="box-name">FNOL emails + claims SQLite (insurance, primary)</div>
+          <div class="box-detail"><code>data/insurance/fnol_emails.csv</code> + <code>claims.db</code> + <code>policies/*.md</code></div>
+        </div>
+        <div class="dataset-box">
+          <div class="box-name">Delivery-exception emails + shipments SQLite (logistics, exercise/homework)</div>
+          <div class="box-detail"><code>data/logistics/customer_emails.csv</code> + <code>shipments.db</code> + <code>shipment_events.jsonl</code></div>
+        </div>
+        <div class="platform-box">
+          <div class="box-name">Platforms <span class="pill-free">FREE</span></div>
+          <div class="box-detail"><b>Required:</b> <code>conda activate ai_agent_env</code>, Claude Code logged in (verify with <code>claude auth status</code>), seeded <code>claims.db</code>/<code>shipments.db</code>. One short instructor-run LangGraph+Anthropic demo (instructor's own machine) shows the explicit graph form for comparison — not run by learners.</div>
+        </div>
+        </div>
+      </div>
+      <div class="col col-flow">
+        <div class="implementation-path">
+          <h3>Consolidated implementation path</h3>
+          <p>Full step-by-step (exact prompts, where to type them, what to expect) is in <a href="../W2D1/W2D1AM.html">the W2D1AM session guide</a>. Delivery is cycles of concept nugget → instructor drives Claude Code live → learners repeat/extend → quick debrief, not a notebook read-through.</p>
+          <ol>
+            <li>Agentic loop → predict, then watch, Claude Code triage an FNOL email live; name each perceive/reason/act/observe step in its own transcript.</li>
+            <li>Reasoning patterns → prompt Claude Code to reason ReAct-style vs. plan-first on the same email; compare with an extended-thinking pass.</li>
+            <li>Tools as contracts → design the JSON-schema for a "look up claim/policy" tool together before any code exists.</li>
+            <li>Layered memory → grow <code>CLAUDE.md</code> live and watch context compaction trigger on a long session.</li>
+            <li>Agent vs pipeline → time a hardcoded one-path script against letting Claude Code judge an ambiguous email.</li>
+            <li>Failure modes/guardrails → hand Claude Code the deliberately ungrounded <code>commercial_package</code> claim and require it to refuse/escalate, not fabricate.</li>
+          </ol>
+        </div>
+        <div class="col-label">Session flow (11:00–15:00)</div>
+        <div class="flow-grid">
+          <div class="flow-card"><span class="flow-time">11:00–11:15</span> <span class="flow-break">Revision</span><span class="flow-app">Environment + auth check</span>Verify <code>conda activate ai_agent_env</code>, <code>claude auth status</code>, and the seeded <code>claims.db</code>.<div class="flow-links"><a href="../W2D1/W2D1AM.html">W2D1AM session guide</a></div></div>
+          <div class="flow-card"><span class="flow-time">11:15–13:00</span><span class="flow-app">01–03 · Loop, reasoning, tool contracts</span>Cycles on the insurance thread: predict → drive Claude Code live → learners repeat → debrief.<div class="flow-links"><a href="../W2D1/W2D1AM.html#topics-01-03">Steps 1–3</a></div></div>
+          <div class="flow-card flow-card--break"><span class="flow-time">13:00–13:10</span> <span class="flow-break">Break</span></div>
+          <div class="flow-card"><span class="flow-time">13:10–14:45</span><span class="flow-app">04–06 · Memory, pipeline trade-off, guardrails</span>Same cycle structure; closes with the deliberate ungrounded-claim refusal exercise.<div class="flow-links"><a href="../W2D1/W2D1AM.html#topics-04-06">Steps 4–6</a></div></div>
+          <div class="flow-card flow-card--assess"><span class="flow-time">14:45–15:00</span><span class="flow-app">Showcase</span>1–2 learners show what Claude Code did differently for their run; no formal grading.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="session">
+    <div class="session-header">
+      <span class="slot lab">APPLIED LAB</span>
+      <span class="session-title">Claude Agent SDK primitives — configured directly on your own Claude Code</span>
+      <span class="domain-badge d-insurance">Insurance · primary</span>
+      <span class="domain-badge d-supply">Logistics · homework</span>
+    </div>
+    <p class="session-meta"><strong>16:00–20:00</strong> · break 18:00–18:10 · assessment 19:30–20:00</p>
+    <div class="session-body">
+      <div class="col col-left">
+        <div class="col-section">
+        <div class="col-label">PDF topic coverage contract 01–06</div>
+        <ul class="concept-list">
+          <li><b>01</b> The Claude Agent SDK — the same loop, tools and context management that power Claude Code, as a library (<code>claude-agent-sdk</code> · <code>@anthropic-ai/claude-agent-sdk</code>); <code>query()</code> vs <code>ClaudeSDKClient</code>.</li>
+          <li><b>02</b> Built-in &amp; custom tools — file / bash / web tools out of the box; custom domain tools via in-process MCP servers (named <code>mcp__&lt;server&gt;__&lt;tool&gt;</code>).</li>
+          <li><b>03</b> Structured outputs &amp; message blocks — JSON-Schema responses; streaming <code>TextBlock</code> / <code>ToolUseBlock</code> / <code>ToolResultBlock</code> / <code>ThinkingBlock</code>.</li>
+          <li><b>04</b> Memory &amp; sessions — session resume via <code>session_id</code>, <code>CLAUDE.md</code> / <code>AGENTS.md</code> project context, and automatic context compaction.</li>
+          <li><b>05</b> Permissions &amp; model choice — <code>allowed_tools</code> and permission modes; approvals for sensitive actions; Opus 4.8 for reasoning depth, Sonnet 4.6 for speed.</li>
+          <li><b>06</b> Cost awareness — token-weighted cost and the 2026 Agent SDK credit / metering model; budgeting tokens per run.</li>
+        </ul>
+        </div>
+        <div class="col-section col-resources">
+        <div class="col-label">Libraries · datasets · platforms</div>
+        <span class="pill pick">Claude Code (the SDK, as an app)</span>
+        <span class="pill pick">mcp</span>
+        <span class="pill-py">no API key needed</span>
+        <div class="dataset-box">
+          <div class="box-name">FNOL triage corpus (insurance, primary)</div>
+          <div class="box-detail">Same as AM — <code>fnol_emails.csv</code> + <code>claims.db</code> + <code>policies/*.md</code></div>
+        </div>
+        <div class="dataset-box">
+          <div class="box-name">Delivery-exception corpus (logistics, in-session start + homework)</div>
+          <div class="box-detail"><code>customer_emails.csv</code> + <code>shipments.db</code> — build the parallel MCP tool independently</div>
+        </div>
+        <div class="platform-box">
+          <div class="box-name">Runtime <span class="pill-free">FREE</span></div>
+          <div class="box-detail">Every topic this session is a real, live property of the learner's own Claude Code: no separate demo notebook to run. <code>claude --version</code> and <code>claude auth status</code> confirm the runtime before starting.</div>
+        </div>
+        </div>
+      </div>
+      <div class="col col-flow">
+        <div class="implementation-path">
+          <h3>Consolidated implementation path</h3>
+          <p>Full step-by-step is in <a href="../W2D1/W2D1PM.html">the W2D1PM session guide</a>. Nothing here is a simulation — learners configure and observe their own Claude Code session throughout.</p>
+          <ol>
+            <li>SDK/<code>query()</code> vs <code>ClaudeSDKClient</code> → frame Claude Code itself as "the SDK, running as an app"; inspect one of its own transcripts turn by turn.</li>
+            <li>Built-in/custom tools → build a real local MCP server exposing a "look up policy/claim" tool and wire it into Claude Code's <code>.mcp.json</code>.</li>
+            <li>Structured outputs/message blocks → read the tool-call/tool-result blocks Claude Code just produced calling that tool.</li>
+            <li>Memory/sessions → extend <code>CLAUDE.md</code>, resume a prior session by ID, and observe compaction on a long run.</li>
+            <li>Permissions/model choice → configure <code>.claude/settings.json</code> permission modes live; trigger and respond to a real approval prompt on a sensitive write.</li>
+            <li>Cost awareness → read Claude Code's own reported token/cost usage for the session and log it.</li>
+          </ol>
+        </div>
+        <div class="col-label">Session flow (16:00–20:00)</div>
+        <div class="flow-grid">
+          <div class="flow-card"><span class="flow-time">16:00–16:05</span><span class="flow-app">Bridge and runtime check</span>Confirm <code>claude auth status</code> and the MCP server pattern.<div class="flow-links"><a href="../W2D1/W2D1PM.html">W2D1PM session guide</a></div></div>
+          <div class="flow-card"><span class="flow-time">16:05–18:00</span><span class="flow-app">01–03 · SDK framing, custom MCP tool, message blocks</span>Build and wire the first lookup tool; read its call/result blocks in the transcript.<div class="flow-links"><a href="../W2D1/W2D1PM.html#topics-01-03">Steps 1–3</a></div></div>
+          <div class="flow-card flow-card--break"><span class="flow-time">18:00–18:10</span> <span class="flow-break">Break</span></div>
+          <div class="flow-card"><span class="flow-time">18:10–19:30</span><span class="flow-app">04–06 · Sessions, permissions, cost</span><code>CLAUDE.md</code>/session resume, live permission configuration, cost read-out; start the logistics MCP tool as homework.<div class="flow-links"><a href="../W2D1/W2D1PM.html#topics-04-06">Steps 4–6</a></div></div>
+          <div class="flow-card flow-card--assess"><span class="flow-time">19:30–20:00</span> <span class="flow-assess">Assessment</span><span class="flow-app">30-min MCQ covering Day 1's 12 topics</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="pitfall-note"><b>Pitfall:</b> <code>allowed_tools</code>/permission allowlisting pre-approves calls — keep real authorization logic inside the tool implementation itself, not just in the permission config. Cost figures Claude Code reports are a running estimate, not a hard pre-flight budget.</div>
+  </div>
+</div>
+
+<!-- DAY 2 -->
+<div class="day-block">
+  <div class="day-header">
+    <div class="day-header-top">
+      <span class="day-label">Day 2</span>
+      <span class="day-title">Agent Development &amp; Orchestration, via Claude Code subagents</span>
+      <span class="ship-badge">Ship: subagent-based triage + real MCP/A2A evidence + one Bedrock call + checkpointed HITL</span>
+    </div>
+    <div class="session-objectives"><b>Session objectives (Day 2):</b> Direct and inspect Claude Code's own orchestration primitives — subagent isolation, lifecycle hooks — against the insurance thread; exercise reliability patterns (retry/fallback) and durable HITL checkpointing against local mocks, no API key needed; build a real network MCP server and a real A2A server; make one bounded AWS Bedrock call as the week's one outside-Claude-Code inference. GCP Vertex/ADK and Azure Agent Framework stay instructor-demo only.</div>
+  </div>
+
+  <div class="session">
+    <div class="session-header">
+      <span class="slot concepts">CONCEPTS</span>
+      <span class="session-title">Frameworks, state &amp; orchestration patterns — Claude Code's own primitives, exercised directly</span>
+    </div>
+    <p class="session-meta"><strong>11:00–15:00</strong> · revision 11:00–11:10 · break 13:00–13:10 · showcase 14:45–15:00 (no formal assessment)</p>
+    <div class="session-body">
+      <div class="col col-left">
+        <div class="col-section">
+        <div class="col-label">PDF topic coverage contract 01–06</div>
+        <ul class="concept-list">
+          <li><b>01</b> The 2026 framework landscape — LangGraph 1.x (graph state machines, checkpointing, durable execution, HITL — in production at Klarna, Uber, LinkedIn, BlackRock, JPMorgan), Claude Agent SDK, CrewAI 1.x, OpenAI Agents SDK, Google ADK 1.0 and Microsoft Agent Framework 1.0.</li>
+          <li><b>02</b> Orchestration scaffold matters — the same model can swing ~30 points on GAIA depending on the scaffold — architecture, not just the model, drives reliability.</li>
+          <li><b>03</b> Claude Agent SDK primitives, in depth — the isolation spectrum: skills (in-context) → sub-agents (isolated, one-way) → agent teams (separate processes, experimental); orchestrator on Opus, workers on Sonnet.</li>
+          <li><b>04</b> Lifecycle hooks — <code>PreToolUse</code>, <code>PostToolUse</code>, <code>Stop</code>, <code>SubagentStop</code>, <code>SessionStart</code> / <code>End</code>, <code>UserPromptSubmit</code> — deterministic validate / log / block / transform in your code, not the agent’s.</li>
+          <li><b>05</b> Reliability engineering — retries with exponential back-off, model fallback / routing, deterministic state transitions and step / cost budgets.</li>
+          <li><b>06</b> Human-in-the-loop — approval gates for irreversible actions, and where to place a human in the loop.</li>
+        </ul>
+        </div>
+        <div class="col-section col-resources">
+        <div class="col-label">Libraries · datasets · platforms</div>
+        <span class="pill pick">Claude Code (subagents, hooks)</span>
+        <span class="pill pick">langgraph + langgraph-checkpoint-sqlite</span>
+        <span class="pill">tenacity</span>
+        <span class="pill">crewai</span>
+        <div class="dataset-box">
+          <div class="box-name">FNOL/claims corpus (insurance, primary)</div>
+          <div class="box-detail">Same as Day 1 — <code>data/insurance/</code></div>
+        </div>
+        <div class="platform-box">
+          <div class="box-name">Runtime <span class="pill-free">FREE</span></div>
+          <div class="box-detail">All six topics run against local mocks or Claude Code's own features — no API key. Reference: <a href="../W2D2/W2D2AM.html">W2D2AM session guide</a> (collapsible env-setup + GCP/Azure instructor-reference sections inline).</div>
+        </div>
+        </div>
+      </div>
+      <div class="col col-flow">
+        <div class="implementation-path">
+          <h3>Consolidated implementation path</h3>
+          <p>Full step-by-step, exact prompts, and collapsible cloud/library setup notes are in <a href="../W2D2/W2D2AM.html">the W2D2AM session guide</a>.</p>
+          <ol>
+            <li>Framework landscape → compare frameworks for our exact use case; scaffold a CrewAI crew (structure-only, no <code>kickoff()</code> yet — that happens once Bedrock is wired up this afternoon).</li>
+            <li>Scaffold effect → same claim, weak vs. strong scaffold prompt, compared side by side.</li>
+            <li>SDK isolation spectrum → an in-context "skill" vs. a real dispatched Claude Code subagent, with an isolation-boundary probe.</li>
+            <li>Lifecycle hooks → real <code>PreToolUse</code>/<code>PostToolUse</code>/<code>SessionStart</code> hooks configured in <code>.claude/settings.json</code>.</li>
+            <li>Reliability → <code>tenacity</code> retry/backoff on a mock transient fault vs. fail-fast on a mock permanent fault, plus a fallback path.</li>
+            <li>HITL → a LangGraph + SQLite checkpoint that pauses, survives a process restart, and resumes with an idempotency-guarded execute step.</li>
+          </ol>
+        </div>
+        <div class="col-label">Session flow (11:00–15:00)</div>
+        <div class="flow-grid">
+          <div class="flow-card"><span class="flow-time">11:00–11:10</span> <span class="flow-break">Revision</span><span class="flow-app">Day 2 environment check</span>Confirm <code>langgraph-checkpoint-sqlite</code> imports; recap yesterday's MCP tools.<div class="flow-links"><a href="../W2D2/W2D2AM.html">W2D2AM session guide</a></div></div>
+          <div class="flow-card"><span class="flow-time">11:10–13:00</span><span class="flow-app">01–03 · Landscape, scaffold, isolation</span>Cycles on the insurance thread: predict → drive live → learners repeat → debrief.<div class="flow-links"><a href="../W2D2/W2D2AM.html#topics-01-03">Steps 1–3</a></div></div>
+          <div class="flow-card flow-card--break"><span class="flow-time">13:00–13:10</span> <span class="flow-break">Break</span></div>
+          <div class="flow-card"><span class="flow-time">13:10–14:45</span><span class="flow-app">04–06 · Hooks, reliability, HITL</span>Real hooks, retry/fallback mocks, and a durable checkpoint-and-resume proof.<div class="flow-links"><a href="../W2D2/W2D2AM.html#topics-04-06">Steps 4–6</a></div></div>
+          <div class="flow-card flow-card--assess"><span class="flow-time">14:45–15:00</span><span class="flow-app">Showcase</span>1–2 learners demo a scaffold difference, isolation test, hook firing, or HITL resume proof.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="session">
+    <div class="session-header">
+      <span class="slot lab">APPLIED LAB</span>
+      <span class="session-title">Multi-agent systems, MCP &amp; A2A — real subagents, a real network MCP server, a real A2A server</span>
+    </div>
+    <p class="session-meta"><strong>16:00–20:00</strong> · break 18:00–18:10 · assessment 19:30–20:00</p>
+    <div class="session-body">
+      <div class="col col-left">
+        <div class="col-section">
+        <div class="col-label">PDF topic coverage contract 01–06</div>
+        <ul class="concept-list">
+          <li><b>01</b> Multi-agent patterns — supervisor / worker, role-based crews and critique / debate — and sub-agent sprawl, which multiplies context, cost and OOM risk (Opus 4.8 caps workflows at 1,000 sub-agents).</li>
+          <li><b>02</b> MCP, in depth — hosts / clients / servers, Streamable HTTP, the registry (10k+ servers, 200+ implementations), auth / SSO and gateways; in-process vs network servers.</li>
+          <li><b>03</b> Agent-to-Agent (A2A) — Agent Cards (JSON describing identity, capabilities, skills and auth) for discovery; ACP merged into A2A under the Linux Foundation; MCP (agent → tool) + A2A (agent → agent) together.</li>
+          <li><b>04</b> Enterprise integration — CRM / ERP / ticketing via MCP (Salesforce Agentforce, ServiceNow, SAP) and managed runtimes (Bedrock AgentCore, Vertex Agent Builder, Azure AI Foundry, Anthropic Managed Agents).</li>
+          <li><b>05</b> Handoffs &amp; shared state — passing context safely across session / agent / task state, with guardrails between agents.</li>
+          <li><b>06</b> Single vs multi-agent — start single; add agents only when context isolation or parallelism pays for its overhead.</li>
+        </ul>
+        </div>
+        <div class="col-section col-resources">
+        <div class="col-label">Libraries · datasets · platforms</div>
+        <span class="pill pick">mcp (Streamable HTTP)</span>
+        <span class="pill pick">python-a2a</span>
+        <span class="pill pick">boto3</span>
+        <div class="dataset-box">
+          <div class="box-name">Claims corpus (insurance, primary)</div>
+          <div class="box-detail">Same as Day 1 — <code>data/insurance/claims.db</code></div>
+        </div>
+        <div class="platform-box">
+          <div class="box-name">AWS Bedrock <span class="pill-paid">PAID</span> (sandbox-covered)</div>
+          <div class="box-detail">Amazon Bedrock API keys (current, single-bearer-token flow) — full step-by-step, including the syncclip.in handoff, is a collapsible section mid-way through <a href="../W2D2/W2D2PM.html#topic-04">Topic 04 in the W2D2PM session guide</a>.</div>
+        </div>
+        <div class="platform-box">
+          <div class="box-name">Local network MCP + A2A servers <span class="pill-free">FREE</span></div>
+          <div class="box-detail">Both verified working: a Streamable HTTP MCP server on <code>127.0.0.1:8766/mcp</code> and an A2A server with a real Agent Card on <code>127.0.0.1:5055</code>. Reference implementations ship in <a href="../W2D2/W2D2PM.html">the session guide's snippets/</a>.</div>
+        </div>
+        </div>
+      </div>
+      <div class="col col-flow">
+        <div class="implementation-path">
+          <h3>Consolidated implementation path</h3>
+          <p>Full step-by-step is in <a href="../W2D2/W2D2PM.html">the W2D2PM session guide</a>.</p>
+          <ol>
+            <li>Multi-agent patterns → real Claude Code subagents: supervisor/worker (parallel) vs. critique/debate (sequential), compared directly.</li>
+            <li>MCP → stand up a network Streamable HTTP server, connect Claude Code to it, contrast with Day 1's stdio tool.</li>
+            <li>A2A → stand up a real A2A server (Agent Card + task lifecycle), have Claude Code act as the client via a script.</li>
+            <li>Enterprise integration → trust-boundary concept, then one real bounded Bedrock call with a deterministic (non-model) authorization gate.</li>
+            <li>Handoffs/shared state → a clean, brief-only subagent handoff vs. a full-context-dump handoff, compared.</li>
+            <li>Single vs multi-agent → time a single-agent run against Topic 01's multi-agent version on the same claim.</li>
+          </ol>
+        </div>
+        <div class="col-label">Session flow (16:00–20:00)</div>
+        <div class="flow-grid">
+          <div class="flow-card"><span class="flow-time">16:00–16:05</span><span class="flow-app">Bridge and transport check</span><div class="flow-links"><a href="../W2D2/W2D2PM.html">W2D2PM session guide</a></div></div>
+          <div class="flow-card"><span class="flow-time">16:05–18:00</span><span class="flow-app">01–03 · Multi-agent, MCP, A2A</span>Real subagents, a real network MCP server, a real A2A server.<div class="flow-links"><a href="../W2D2/W2D2PM.html#topics-01-03">Steps 1–3</a></div></div>
+          <div class="flow-card flow-card--break"><span class="flow-time">18:00–18:10</span> <span class="flow-break">Break</span></div>
+          <div class="flow-card"><span class="flow-time">18:10–19:30</span><span class="flow-app">04–06 · Enterprise/Bedrock, handoffs, single vs multi</span>One bounded Bedrock call with a deterministic authorization gate; handoff hygiene; single-vs-multi timing comparison.<div class="flow-links"><a href="../W2D2/W2D2PM.html#topics-04-06">Steps 4–6</a></div></div>
+          <div class="flow-card flow-card--assess"><span class="flow-time">19:30–20:00</span> <span class="flow-assess">Assessment</span><span class="flow-app">30-min MCQ covering Day 2's 12 topics</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DAY 3 -->
+<div class="day-block">
+  <div class="day-header">
+    <div class="day-header-top">
+      <span class="day-label">Day 3</span>
+      <span class="day-title">Data &amp; Knowledge for Agents, local &amp; free</span>
+      <span class="ship-badge">Ship: local agentic RAG (LanceDB/pgvector) + GraphRAG + governed memory and events</span>
+    </div>
+    <div class="session-objectives"><b>Session objectives (Day 3):</b> Build a fully local, fully free agentic RAG stack — LanceDB (embedded) + sentence-transformers + a cross-encoder reranker — wired into Claude Code as a tool it decides when to call and when to re-query; a real GraphRAG multi-hop fraud signal via NetworkX; permission-aware retrieval enforced before generation; a durable idempotent webhook; and exact+semantic caching. No API key anywhere today.</div>
+  </div>
+
+  <div class="session">
+    <div class="session-header">
+      <span class="slot concepts">CONCEPTS</span>
+      <span class="session-title">Agentic RAG, GraphRAG &amp; retrieval that reasons — fully local, fully free</span>
+    </div>
+    <p class="session-meta"><strong>11:00–15:00</strong> · revision 11:00–11:10 · break 13:00–13:10 · showcase 14:30–15:00 (no formal assessment)</p>
+    <div class="session-body">
+      <div class="col col-left">
+        <div class="col-section">
+        <div class="col-label">PDF topic coverage contract 01–06</div>
+        <ul class="concept-list">
+          <li><b>01</b> From RAG to Agentic RAG — the planner loop decides whether / what / where to retrieve, evaluates the evidence, then re-queries and refines — with large faithfulness gains over single-pass RAG on multi-step questions.</li>
+          <li><b>02</b> Retrieval architecture — chunking strategies, hybrid (keyword + semantic) search, rerankers and metadata filters; vector DBs (pgvector, Pinecone, Weaviate, Milvus, Qdrant).</li>
+          <li><b>03</b> GraphRAG &amp; hybrid retrieval — entity / relationship extraction → knowledge graph → graph traversal + vector search for multi-hop reasoning; ~3–5× the cost, so use it where relationships matter.</li>
+          <li><b>04</b> Permission-aware retrieval — an agent must be constrained to the same data rights as the user; row- / document-level access and metadata controls applied before retrieval.</li>
+          <li><b>05</b> Context engineering — assembling the right window; working / episodic / semantic memory; defeating lost-in-the-middle; semantic caching.</li>
+          <li><b>06</b> Data quality, lineage &amp; freshness — an agent’s answer is only as good as the indexed, governed source behind it.</li>
+        </ul>
+        </div>
+        <div class="col-section col-resources">
+        <div class="col-label">Libraries · datasets · platforms</div>
+        <span class="pill pick">lancedb</span>
+        <span class="pill pick">sentence-transformers (embed + CrossEncoder)</span>
+        <span class="pill pick">networkx</span>
+        <span class="pill-py">no API key needed</span>
+        <div class="dataset-box">
+          <div class="box-name">Policy corpus (insurance + logistics)</div>
+          <div class="box-detail"><code>data/insurance/policies/</code> (10 files) + <code>data/logistics/policies/</code> (6 files)</div>
+        </div>
+        <div class="dataset-box">
+          <div class="box-name">Claims knowledge graph (GraphRAG)</div>
+          <div class="box-detail"><code>data/insurance/claims_kg.json</code> — one deliberate multi-hop fraud signal (address collision), verified end to end</div>
+        </div>
+        <div class="platform-box">
+          <div class="box-name">Runtime <span class="pill-free">FREE</span></div>
+          <div class="box-detail">LanceDB is embedded (no server, no account). Reference: <a href="../W2D3/W2D3AM.html">W2D3AM session guide</a> (collapsible <code>sentence-transformers</code>/<code>diskcache</code> install section inline).</div>
+        </div>
+        </div>
+      </div>
+      <div class="col col-flow">
+        <div class="implementation-path">
+          <h3>Consolidated implementation path</h3>
+          <p>Full step-by-step, with verified working reference scripts, is in <a href="../W2D3/W2D3AM.html">the W2D3AM session guide</a>.</p>
+          <ol>
+            <li>Agentic RAG → wire <code>rag_index.search()</code> in as an MCP tool; force a re-query on a paraphrase-sensitive question.</li>
+            <li>Retrieval architecture → compare with and without cross-encoder reranking on the same query.</li>
+            <li>GraphRAG → run the verified 2-hop address-collision traversal, then combine it with Topic 1's cited answer.</li>
+            <li>Permission-aware retrieval → a default-deny metadata pre-filter applied before the vector search runs, not after.</li>
+            <li>Context engineering → provenance-tagged assembly vs. an overflowing, badly-ordered context, compared.</li>
+            <li>Lineage/freshness → a SHA-256 manifest that correctly flags a real edit to a policy doc as drift.</li>
+          </ol>
+        </div>
+        <div class="col-label">Session flow (11:00–15:00)</div>
+        <div class="flow-grid">
+          <div class="flow-card"><span class="flow-time">11:00–11:10</span> <span class="flow-break">Revision</span><span class="flow-app">Close the sentence-transformers/diskcache gap</span><div class="flow-links"><a href="../W2D3/W2D3AM.html">W2D3AM session guide</a></div></div>
+          <div class="flow-card"><span class="flow-time">11:10–13:00</span><span class="flow-app">01–03 · Agentic RAG, retrieval arch., GraphRAG</span>Cycles on the insurance thread, ending with the verified fraud-signal traversal.<div class="flow-links"><a href="../W2D3/W2D3AM.html#topics-01-03">Steps 1–3</a></div></div>
+          <div class="flow-card flow-card--break"><span class="flow-time">13:00–13:10</span> <span class="flow-break">Break</span></div>
+          <div class="flow-card"><span class="flow-time">13:10–14:30</span><span class="flow-app">04–06 · Permissions, context, lineage</span>Default-deny retrieval, provenance-tagged context, drift detection.<div class="flow-links"><a href="../W2D3/W2D3AM.html#topics-04-06">Steps 4–6</a></div></div>
+          <div class="flow-card flow-card--assess"><span class="flow-time">14:30–15:00</span><span class="flow-app">Showcase</span>1–2 learners demo a re-query, a rerank win, the graph signal, or a caught staleness flag.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="session">
+    <div class="session-header">
+      <span class="slot lab">APPLIED LAB</span>
+      <span class="session-title">Memory, real-time data &amp; cost — durable sessions, a live webhook, a cache that catches paraphrases</span>
+    </div>
+    <p class="session-meta"><strong>16:00–20:00</strong> · break 18:00–18:10 · assessment 19:30–20:00</p>
+    <div class="session-body">
+      <div class="col col-left">
+        <div class="col-section">
+        <div class="col-label">PDF topic coverage contract 01–06</div>
+        <ul class="concept-list">
+          <li><b>01</b> Layered agent memory — working memory, conversation summaries, artifacts and long-term preferences; episodic + semantic stores and 2026 memory APIs.</li>
+          <li><b>02</b> Knowledge-base engineering — ingestion, chunk + embed pipelines, refresh / versioning and retrieval evals (context precision / recall).</li>
+          <li><b>03</b> Real-time &amp; event-driven data — streaming events into agents via webhooks and queues; reacting to a business event the moment it happens.</li>
+          <li><b>04</b> Semantic layers &amp; context graphs — structured business context an agent can reason over, plus disciplined metadata management.</li>
+          <li><b>05</b> Cost &amp; latency control — semantic caching, retrieval budgets and model tiering for retrieval-heavy agents.</li>
+          <li><b>06</b> MDM &amp; the data value chain — the shared baseline that makes agentic delivery trustworthy (and ties into the DM track).</li>
+        </ul>
+        </div>
+        <div class="col-section col-resources">
+        <div class="col-label">Libraries · datasets · platforms</div>
+        <span class="pill pick">langgraph-checkpoint-sqlite</span>
+        <span class="pill pick">fastapi + uvicorn</span>
+        <span class="pill pick">diskcache</span>
+        <span class="pill">redis, neo4j (optional stretch)</span>
+        <div class="dataset-box">
+          <div class="box-name">Retrieval goldens (existing fixture, real bug included)</div>
+          <div class="box-detail"><code>data/insurance/rag_goldens.json</code> — verified eval scores 4/5; the one failure is a golden-data bug, not a retrieval bug (the exercise)</div>
+        </div>
+        <div class="dataset-box">
+          <div class="box-name">Delay webhook events (logistics, homework)</div>
+          <div class="box-detail"><code>data/logistics/delay_events.jsonl</code></div>
+        </div>
+        <div class="platform-box">
+          <div class="box-name">Runtime <span class="pill-free">FREE</span></div>
+          <div class="box-detail">Postgres+pgvector, Redis, and Neo4j are already running as live VM services for the optional stretch topics; every required exercise uses SQLite/diskcache instead. Reference: <a href="../W2D3/W2D3PM.html">W2D3PM session guide</a>.</div>
+        </div>
+        </div>
+      </div>
+      <div class="col col-flow">
+        <div class="implementation-path">
+          <h3>Consolidated implementation path</h3>
+          <p>Full step-by-step, with verified working reference scripts, is in <a href="../W2D3/W2D3PM.html">the W2D3PM session guide</a>.</p>
+          <ol>
+            <li>Layered memory → a SQLite-checkpointed customer session that correctly resumes in a brand-new process.</li>
+            <li>KB engineering → run the real retrieval eval against <code>rag_goldens.json</code>; diagnose the one real failure as a golden-data bug, not a retrieval bug.</li>
+            <li>Real-time events → a verified idempotent FastAPI webhook: a redelivered event is a safe no-op.</li>
+            <li>Semantic layers/context graphs → a governed-terms glossary, catching one term in wide use that was never actually defined.</li>
+            <li>Cost/latency → exact + semantic caching, then deliberately break a too-loose similarity threshold to see the failure mode.</li>
+            <li>MDM/value chain → one operator CLI check threading a single <code>claim_id</code> through every tool built this week.</li>
+          </ol>
+        </div>
+        <div class="col-label">Session flow (16:00–20:00)</div>
+        <div class="flow-grid">
+          <div class="flow-card"><span class="flow-time">16:00–16:05</span><span class="flow-app">Bridge and fixture check</span><div class="flow-links"><a href="../W2D3/W2D3PM.html">W2D3PM session guide</a></div></div>
+          <div class="flow-card"><span class="flow-time">16:05–18:00</span><span class="flow-app">01–03 · Memory, KB eval, event-driven</span>A resumable customer session, a real eval bug hunt, a verified idempotent webhook.<div class="flow-links"><a href="../W2D3/W2D3PM.html#topics-01-03">Steps 1–3</a></div></div>
+          <div class="flow-card flow-card--break"><span class="flow-time">18:00–18:10</span> <span class="flow-break">Break</span></div>
+          <div class="flow-card"><span class="flow-time">18:10–19:30</span><span class="flow-app">04–06 · Semantic layer, cost/cache, MDM</span>Governed glossary, a deliberately-broken cache threshold, and the integrated operator check.<div class="flow-links"><a href="../W2D3/W2D3PM.html#topics-04-06">Steps 4–6</a></div></div>
+          <div class="flow-card flow-card--assess"><span class="flow-time">19:30–20:00</span> <span class="flow-assess">Assessment</span><span class="flow-app">30-min MCQ covering Day 3's 12 topics</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DAY 4 -->
+<div class="day-block">
+  <div class="day-header">
+    <div class="day-header-top">
+      <span class="day-label">Day 4</span>
+      <span class="day-title">Production — Architecture, Guardrails, Observability &amp; Evaluation</span>
+      <span class="ship-badge">Ship: guardrail checks + a scored trajectory + a green eval-gated CI run</span>
+    </div>
+    <div class="session-objectives"><b>Session objectives (Day 4):</b> AI-DLC; reference architecture; a real Presidio PII guardrail and a deterministic prompt-injection scanner, both scored against real fixtures (20-case adversarial set, 26-case trajectory set); identity/sandboxing default-deny; reliability/scale; a local trace analyzer; trajectory + three-layer evaluation; a versioned eval manifest; a <code>pytest</code> gate that actually fails the build on regression; cost/perf tiering. No API key anywhere.</div>
+  </div>
+
+  <div class="session">
+    <div class="session-header">
+      <span class="slot concepts">CONCEPTS</span>
+      <span class="session-title">AI-DLC, reference architecture, guardrails &amp; security — tested against real adversarial data</span>
+    </div>
+    <p class="session-meta"><strong>11:00–15:00</strong> · revision 11:00–11:10 · break 13:00–13:10 · showcase 14:30–15:00 (no formal assessment)</p>
+    <div class="session-body">
+      <div class="col col-left">
+        <div class="col-section">
+        <div class="col-label">PDF topic coverage contract 01–06</div>
+        <ul class="concept-list">
+          <li><b>01</b> The AI Development Life Cycle (AI-DLC) — design → build → evaluate → deploy → operate as a repeatable loop, with production traffic treated as an ever-growing test set</li>
+          <li><b>02</b> Reference architecture for agents — orchestration, tools, data / retrieval, memory, guardrails, observability and a cost layer; optional managed runtimes (Bedrock AgentCore, Vertex AI Agent Builder, Azure AI Foundry)</li>
+          <li><b>03</b> Guardrails &amp; policy-as-code — input / output filters, PII handling, content policy and approvals for irreversible actions; the eval-to-guardrail pattern, where evals become runtime controls on tool access and escalation</li>
+          <li><b>04</b> Prompt-injection &amp; untrusted content — treat retrieved web / documents as untrusted; separate data from instructions; restrict tool permissions; understand the adversarial-drift taxonomy</li>
+          <li><b>05</b> Identity, secrets &amp; sandboxing — scoped tool / MCP permissions, secrets management, sandboxed execution and data residency</li>
+          <li><b>06</b> Reliability &amp; scale — stateless scaling, queues, concurrency, checkpoints and graceful degradation</li>
+        </ul>
+        </div>
+        <div class="col-section col-resources">
+        <div class="col-label">Libraries · datasets · platforms</div>
+        <span class="pill pick">presidio-analyzer + presidio-anonymizer</span>
+        <span class="pill">en_core_web_sm (spaCy)</span>
+        <span class="pill-py">no API key needed</span>
+        <div class="dataset-box">
+          <div class="box-name">Adversarial prompts (real, scored)</div>
+          <div class="box-detail"><code>data/eval/adversarial_prompts.json</code> — 20 cases; the shipped scanner verifiably scores 17/20</div>
+        </div>
+        <div class="platform-box">
+          <div class="box-name">Runtime <span class="pill-free">FREE</span></div>
+          <div class="box-detail">Both guardrails run fully local. Reference: <a href="../W2D4/W2D4AM.html">W2D4AM session guide</a> (collapsible note on why Presidio must be pointed at <code>en_core_web_sm</code>, not its ~380MB default).</div>
+        </div>
+        </div>
+      </div>
+      <div class="col col-flow">
+        <div class="implementation-path">
+          <h3>Consolidated implementation path</h3>
+          <p>Full step-by-step, with verified working reference scripts, is in <a href="../W2D4/W2D4AM.html">the W2D4AM session guide</a>.</p>
+          <ol>
+            <li>AI-DLC → map this week's actual work onto the loop; a typed stage gate using Day 3's real eval result as evidence.</li>
+            <li>Reference architecture → inventory which layer each of this week's real components fills; a trust-zone redraw.</li>
+            <li>Guardrails → the Presidio PII redactor, run against a real FNOL email; a threshold experiment showing the false-positive cost of going too loose.</li>
+            <li>Prompt injection → the regex scanner scored 17/20 against real data; the 3 misses diagnosed and one patched live.</li>
+            <li>Identity/sandboxing → default-deny tested for both an unknown role and an undeclared capability.</li>
+            <li>Reliability/scale → a bounded-concurrency worker-pool simulation, then an overload test with graceful rejection.</li>
+          </ol>
+        </div>
+        <div class="col-label">Session flow (11:00–15:00)</div>
+        <div class="flow-grid">
+          <div class="flow-card"><span class="flow-time">11:00–11:10</span> <span class="flow-break">Revision</span><span class="flow-app">Install the small spaCy model for Presidio</span><div class="flow-links"><a href="../W2D4/W2D4AM.html">W2D4AM session guide</a></div></div>
+          <div class="flow-card"><span class="flow-time">11:10–13:00</span><span class="flow-app">01–03 · AI-DLC, architecture, guardrails</span>Cycles on the insurance thread, ending with a real, scored PII guardrail.<div class="flow-links"><a href="../W2D4/W2D4AM.html#topics-01-03">Steps 1–3</a></div></div>
+          <div class="flow-card flow-card--break"><span class="flow-time">13:00–13:10</span> <span class="flow-break">Break</span></div>
+          <div class="flow-card"><span class="flow-time">13:10–14:30</span><span class="flow-app">04–06 · Injection, identity, reliability</span>17/20 scanner score, default-deny tests, bounded concurrency.<div class="flow-links"><a href="../W2D4/W2D4AM.html#topics-04-06">Steps 4–6</a></div></div>
+          <div class="flow-card flow-card--assess"><span class="flow-time">14:30–15:00</span><span class="flow-app">Showcase</span>1–2 learners demo an adversarial prompt they wrote, a PII false positive, or a graceful-degradation call.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="session">
+    <div class="session-header">
+      <span class="slot lab">APPLIED LAB</span>
+      <span class="session-title">Observability, evaluation &amp; cost in production — a real trace, a real eval gate</span>
+    </div>
+    <p class="session-meta"><strong>16:00–20:00</strong> · break 18:00–18:10 · assessment 19:30–20:00</p>
+    <div class="session-body">
+      <div class="col col-left">
+        <div class="col-section">
+        <div class="col-label">PDF topic coverage contract 01–06</div>
+        <ul class="concept-list">
+          <li><b>01</b> Agent observability — full-session, OpenTelemetry-based tracing of tool calls, retrievals and reasoning — not HTTP hops — with per-user, token-weighted cost; LangSmith, Langfuse, MLflow, Arize Phoenix, Galileo</li>
+          <li><b>02</b> Trajectory evaluation — score the whole path — tool-selection accuracy, argument validity, step count, time / cost, policy compliance and task success — not just the final answer</li>
+          <li><b>03</b> The three-layer eval model &amp; judges — heuristic / code-based checks, LLM-as-judge (with rubric + auditing), agent-as-judge, and distilled evaluators (e.g., Galileo Luna-2) that score 100% of traffic cheaply</li>
+          <li><b>04</b> Building test data — 50–100 hand-crafted goldens as an anchor set plus production-trace mining; deterministic tool mocks in CI</li>
+          <li><b>05</b> Eval-gated CI/CD — block a deploy when trajectory or faithfulness scores regress; run online evals with alerting and failure clustering in production</li>
+          <li><b>06</b> Cost &amp; performance optimisation — model tiering / routing, caching and token budgets; measuring cost per resolved task</li>
+        </ul>
+        </div>
+        <div class="col-section col-resources">
+        <div class="col-label">Libraries · datasets · platforms</div>
+        <span class="pill pick">pytest</span>
+        <span class="pill pick">mlflow</span>
+        <span class="pill-py">no API key needed</span>
+        <div class="dataset-box">
+          <div class="box-name">Trajectory golden set (real, verified)</div>
+          <div class="box-detail"><code>data/eval/trajectory_goldens.json</code> — 25 scenarios + 1 intentional failure; the shipped evaluator correctly localizes it, 25/26</div>
+        </div>
+        <div class="platform-box">
+          <div class="box-name">Runtime <span class="pill-free">FREE</span></div>
+          <div class="box-detail">The <code>pytest</code> eval gate, its GitHub Actions counterpart, and the trace analyzer all run fully local/mocked. Reference: <a href="../W2D4/W2D4PM.html">W2D4PM session guide</a>. LangSmith/Langfuse/named backends remain <strong>coverage/demo to verify</strong> this cohort.</div>
+        </div>
+        </div>
+      </div>
+      <div class="col col-flow">
+        <div class="implementation-path">
+          <h3>Consolidated implementation path</h3>
+          <p>Full step-by-step, with verified working reference scripts, is in <a href="../W2D4/W2D4PM.html">the W2D4PM session guide</a>.</p>
+          <ol>
+            <li>Observability → a local trace analyzer that catches a real stuck-loop anomaly (3 identical calls, rising latency).</li>
+            <li>Trajectory evaluation → 25/26 pass, with the intentional failure correctly localized and its outcome-only-eval blind spot demonstrated.</li>
+            <li>Three-layer eval → Layer 1 (the injection scanner) vs. Layer 2 (Claude Code as judge against a written rubric), compared directly.</li>
+            <li>Test data → a checksummed manifest extended to cover this week's real eval files.</li>
+            <li>Eval-gated CI/CD → a <code>pytest</code> gate that actually fails when a floor is set above what the code achieves, plus its GitHub Actions counterpart.</li>
+            <li>Cost/performance → a routing/caching policy proposal under this week's actual quality floors.</li>
+          </ol>
+        </div>
+        <div class="col-label">Session flow (16:00–20:00)</div>
+        <div class="flow-grid">
+          <div class="flow-card"><span class="flow-time">16:00–16:05</span><span class="flow-app">Bridge and fixture check</span><div class="flow-links"><a href="../W2D4/W2D4PM.html">W2D4PM session guide</a></div></div>
+          <div class="flow-card"><span class="flow-time">16:05–18:00</span><span class="flow-app">01–03 · Observability, trajectory eval, three-layer eval</span>A real trace anomaly, a localized intentional failure, Layer 1 vs. Layer 2 compared.<div class="flow-links"><a href="../W2D4/W2D4PM.html#topics-01-03">Steps 1–3</a></div></div>
+          <div class="flow-card flow-card--break"><span class="flow-time">18:00–18:10</span> <span class="flow-break">Break</span></div>
+          <div class="flow-card"><span class="flow-time">18:10–19:30</span><span class="flow-app">04–06 · Test data, eval-gated CI, cost/perf</span>A versioned manifest, a gate that actually fails on regression, a routing proposal under a real quality floor.<div class="flow-links"><a href="../W2D4/W2D4PM.html#topics-04-06">Steps 4–6</a></div></div>
+          <div class="flow-card flow-card--assess"><span class="flow-time">19:30–20:00</span> <span class="flow-assess">Assessment</span><span class="flow-app">30-min MCQ covering Day 4's 12 topics</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="pitfall-note"><b>Pitfall:</b> Test trajectories, not just final answers — Topic 02's variation B shows an outcome-only eval incorrectly passing the intentional failure. CI mocks tools to avoid API spend on every push.</div>
+  </div>
+</div>
+
+<!-- DAY 5 -->
+<div class="day-block">
+  <div class="day-header">
+    <div class="day-header-top">
+      <span class="day-label">Day 5</span>
+      <span class="day-title">Industry Applications, ROI, Governance &amp; Capstone Launch</span>
+      <span class="ship-badge">Ship: demo-ready assistant + capstone brief grounded in this week's real build</span>
+    </div>
+    <div class="session-objectives"><b>Session objectives (Day 5):</b> Apply the week's real build to CX, ops, analytics, and coding-agent lenses; a real aggregate-data recommendation; a bounded Claude Code patch contract on our own codebase; insurance-vs-logistics comparison; an ROI model logged to local MLflow (sqlite backend — the plain-file backend is now deprecated in MLflow 3.14). PM: a real tamper-evident audit chain, an autonomy matrix checked against real risk-tier data, regulatory fit as engineering questions, and a capstone brief citing this week's actual artifacts.</div>
+  </div>
+
+  <div class="session">
+    <div class="session-header">
+      <span class="slot concepts">CONCEPTS</span>
+      <span class="session-title">Agentic AI across the enterprise — applying the week's real build to each lens</span>
+    </div>
+    <p class="session-meta"><strong>11:00–15:00</strong> · revision 11:00–11:10 · break 13:00–13:10 · showcase 14:30–15:00 (no formal assessment)</p>
+    <div class="session-body">
+      <div class="col col-left">
+        <div class="col-section">
+        <div class="col-label">PDF topic coverage contract 01–06</div>
+        <ul class="concept-list">
+          <li><b>01</b> Customer-experience agents — journey-centric CX across voice, digital and back-office; deflection, resolution and escalation design</li>
+          <li><b>02</b> Operations &amp; process automation — claims, KYC / onboarding, order-to-cash, returns and reconciliation — exception-handling agents</li>
+          <li><b>03</b> Analytics &amp; decision-support agents — natural-language data access, insight generation and action recommendation</li>
+          <li><b>04</b> Software-engineering agents — a brief, applied look at Claude Code and agentic coding — context for the DE specialisation tracks</li>
+          <li><b>05</b> Industry deep dives — insurance, healthcare, BFSI, supply chain, logistics and transportation — patterns and constraints</li>
+          <li><b>06</b> ROI &amp; value realisation — cost per resolved task, cycle-time reduction, deflection and accuracy — building the business case</li>
+        </ul>
+        </div>
+        <div class="col-section col-resources">
+        <div class="col-label">Libraries · datasets · platforms</div>
+        <span class="pill pick">mlflow (sqlite backend)</span>
+        <span class="pill-py">no API key needed</span>
+        <div class="dataset-box">
+          <div class="box-name">Integrated week scenario</div>
+          <div class="box-detail">Reuses D1–D4 data and artifacts directly — no new downloads</div>
+        </div>
+        <div class="platform-box">
+          <div class="box-name">Runtime <span class="pill-free">FREE</span></div>
+          <div class="box-detail">Reference: <a href="../W2D5/W2D5AM.html">W2D5AM session guide</a> — includes a collapsible note that MLflow's plain filesystem tracking backend is now in maintenance mode (verified on 3.14); use <code>sqlite:///...</code> instead.</div>
+        </div>
+        </div>
+      </div>
+      <div class="col col-flow">
+        <div class="implementation-path">
+          <h3>Consolidated implementation path</h3>
+          <p>Full step-by-step, with verified working reference scripts, is in <a href="../W2D5/W2D5AM.html">the W2D5AM session guide</a>.</p>
+          <ol>
+            <li>CX agents → a deflection case and an escalation package, contrasted directly.</li>
+            <li>Operations automation → a plan, then Day 2's real checkpoint pattern executing it behind approval.</li>
+            <li>Analytics/decision support → a real aggregate query against <code>claims.db</code>, repeated against the logistics thread.</li>
+            <li>Software-engineering agents → a real, bounded patch to Day 1's MCP server, with a scope-creep test as contrast.</li>
+            <li>Industry deep dives → insurance vs. logistics, naming what transferred and what didn't.</li>
+            <li>ROI/value → a real ROI model logged to local MLflow (sqlite backend), with a baseline-sensitivity check.</li>
+          </ol>
+        </div>
+        <div class="col-label">Session flow (11:00–15:00)</div>
+        <div class="flow-grid">
+          <div class="flow-card"><span class="flow-time">11:00–11:10</span> <span class="flow-break">Revision</span><span class="flow-app">Week build recap</span><div class="flow-links"><a href="../W2D5/W2D5AM.html">W2D5AM session guide</a></div></div>
+          <div class="flow-card"><span class="flow-time">11:10–13:00</span><span class="flow-app">01–03 · CX, ops automation, analytics</span>Cycles applying this week's build to each business lens.<div class="flow-links"><a href="../W2D5/W2D5AM.html#topics-01-03">Steps 1–3</a></div></div>
+          <div class="flow-card flow-card--break"><span class="flow-time">13:00–13:10</span> <span class="flow-break">Break</span></div>
+          <div class="flow-card"><span class="flow-time">13:10–14:30</span><span class="flow-app">04–06 · Coding agents, industry, ROI</span>A real bounded patch, a two-domain comparison, and a real logged ROI model.<div class="flow-links"><a href="../W2D5/W2D5AM.html#topics-04-06">Steps 4–6</a></div></div>
+          <div class="flow-card flow-card--assess"><span class="flow-time">14:30–15:00</span><span class="flow-app">Showcase</span>1–2 learners demo an escalation package, an aggregate finding, or an ROI number.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="session">
+    <div class="session-header">
+      <span class="slot lab">APPLIED LAB</span>
+      <span class="session-title">Delivery excellence, governance &amp; capstone — a real audit chain, a real autonomy check, your own brief</span>
+    </div>
+    <p class="session-meta"><strong>16:00–20:00</strong> · break 18:00–18:10 · assessment 19:30–20:00 (demo + written)</p>
+    <div class="session-body">
+      <div class="col col-left">
+        <div class="col-section">
+        <div class="col-label">PDF topic coverage contract 01–06</div>
+        <ul class="concept-list">
+          <li><b>01</b> From PoC to production — the common pitfalls — over-automation, weak evals, no guardrails, cost blow-ups — and what separates the ~57% of organisations now running agents in production that actually work.</li>
+          <li><b>02</b> Responsible-AI governance for agents — autonomy levels, meaningful human oversight, audit logging and model / agent cards</li>
+          <li><b>03</b> Regulatory fit in 2026 — EU AI Act high-risk (Annex III; Digital Omnibus deferral to Dec 2027) and Article 50 transparency; India's DPDP Act; NIST AI RMF and ISO/IEC 42001; extraterritorial reach for India-based delivery to EU clients</li>
+          <li><b>04</b> Solution consulting — discovery, scoping, stakeholder alignment, success metrics and build-vs-buy</li>
+          <li><b>05</b> Capstone framing — choosing a real industry problem and defining success metrics and an eval plan</li>
+          <li><b>06</b> Specialisation preview — the DM track and the three DE tracks (AI Engineering / GenAI, Agentic CX, Low-Code / No-Code) in Week 3</li>
+        </ul>
+        </div>
+        <div class="col-section col-resources">
+        <div class="col-label">Libraries · datasets · platforms</div>
+        <span class="pill pick">hashlib (stdlib)</span>
+        <span class="pill-py">no API key needed</span>
+        <div class="dataset-box">
+          <div class="box-name">Risk-tier governance sheet (real, verified)</div>
+          <div class="box-detail"><code>data/governance/use_case_risk_tiers.json</code> — the shipped autonomy checker scores all 5 real use cases <code>OK</code>; learners then inject a violation and confirm it's caught</div>
+        </div>
+        <div class="platform-box">
+          <div class="box-name">Runtime <span class="pill-free">FREE</span></div>
+          <div class="box-detail">The audit chain and autonomy matrix are both fully local, no dependencies beyond the standard library. Reference: <a href="../W2D5/W2D5PM.html">W2D5PM session guide</a>.</div>
+        </div>
+        </div>
+      </div>
+      <div class="col col-flow">
+        <div class="implementation-path">
+          <h3>Consolidated implementation path</h3>
+          <p>Full step-by-step, with verified working reference scripts, is in <a href="../W2D5/W2D5PM.html">the W2D5PM session guide</a>.</p>
+          <ol>
+            <li>PoC to production → a real hash-chained audit log, tamper-tested; readiness gates scored with specific evidence from this week.</li>
+            <li>Responsible-AI governance → the autonomy matrix checked against real data, then a deliberately-injected violation caught.</li>
+            <li>Regulatory fit → EU AI Act/DPDP/NIST/ISO turned into engineering discovery questions, scoped as engineering-not-legal.</li>
+            <li>Solution consulting → a scope contract with testable, checkable acceptance criteria.</li>
+            <li>Capstone framing → a real brief citing this week's actual artifacts, then self-audited against truth/eval/write/rollback.</li>
+            <li>Specialisation preview → a four-lane map and a control-preserving handoff card.</li>
+          </ol>
+        </div>
+        <div class="col-label">Session flow (16:00–20:00)</div>
+        <div class="flow-grid">
+          <div class="flow-card"><span class="flow-time">16:00–16:05</span><span class="flow-app">Bridge and governance fixture check</span><div class="flow-links"><a href="../W2D5/W2D5PM.html">W2D5PM session guide</a></div></div>
+          <div class="flow-card"><span class="flow-time">16:05–18:00</span><span class="flow-app">01–03 · PoC pitfalls, governance, regulatory</span>A tamper-tested audit chain, an autonomy violation caught, regulation as engineering questions.<div class="flow-links"><a href="../W2D5/W2D5PM.html#topics-01-03">Steps 1–3</a></div></div>
+          <div class="flow-card flow-card--break"><span class="flow-time">18:00–18:10</span> <span class="flow-break">Break</span></div>
+          <div class="flow-card"><span class="flow-time">18:10–19:30</span><span class="flow-app">04–06 · Consulting, capstone, specialisation</span>A testable scope contract, the real capstone brief, and the Week 3 handoff.<div class="flow-links"><a href="../W2D5/W2D5PM.html#topics-04-06">Steps 4–6</a></div></div>
+          <div class="flow-card flow-card--assess"><span class="flow-time">19:30–20:00</span> <span class="flow-assess">Assessment</span><span class="flow-app">30-min MCQ covering Day 5's 12 topics, plus the demo/written capstone submission</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="instructor-note"><b>Instructor tip:</b> Demos on localhost are fine — production deploy is Week 3/4. Autonomy is a dial: document oversight for each irreversible tool.</div>
+  </div>
+</div>
+
+<div style="padding: 20px 40px; font-size: 14px; color: #aaa; border-top: 1px solid #e0ddd6; background:#fff;">
+  Ambilio × EXL · Week 2 Instructor Guide · 11:00–15:00 / 16:00–20:00 · ten session-first modules
+</div>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

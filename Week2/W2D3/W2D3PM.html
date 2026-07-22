@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D3 PM · Memory, Real-Time Data &amp; Cost</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">Week 2 · Day 3 · Applied Build Lab (16:00–20:00)</p>
+  <h1>Memory, real-time data &amp; cost — durable sessions, a live webhook, and a cache that catches paraphrases</h1>
+  <p>Everything runs locally against services already live on the VM: SQLite session persistence, a real FastAPI webhook, and diskcache/Redis-backed caching. No API key anywhere today.</p>
+  <div class="thread-badges">
+    <span class="thread-badge insurance">Insurance — primary build, all six topics</span>
+    <span class="thread-badge homework">Logistics — point the webhook at delay_events.jsonl as homework</span>
+  </div>
+  <div class="timing-strip">
+    <span class="timing-chip">16:00–16:05 bridge</span>
+    <span class="timing-chip">16:05–17:45 topics 01–03</span>
+    <span class="timing-chip">17:45–17:55 break</span>
+    <span class="timing-chip">17:55–19:00 topics 04–06</span>
+    <span class="timing-chip">19:00–19:30 app build</span>
+    <span class="timing-chip">19:30–20:00 MCQ assessment</span>
+  </div>
+</header>
+
+<nav class="page-nav" aria-label="Session sections">
+  <a href="#bridge">Bridge</a>
+  <a href="#topics-01-03">01 Memory</a>
+  <a href="#topic-02">02 KB engineering</a>
+  <a href="#topic-03">03 Event-driven</a>
+  <a href="#topics-04-06">04 Semantic layer</a>
+  <a href="#topic-05">05 Cost/cache</a>
+  <a href="#topic-06">06 MDM</a>
+  <a href="#appbuild">App build</a>
+  <a href="#homework">Logistics homework</a>
+</nav>
+
+<main>
+
+<section id="bridge">
+  <h2>Bridge (16:00–16:05)</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">0</span><span class="step-title">Fixture check</span><span class="step-time">5 min</span></div>
+    <span class="where-tag where-vm">VM · VS Code terminal</span>
+    <pre><code>conda activate ai_agent_env
+python -c "import fastapi, diskcache; print('fastapi + diskcache OK')"</code></pre>
+    <details class="setup-guide">
+      <summary><span class="setup-tag lib">Library setup</span> Redis and Neo4j Python clients (optional stretch topics today)</summary>
+      <div class="setup-body">
+        <p class="freshness">Postgres+pgvector, Redis, and Neo4j are already running as live VM services (confirmed in the pre-course check: pgvector 0.8.0, Redis 7.0.15, Neo4j active) — only their Python client libraries were missing.</p>
+        <pre><code>conda activate ai_agent_env
+uv pip install redis neo4j psycopg2-binary
+python -c "import redis; r = redis.Redis(); print('redis ping:', r.ping())"</code></pre>
+        <p>Only needed if you do the optional Redis-cache comparison in Topic 05 or the Neo4j aside in Topic 04 — every required exercise today uses SQLite/diskcache instead, which need no service.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section id="topics-01-03">
+<h2 id="topic-01">Topic 01 · Layered agent memory, revisited</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">1</span><span class="step-title">Session persistence, and where 2026 memory APIs fit</span><span class="step-time">~25 min</span></div>
+  <p><b>Concept.</b> Day 1 covered the four memory layers conceptually; Day 2 covered durable LangGraph checkpointing for HITL. Today's version: the same SQLite-checkpoint mechanism, applied specifically to remembering a customer's session across multiple separate interactions — episodic memory (this specific customer's history) as distinct from semantic memory (general facts, like policy terms). 2026 memory APIs (Mem0 and similar, installed in <code>ai_agent_env</code> as <code>mem0ai</code>) typically extract and manage this automatically — but they need their own LLM backend to do the extraction, which is why we're building the SQLite version ourselves this week instead of relying on Mem0 out of the box.</p>
+  <figure class="concept-figure">
+    <img src="images/d3pm_t1_layered_memory.png" alt="Layered memory for governed sessions: temporary working memory versus bounded, retained episodic memory, semantic memory, and external artifacts, all looked up via a stable session key and passing through a governance rail (typed, attributed, retained, permissioned) before feeding a governed decision">
+    <figcaption>A session key looks up the retained layers — it isn't the memory itself.</figcaption>
+  </figure>
+  <ul class="concept-list">
+    <li><b>Episodic vs. semantic, concretely.</b> "This customer emailed about CLM-424063 last week and was told to expect a call" is episodic. "Burst pipes are covered up to $10,000" is semantic — and lives in Day 3 AM's retrieval index, not in any one customer's session history.</li>
+  </ul>
+
+  <p><b>Instructor drives live, variation A — a returning-customer session.</b> <span class="where-tag where-vm">VS Code terminal + Claude Code</span> — reuse Day 2 Topic 06's checkpoint pattern, applied to a customer thread:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Using langgraph with a SqliteSaver at
+W2D3/outputs/customer_sessions.sqlite, build a small graph that
+records a note against a thread_id every time we "talk" to a customer.
+Record a note for thread_id "jennifer-garcia" about claim CLM-424063
+today, then end the process.</code></pre>
+  </div>
+
+  <p><b>Instructor drives live, variation B — resume it days later, for contrast.</b> In a brand-new terminal/process:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Reconnect to the same SqliteSaver database and thread_id
+"jennifer-garcia". Without me telling you anything, what do we already
+know about this customer's history?</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    This is episodic memory surviving across genuinely separate interactions — contrast with <code>CLAUDE.md</code> (semantic/project memory, the same for every customer) and Day 1's working-context memory (gone the moment the session ends unless checkpointed like this).
+  </div>
+
+  <p><b>Learners repeat.</b> Record a second note for a different <code>thread_id</code>, then confirm the two customers' histories stay correctly separate when you reconnect to each.</p>
+</div>
+
+<h2 id="topic-02">Topic 02 · Knowledge-base engineering</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">2</span><span class="step-title">Ingestion, refresh, versioning — and a real retrieval eval</span><span class="step-time">~40 min</span></div>
+  <p><b>Concept.</b> A knowledge base isn't indexed once and forgotten — it needs a refresh cycle (Day 3 AM's checksum manifest tells you <i>when</i>) and a retrieval eval (precision/recall against a golden question set) to tell you whether the index is actually serving the right content, not just whether it runs.</p>
+  <figure class="concept-figure">
+    <img src="images/d3pm_t2_kb_engineering.png" alt="Knowledge-base engineering as a clockwise lifecycle: source owners feed a manifest, validate, standardize a chunk contract, index, evaluate against goldens, publish an approved version, then refresh or roll back, governed throughout by source path, version, schema, goldens, and citation-coverage requirements">
+    <figcaption>Publish is a governed step, not a file save — refresh and rollback are part of the same loop.</figcaption>
+  </figure>
+  <ul class="concept-list">
+    <li><b>An eval can fail for two different reasons.</b> Either retrieval is genuinely wrong, or the golden/eval data itself has a bug — you have to diagnose which, not just report a pass rate.</li>
+  </ul>
+
+  <p><b>Run it together, variation A — the eval as shipped.</b> <span class="where-tag where-vm">VS Code terminal</span> — a real golden set already exists in the repo:</p>
+  <pre><code>uv run python W2D3/snippets/retrieval_eval.py</code></pre>
+  <p>You should see 4/5 pass. Investigate the failure with Claude Code:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Read W2D3/snippets/retrieval_eval.py's output for G-003, then look
+at its entry in data/insurance/rag_goldens.json and the actual file
+POL-HOME-010_flood_rider.md. Is this a retrieval bug or a golden-data bug?
+Show me your reasoning.</code></pre>
+  </div>
+
+  <p><b>Run it together, variation B — fix the golden, re-run, for contrast.</b></p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>If it's a golden-data bug, propose the corrected expected_policy_ids value
+for G-003 (don't guess — check what the actual source file is named). Show
+me the fix, but don't apply it yet — first tell me whether we should also
+add a chunk_id-level check later, given the goldens already carry a
+required_chunk_ids field our simpler eval doesn't use.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    This is a genuine, unstaged bug discovery exercise — the point isn't "the eval passed," it's building the habit of investigating a failure before assuming either the system or the test is automatically right.
+  </div>
+
+  <p><b>Learners repeat.</b> Add one new golden question of your own (any claim/policy you've worked with this week) to a scratch copy of the goldens file, and confirm the eval correctly passes or fails it.</p>
+</div>
+
+<h2 id="topic-03">Topic 03 · Real-time &amp; event-driven data</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">3</span><span class="step-title">A real webhook, consumed idempotently</span><span class="step-time">~40 min</span></div>
+  <p><b>Concept.</b> An agent shouldn't have to poll for changes — a webhook lets an external system push an event the moment it happens. The consumer side has to be idempotent: a webhook provider may redeliver the same event more than once (network retry, at-least-once delivery guarantees), and processing it twice must be a safe no-op, not a duplicate action.</p>
+  <figure class="concept-figure">
+    <img src="images/d3pm_t3_event_driven_data.png" alt="Event-driven data flow: an immutable event arrives via webhook transport, is schema-validated, checked against a seen-set for its stable event ID and given exactly one state transition inside an atomic boundary, an already-seen event becomes an idempotent no-op, and validation or transition failures route to an auditable replay queue">
+    <figcaption>A re-delivered event must be a safe no-op.</figcaption>
+  </figure>
+
+  <p><b>Run it together, variation A — start the webhook and send one event.</b> <span class="where-tag where-vm">VS Code terminal (separate tab)</span>:</p>
+  <pre><code>uv run uvicorn W2D3.snippets.delay_webhook:app --port 8010</code></pre>
+  <p>In a second terminal:</p>
+  <pre><code>curl -X POST http://127.0.0.1:8010/webhook/delay \
+  -H "Content-Type: application/json" \
+  -d '{"event_id":"DEL-001","container_id":"MSKU123","delay_hours":18}'</code></pre>
+
+  <p><b>Run it together, variation B — redeliver the same event, for contrast.</b> Run the exact same <code>curl</code> command again, unchanged:</p>
+  <pre><code>curl -X POST http://127.0.0.1:8010/webhook/delay \
+  -H "Content-Type: application/json" \
+  -d '{"event_id":"DEL-001","container_id":"MSKU123","delay_hours":18}'</code></pre>
+  <div class="checkpoint">
+    <b class="tag">Checkpoint</b>
+    First response: <code>{"status":"processed",...}</code>. Second, identical response: <code>{"status":"duplicate_ignored",...}</code>. Confirm with <code>sqlite3</code> (or ask Claude Code) that the underlying table has exactly one row, not two.
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    Have Claude Code connect this webhook conceptually to Day 1's <code>delay_events.jsonl</code> fixture — the same shape of event, this time arriving live over HTTP instead of being read from a static file.
+  </div>
+
+  <p><b>Learners repeat.</b> Send a webhook call with a <i>different</i> <code>event_id</code> and confirm it's processed as new, not treated as a duplicate — the idempotency key has to be specific, not just "any repeated POST."</p>
+</div>
+</section>
+
+<section id="topics-04-06">
+<h2 id="topic-04">Topic 04 · Semantic layers &amp; context graphs</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">4</span><span class="step-title">Governed business terms, sourced to real data</span><span class="step-time">~25 min</span></div>
+  <p><b>Concept.</b> A semantic layer gives a business term one governed definition (not five slightly-different ones scattered across prompts) and connects it to exactly where it's sourced in the data — the same discipline as Day 3 AM's lineage topic, applied to vocabulary instead of documents.</p>
+  <figure class="concept-figure">
+    <img src="images/d3pm_t4_semantic_layers_context_graphs.png" alt="A semantic mapping matrix connecting each governed field (customer, policy, shipment, evidence) to its source system and meaning, feeding a context graph where every edge (opens, asks, supported_by, references, emits) carries its own provenance tag">
+    <figcaption>Explicit mappings, not prompt folklore — every edge carries its own provenance.</figcaption>
+  </figure>
+
+  <details class="setup-guide">
+    <summary><span class="setup-tag lib">Optional stretch</span> Neo4j as a real graph database, vs. Day 3 AM's in-memory NetworkX</summary>
+    <div class="setup-body">
+      <p>Day 3 AM's <code>claims_kg.json</code> graph lived entirely in memory, rebuilt every run. Neo4j (already running as a VM service) is a real persistent graph database with its own query language (Cypher) — worth trying if you finish early, not required. Minimal connection check:</p>
+      <pre><code>python -c "
+from neo4j import GraphDatabase
+driver = GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j', '&lt;sandbox password&gt;'))
+driver.verify_connectivity()
+print('connected')
+"</code></pre>
+      <p>Ask your trainer for the sandbox Neo4j password rather than guessing one. This is genuinely optional — everything required this week uses NetworkX.</p>
+    </div>
+  </details>
+
+  <p><b>Instructor drives live, variation A — define governed terms.</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Define a small governed-terms dictionary for our project: "reserve_usd",
+"route_queue", "grounding_available". For each, write one sentence
+definition and the exact source (table.column or field) it comes from.
+Save it as W2D3/outputs/glossary.json.</code></pre>
+  </div>
+  <p><b>Instructor drives live, variation B — catch an ungoverned term, for contrast.</b></p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Now, without checking the glossary, quickly explain what "urgency" means
+in one sentence. Then check it against the glossary we just built — is
+"urgency" actually defined there? If not, what's the risk of a term being
+used constantly across our week's tools without ever being formally
+governed?</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    An ungoverned but widely-used term is a real, common gap — the exercise is to notice it, not to have a perfect glossary by the end of 30 minutes.
+  </div>
+
+  <p><b>Learners repeat.</b> Add "urgency" to the glossary yourself, sourced correctly to <code>claims.urgency</code>.</p>
+</div>
+
+<h2 id="topic-05">Topic 05 · Cost &amp; latency control</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">5</span><span class="step-title">Exact and semantic caching, and what each catches</span><span class="step-time">~30 min</span></div>
+  <p><b>Concept.</b> An exact cache matches only identical query strings — fast, zero false hits, but misses obvious paraphrases. A semantic cache matches by embedding similarity above a threshold — catches paraphrases, but risks a false hit if the threshold is too loose. Checking exact first, then semantic, gets the speed of exact matches without losing paraphrase coverage.</p>
+  <figure class="concept-figure">
+    <img src="images/d3pm_t5_cost_latency_control.png" alt="Cost and latency control for retrieval: a question checks an exact cache, then a semantic cache within the same permission scope, and only on a double miss runs a budgeted retrieval (bounded rounds, candidates, and evidence bytes), with every path measured for latency, cost, hit reason, and quality">
+    <figcaption>Exact first (fast, zero false hits), then semantic (catches paraphrases), then a budgeted retrieval — all measured, never a free-for-all.</figcaption>
+  </figure>
+
+  <p><b>Run it together, variation A — exact and semantic hits.</b> <span class="where-tag where-vm">VS Code terminal</span>:</p>
+  <pre><code>uv run python W2D3/snippets/semantic_cache.py</code></pre>
+  <p>You should see: an exact hit on the identical query, a semantic hit on the paraphrase (~0.95 similarity), and a miss on the unrelated query (~0.07 similarity).</p>
+
+  <p><b>Run it together, variation B — break the threshold, for contrast.</b> Have Claude Code lower <code>SIMILARITY_THRESHOLD</code> deliberately (e.g. to 0.3) and re-run with a query that's topically related but should NOT be treated as the same question:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Temporarily lower SIMILARITY_THRESHOLD to 0.3 in a scratch copy of
+semantic_cache.py, and test the query "is flood damage covered" against
+the cached "is a burst pipe covered" entry. Does it now incorrectly
+register as a cache hit? What does that mean for a real system with too
+loose a threshold?</code></pre>
+  </div>
+  <div class="callout danger">
+    <b class="tag">The failure this variation demonstrates</b>
+    A too-loose threshold serves a cached answer to a genuinely different question — flood and burst-pipe coverage are different clauses. That's a real correctness bug caused entirely by a cache-tuning choice, not a retrieval or model error.
+  </div>
+
+  <p><b>Learners repeat.</b> Restore the threshold to 0.85, then test two of your own query pairs (one true paraphrase, one superficially-similar-but-different question) and confirm the cache handles both correctly.</p>
+</div>
+
+<h2 id="topic-06">Topic 06 · MDM &amp; the data value chain</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">6</span><span class="step-title">Stable IDs, carried through everything built this week</span><span class="step-time">~20 min</span></div>
+  <p><b>Concept.</b> Master data management is the unglamorous baseline that makes all of this trustworthy: <code>claim_id</code>, <code>policy_id</code>, <code>order_id</code> have to mean exactly one thing, consistently, across the lookup tool, the retrieval index, the graph, the cache, and the webhook — not five slightly different representations that happen to share a name.</p>
+  <figure class="concept-figure">
+    <img src="images/d3pm_t6_mdm_data_value_chain.png" alt="The governed data value chain: a master identity is matched from shared fixtures into governed context, grounds a cited decision, drives an event response, and leaves audit evidence — with an impact-trace row showing how a single incorrect identity cascades into wrong context, wrong support, wrong action, and an audit exception if any link breaks">
+    <figcaption>One broken link in this chain cascades all the way to an audit exception.</figcaption>
+  </figure>
+
+  <p><b>Build it together.</b> <span class="where-tag where-claude">Claude Code chat panel</span> — a small integrated check that exercises everything built across Day 1-3:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Write a short operator CLI script, W2D3/outputs/operator_check.py,
+that takes a claim_id and reports: (1) the claim/policy record via
+get_claim_and_policy, (2) whether it's grounded in the retrieval index,
+(3) whether GraphRAG finds any related claims at the same address, (4)
+whether it appears in any customer session memory. Run it for CLM-424063
+and show me the combined report.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    The same <code>claim_id</code> string should thread cleanly through all four checks with no translation/mismatch — if it doesn't, that's exactly the kind of MDM gap this topic is warning about.
+  </div>
+
+  <p><b>Learners repeat.</b> Run the same operator check for the fraud-flagged <code>CLM-255335</code> and confirm the combined report correctly reflects its ungrounded-policy status from Day 1.</p>
+</div>
+</section>
+
+<section id="appbuild">
+  <h2>App build (19:00–19:30) · Day 3 of the progressive insurance app</h2>
+  <p>Days 1–2 only checked <i>whether</i> a policy document exists for a claim's product. Today's increment makes the app actually answer the coverage question — RAG search over the indexed policy corpus (Topic 02), a cache in front of it (Topic 05), and a fraud-connection signal from the claims graph, all wired into the same <code>resolve_email</code> pipeline you've been extending since Day 1.</p>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">App</span><span class="step-title">Extend your Day 2 file into a Day 3 version</span><span class="step-time">~15 min</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <p>Direct Claude Code to build your <b>own</b> file, importing your Day 2 one rather than editing it in place — the same pattern <code>app/day3_resolve.py</code> uses on top of <code>app/day2_resolve.py</code>:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Create app/my_day3_resolve.py, importing resolve_email from your Day 2
+file and extending its result. For any claim where grounding_available
+is true:
+1. Build (or reuse, if already built) a chunk -> embed -> LanceDB index
+   over data/insurance/policies/*.md.
+2. Search it for a coverage question about the claim's own loss_type,
+   but restrict the search to ONLY that claim's own policy_doc_files --
+   never let it match a document belonging to a different product.
+3. Put an exact-then-semantic cache in front of that search, and
+   hard-partition the cache by the claim's product (a namespace argument
+   on get/set), not by question text alone.
+4. Add a same-address fraud signal: load the claims knowledge graph and
+   check whether this claim's address is shared by any other claim.
+Print coverage_question, coverage_answer_source, coverage_excerpt, and
+fraud_signal alongside the Day 2 fields. Run it for CLN-001.</code></pre>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">App</span><span class="step-title">Prove the product constraint actually matters</span><span class="step-time">~10 min</span></div>
+    <p>Before trusting the excerpt, reason out loud about why step 2 above restricts search to <code>allowed_files</code> at all: with unconstrained search over the whole policy corpus, a wording match from a different product's document can outrank the correct one — and if it gets cached, that wrong-product answer keeps getting served to anyone who asks a similarly-worded question afterward. Then run both claims and check the two excerpts really do come from each claim's own product, not a leaked cross-product answer:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Run my_day3_resolve.py for CLN-001 and then CLN-002. Show me both
+coverage_excerpt values and which source_file each came from. Confirm
+CLN-001's excerpt comes from a POL-HOME-010 file and CLN-002's comes
+from a POL-COMM-030 file -- if either claim's excerpt is sourced to the
+other's product, that's the grounding bug this course keeps warning
+about, not a working result.</code></pre>
+    </div>
+  </div>
+
+  <div class="checkpoint">
+    <b class="tag">Checkpoint</b>
+    <code>CLN-001</code> (claim <code>CLM-424063</code>, homeowners) resolves with a <code>coverage_excerpt</code> starting <code>"# POL-HOME-010 Water Damage Coverage..."</code>, sourced to a <code>POL-HOME-010_*</code> file — the claim's own product docs. <code>CLN-002</code> (claim <code>CLM-748422</code>, commercial_property) resolves to a <i>different</i> excerpt sourced to a <code>POL-COMM-030_*</code> file — confirming the two claims are grounded independently, not cross-contaminated. CLM-424063's <code>fraud_signal</code> reports claimant Jennifer Garcia with <code>same_address_claim_ids: ["CLM-100234"]</code> and <code>flag: true</code> — a real 2-hop graph traversal (claim → address → another claim at that address) that no amount of text or vector search over one claim's own content could have surfaced.
+  </div>
+
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>A complete, tested version is at <a href="../app/day3_resolve.py"><code>app/day3_resolve.py</code></a> (the orchestration), <a href="../app/rag_index.py"><code>app/rag_index.py</code></a> (chunk → embed → LanceDB → cross-encoder rerank, with the <code>allowed_files</code> constraint), <a href="../app/semantic_cache.py"><code>app/semantic_cache.py</code></a> (exact + semantic cache, namespaced by product), and <a href="../app/graph_signals.py"><code>app/graph_signals.py</code></a> (the same-address graph traversal). This course's own author hit both bugs above while building it — an unconstrained RAG search, then the same mistake resurfacing one layer up in a cache keyed on question text alone — and fixed both the same way: partition by product. Use these files to compare after you've built your own, not as the first attempt.</p>
+  </details>
+</section>
+
+<section id="homework">
+  <h2>Logistics thread — homework</h2>
+  <div class="homework-block">
+    <h3>Point the webhook at real delay data</h3>
+    <p>Adapt <code>delay_webhook.py</code> to also accept events matching the shape of <code>data/logistics/delay_events.jsonl</code>, and write a small script that replays every event in that file through the webhook once. Confirm replaying the same file a second time results in all-duplicate responses, not reprocessing.</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">Week 2 · Day 3 PM · Claude Code edition — memory, real-time data &amp; cost, insurance thread primary</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

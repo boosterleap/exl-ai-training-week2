@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D3 AM · Agentic RAG, GraphRAG &amp; Retrieval That Reasons</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">Week 2 · Day 3 · Concept Exploration (11:00–15:00)</p>
+  <h1>Agentic RAG, GraphRAG &amp; retrieval that reasons — fully local, fully free</h1>
+  <p>A real embedded vector store (LanceDB), a real cross-encoder reranker, and a real knowledge graph with a deliberate multi-hop fraud signal — all running on the VM with no API key and no external account. Claude Code is the agent that decides when and what to retrieve.</p>
+  <div class="thread-badges">
+    <span class="thread-badge insurance">Insurance — primary, all six topics</span>
+    <span class="thread-badge logistics">Logistics — parallel retrieval index, quick check at the end</span>
+  </div>
+  <div class="timing-strip">
+    <span class="timing-chip">11:00–11:10 setup</span>
+    <span class="timing-chip">11:10–13:00 topics 01–03</span>
+    <span class="timing-chip">13:00–13:10 break</span>
+    <span class="timing-chip">13:10–14:30 topics 04–06</span>
+    <span class="timing-chip">14:30–15:00 showcase</span>
+  </div>
+</header>
+
+<nav class="page-nav" aria-label="Session sections">
+  <a href="#setup">Setup</a>
+  <a href="#topics-01-03">01 Agentic RAG</a>
+  <a href="#topic-02">02 Retrieval arch.</a>
+  <a href="#topic-03">03 GraphRAG</a>
+  <a href="#topics-04-06">04 Permissions</a>
+  <a href="#topic-05">05 Context eng.</a>
+  <a href="#topic-06">06 Lineage</a>
+  <a href="#showcase">Showcase</a>
+</nav>
+
+<main>
+
+<section id="setup">
+  <h2>Setup (11:00–11:10)</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">0</span><span class="step-title">Environment check + close the sentence-transformers/diskcache gap</span><span class="step-time">10 min</span></div>
+    <span class="where-tag where-vm">VM · VS Code terminal</span>
+    <pre><code>conda activate ai_agent_env
+python -c "import lancedb, networkx; print('lancedb + networkx OK')"
+python -c "import sentence_transformers; print('sentence-transformers OK')"</code></pre>
+    <details class="setup-guide" open>
+      <summary><span class="setup-tag lib">Library setup</span> If <code>sentence_transformers</code> import fails</summary>
+      <div class="setup-body">
+        <p class="freshness">Confirmed missing from <code>ai_agent_env</code> in the pre-course VM check — this is the expected one-time install, not a broken environment.</p>
+        <h4>Install (once per VM)</h4>
+        <pre><code>conda activate ai_agent_env
+uv pip install sentence-transformers diskcache
+python -c "from sentence_transformers import SentenceTransformer, CrossEncoder; print('ok')"</code></pre>
+        <h4>First-run note</h4>
+        <p>The first time you load <code>all-MiniLM-L6-v2</code> or <code>cross-encoder/ms-marco-MiniLM-L-6-v2</code>, it downloads once (a few hundred MB total) and caches locally — expect a short pause on the very first embed/rerank call today, not every call.</p>
+      </div>
+    </details>
+    <details class="setup-guide">
+      <summary><span class="setup-tag lib">Library setup</span> Why LanceDB and not Pinecone/pgvector/Chroma today</summary>
+      <div class="setup-body">
+        <p>LanceDB is embedded (a local folder, like SQLite) — no server, no account, no network dependency, and it's already installed. Postgres+pgvector and Chroma are also installed and already running as VM services if you want to compare them as a stretch goal, but LanceDB is what every required exercise below uses.</p>
+        <pre><code>python -c "import lancedb; print(lancedb.__version__)"</code></pre>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section id="topics-01-03">
+<h2 id="topic-01">Topic 01 · From RAG to Agentic RAG</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">1</span><span class="step-title">The planner decides whether/what/where to retrieve, grades evidence, and re-queries</span><span class="step-time">~40 min</span></div>
+  <p><b>Concept.</b> Plain RAG retrieves once and answers. Agentic RAG treats retrieval as a decision the agent makes as part of its loop: does this question even need retrieval? What should the query actually be? Is what came back good enough, or does it need refining and re-querying? This produces large faithfulness gains over single-pass RAG specifically on multi-step questions, where the first query is rarely the right one.</p>
+  <ul class="concept-list">
+    <li><b>Why grading matters as its own step.</b> Retrieval can return results that are topically related but don't actually answer the question — grading is the explicit check for "is this evidence sufficient," separate from "did the search run."</li>
+    <li><b>Re-querying isn't unlimited.</b> Like Day 1's budget guardrail, agentic RAG's re-query loop needs a bound — 1-2 refinement attempts, not an open-ended search.</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/d3am_t1_agentic_rag.png" alt="Agentic RAG bounded evidence loop: question, classify, retrieve, grade, coverage check leading to a cited answer, or refine the query once, or abstain when the round limit is reached, all under a round-limit/evidence-rules/citation-contract control plane">
+    <figcaption>Retrieval is a decision inside the loop, not a fixed first step.</figcaption>
+  </figure>
+
+  <p><b>Build it together, variation A — wire retrieval in as a tool.</b> <span class="where-tag where-claude">Claude Code chat panel</span> — build the index first, then give Claude Code the ability to search it:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Run W2D3/snippets/rag_index.py once to build the LanceDB index (it
+prints a couple of sample searches). Then build a small MCP tool
+search_policies(query: str, k: int) wrapping its search() function, and
+register it in .mcp.json. Restart, then ask yourself: "is a burst pipe
+covered under my homeowners policy?" using the tool, and give me a cited
+answer.</code></pre>
+  </div>
+
+  <p><b>Build it together, variation B — force a re-query, for contrast.</b> Ask something the first query phrasing won't match well:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Using search_policies, answer: "if my basement floods after a storm, am I
+covered?" First try the query as asked. If the top results don't actually
+answer a flood-specific question, refine your search query once (think
+about what term the documents actually use) and try again before
+answering.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief — compare A and B</b>
+    Variation A's question matched the document vocabulary directly. Variation B likely needed a refined query (the documents distinguish "flood" as a separate, excluded peril from general water damage) — that refinement step is exactly what makes this "agentic" RAG rather than one-shot RAG.
+  </div>
+
+  <p><b>Learners repeat.</b> Ask one more coverage question of your choosing and note whether Claude Code retrieved once or needed a re-query — bring your finding to the showcase.</p>
+</div>
+
+<h2 id="topic-02">Topic 02 · Retrieval architecture</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">2</span><span class="step-title">Chunking, hybrid search, rerankers, metadata filters</span><span class="step-time">~40 min</span></div>
+  <p><b>Concept.</b> Chunking strategy (here: split by <code>##</code> heading, preserving one coherent idea per chunk) determines what can even be retrieved. Hybrid search combines keyword and semantic matching — semantic alone can miss an exact term match; keyword alone misses paraphrase. A cross-encoder reranker re-scores the top candidates with a slower, more accurate model before you trust the ranking. Metadata filters narrow the candidate set by structured fields (product, jurisdiction, date) independent of semantic similarity.</p>
+  <ul class="concept-list">
+    <li><b>Chunk size is a real design decision.</b> Chunking by heading (what <code>rag_index.py</code> does) keeps each chunk coherent and citable — a fixed character-count chunker would sometimes cut a policy clause in half.</li>
+    <li><b>Why rerank at all, if the vector search already ranked results.</b> A vector index's distance metric is fast but approximate; a cross-encoder actually reads the query and candidate together and is far more accurate at the final ranking — hence "search broad, then rerank narrow" (<code>k*3</code> candidates down to <code>k</code> in the reference script).</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/d3am_t2_retrieval_architecture.png" alt="Retrieval architecture in three stages: indexing a corpus into keyword and dense indexes with metadata, query analysis fused across exact and paraphrase matches then reranked into grounded results, and an evaluation stage that tunes the pipeline on recall, ranking, and citations">
+    <figcaption>Chunking and rerank quality matter more than which vector DB you pick.</figcaption>
+  </figure>
+
+  <p><b>Instructor drives live, variation A — with reranking.</b> <span class="where-tag where-vm">VS Code terminal</span> — run the reference search directly and inspect the order:</p>
+  <pre><code>uv run python -c "
+from W2D3.snippets.rag_index import search
+for hit in search('commercial package coverage', k=5):
+    print(round(hit['rerank_score'],2), hit['source_file'], '::', hit['heading'])
+"</code></pre>
+  <p><b>Instructor drives live, variation B — without reranking, for contrast.</b> Have Claude Code temporarily bypass the rerank step and compare the raw vector order:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>In a scratch script, run the same query "commercial package coverage"
+through just the LanceDB vector search step from rag_index.py (skip the
+reranker entirely) and print the top 5 in raw vector-distance order.
+Compare this ordering to the reranked one we just looked at — did the
+best chunk move position?</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    Look for at least one case where reranking promoted a chunk that vector search alone ranked lower (or demoted a topically-similar-but-wrong one) — that's the concrete value of the extra rerank pass, not just a theoretical claim.
+  </div>
+
+  <p><b>Learners repeat.</b> Try a query with an exact term match (e.g. "flood rider") vs. a paraphrased one (e.g. "extra coverage for water from outside") and note whether reranking closes the gap between them.</p>
+</div>
+
+<h2 id="topic-03">Topic 03 · GraphRAG &amp; hybrid retrieval</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">3</span><span class="step-title">Graph traversal + vector search for multi-hop reasoning</span><span class="step-time">~50 min</span></div>
+  <p><b>Concept.</b> Some questions aren't answerable from any single document's text — they require following relationships: this claim, at this address, who else filed a claim at that same address? A knowledge graph makes those relationships traversable directly. GraphRAG costs roughly 3-5× a plain vector query, so it's worth reaching for specifically where relationships matter, not as a default.</p>
+  <ul class="concept-list">
+    <li><b>What vector search structurally cannot do here.</b> Two claims at the same address, filed by different named people, with no shared vocabulary in their claim text, will never be "similar" by embedding distance — the connection lives in the graph structure, not the text.</li>
+    <li><b>GraphRAG combines both, it doesn't replace vector search.</b> Vector/hybrid search still finds the relevant starting node(s); the graph traversal is what extends reasoning beyond a single document's content.</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/d3am_t3_graphrag.png" alt="GraphRAG explicit relationship evidence: a question is answered by traversing a typed graph along directed, cited edges (e.g. supplier supplies SKU, SKU routes_to warehouse), producing a cited answer backed by source documents rather than an uncited claim">
+    <figcaption>The multi-hop signal this exact exercise surfaces.</figcaption>
+  </figure>
+
+  <p><b>Run it together, variation A — the multi-hop traversal.</b> <span class="where-tag where-vm">VS Code terminal + Claude Code</span> — this is the address-collision fraud signal foreshadowed since Day 1's fraud-tip claim:</p>
+  <pre><code>uv run python W2D3/snippets/graphrag_traversal.py CLM-424063</code></pre>
+  <p>Then have Claude Code explain what just happened and why it matters:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Read W2D3/snippets/graphrag_traversal.py and data/insurance
+/claims_kg.json. Explain, in plain terms, what a "2-hop traversal" means
+here, and why a plain search over claim narrative text would never have
+found this connection on its own.</code></pre>
+  </div>
+
+  <p><b>Run it together, variation B — a claim with no signal, for contrast.</b></p>
+  <pre><code>uv run python W2D3/snippets/graphrag_traversal.py CLM-748422</code></pre>
+  <div class="callout instructor">
+    <b class="tag">Debrief — compare A and B</b>
+    <code>CLM-424063</code> surfaces a genuine multi-hop signal. <code>CLM-748422</code> correctly returns "no other claims found" — a graph traversal that finds nothing is still a valid, useful result (it rules something out), not a failure. Don't let the room conflate "no hits" with "broken."
+  </div>
+
+  <p><b>Learners repeat — combine with Topic 01's cited answer.</b> Have Claude Code produce one combined answer for <code>CLM-424063</code> that cites BOTH the vector-retrieved policy grounding (Topic 01) AND the graph-discovered address signal (this topic) — and explicitly flags the claim for <code>special_investigations</code> because of the combined evidence.</p>
+</div>
+</section>
+
+<section id="topics-04-06">
+<h2 id="topic-04">Topic 04 · Permission-aware retrieval</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">4</span><span class="step-title">Default-deny, applied before generation — not after</span><span class="step-time">~40 min</span></div>
+  <p><b>Concept.</b> An agent must be constrained to the same data rights as the user it's acting for. The filter has to run <i>before</i> retrieval selects what goes into context — filtering after generation is too late, the model already read the document.</p>
+  <ul class="concept-list">
+    <li><b>Default-deny, not default-allow.</b> Start from "nothing is visible" and explicitly grant access, rather than starting from "everything is visible" and trying to remember every exclusion.</li>
+    <li><b>Row-level vs. document-level.</b> Our case is document/product-level (an adjuster for homeowners claims shouldn't necessarily see commercial policy terms) — the same idea also applies at the row level (a customer-facing agent should only see that one customer's own claims).</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/d3am_t4_permission_aware_retrieval.png" alt="Permission-aware retrieval: ACL authorization happens before retrieval so denied sources never enter context, contrasted with the unsafe retrieve-all-then-redact-later approach where unauthorized content has already been exposed">
+    <figcaption>The filter runs before retrieval selects candidates — never after.</figcaption>
+  </figure>
+
+  <p><b>Build it together, variation A — a role that can see everything relevant.</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Extend search_policies with a role parameter. Define a default-deny
+permission matrix: role "claims_adjuster" can see all products; role
+"auto_specialist" can see ONLY auto and homeowners products. Apply the
+filter as a LanceDB metadata pre-filter (by source_file prefix) BEFORE
+the vector search runs, not after. Search "commercial package coverage"
+as role "claims_adjuster" and show me the results.</code></pre>
+  </div>
+  <p><b>Build it together, variation B — a restricted role, for contrast.</b></p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Now run the exact same search, "commercial package coverage", as role
+"auto_specialist". Show me what comes back, and confirm no commercial
+policy content appears anywhere in the candidate set — not just excluded
+from the final answer, excluded from retrieval entirely.</code></pre>
+  </div>
+  <div class="callout danger">
+    <b class="tag">What "wrong" looks like here</b>
+    If the restricted role's search still retrieves commercial content and merely gets told "don't mention this," that's filtering after the fact — the failure mode this topic exists to prevent, even if the final answer happens to look correct.
+  </div>
+
+  <p><b>Learners repeat.</b> Add one more role of your choosing (e.g. <code>"landlord_liability_specialist"</code>) with its own allowed-product list, and confirm its searches are correctly scoped.</p>
+</div>
+
+<h2 id="topic-05">Topic 05 · Context engineering</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">5</span><span class="step-title">Assembling the right window, with provenance attached</span><span class="step-time">~30 min</span></div>
+  <p><b>Concept.</b> The context window is a real, finite budget. Every retrieved chunk you add is a deliberate spend, not a free win — and every chunk needs its provenance (source file, section) traveling with it, never separated, so a later citation can trace back correctly.</p>
+  <ul class="concept-list">
+    <li><b>Defeating lost-in-the-middle here specifically.</b> If you're assembling several chunks into one prompt, the most load-bearing evidence belongs first or last in the assembled context, not buried in the middle — same effect from Day 1, applied to retrieval output this time.</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/d3am_t5_context_engineering.png" alt="Context engineering as a governed budget: system policy, task, evidence, session facts, and output contract are assembled and filtered by relevance, authority, freshness, and space, preserving policy-aligned and cited content while truncating duplicate, stale, or low-value content, never a raw transcript dump">
+    <figcaption>Every chunk is a deliberate budget spend, with provenance attached.</figcaption>
+  </figure>
+
+  <p><b>Instructor drives live, variation A — provenance-tagged context.</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Search for evidence on "landlord liability tenant negligence" and assemble
+a context block for answering it. For each chunk you include, tag it with
+its exact source file and heading directly next to the text, not in a
+separate list. Then answer, citing inline.</code></pre>
+  </div>
+  <p><b>Instructor drives live, variation B — an overflowing budget, for contrast.</b></p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Now search for a broad query ("insurance coverage") that returns many
+loosely-relevant chunks, and try to include all of them, ranked, with the
+single most relevant one placed in the middle of the assembled block
+instead of first. Then ask yourself the specific question again and see
+whether you still cite the most relevant chunk correctly.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    Watch for whether the mid-buried best chunk still gets cited correctly, or whether a less relevant but more prominently-placed chunk wins out — a live demonstration of why placement, not just relevance ranking, matters once you're assembling multiple chunks yourself.
+  </div>
+
+  <p><b>Learners repeat.</b> Re-run variation B's same query, but this time place the most relevant chunk first. Note whether the citation improved.</p>
+</div>
+
+<h2 id="topic-06">Topic 06 · Data quality, lineage &amp; freshness</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">6</span><span class="step-title">An answer is only as good as the indexed, governed source behind it</span><span class="step-time">~30 min</span></div>
+  <p><b>Concept.</b> Every chunk in the index should be traceable back to an exact source file and, ideally, a version/checksum of that file at index time. If the source changes after indexing, the index is stale — and a stale or untraceable chunk should gate the answer (refuse or flag), not get used silently as if it were current.</p>
+  <ul class="concept-list">
+    <li><b>Checksums make staleness detectable, not just theoretical.</b> Hash each source file at index time; if the live file's hash no longer matches, you know precisely which chunks are now unverified.</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/d3am_t6_data_quality_lineage_freshness.png" alt="End-to-end lineage from source through stable chunk, versioned index, quality gate, retrieval event, and citation to decision, with a quality-gate matrix (exists, non-empty, known source, stable identity, versioned, fresh enough) and a freshness policy gating what is approved versus flagged or excluded">
+    <figcaption>Every arrow must be traceable backward to its source.</figcaption>
+  </figure>
+
+  <p><b>Instructor drives live, variation A — build the lineage trace.</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Write a script that computes a SHA-256 checksum for every file under
+data/insurance/policies/ and data/logistics/policies/ at index time, and
+saves it to a manifest (source_file -> checksum, indexed_at). Then show me
+how you'd re-check the manifest against the live files to detect drift.</code></pre>
+  </div>
+
+  <p><b>Instructor drives live, variation B — introduce real drift, for contrast.</b> Make a small, real edit to one policy doc (nothing destructive — a one-line clarifying addition), then re-check:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Add one clarifying sentence to the end of POL-HOME-010_water.md (nothing
+that changes its meaning). Then re-run the manifest check from variation
+A. Confirm it correctly flags that file as changed since indexing, and
+tell me what a well-guarded RAG system should do with that claim: keep
+serving the old chunk, or block it until re-indexed?</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    The correct answer is: block/flag until re-indexed, or clearly mark the answer as based on a possibly-stale source — silently continuing to serve the old chunk as if nothing changed is the failure mode.
+  </div>
+
+  <p><b>Learners repeat.</b> Re-run <code>rag_index.py</code> to actually refresh the index, then re-check the manifest and confirm the drift flag clears.</p>
+</div>
+</section>
+
+<section id="showcase">
+  <h2>Showcase (14:30–15:00)</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-title">1–2 learners share, no formal grading</span><span class="step-time">30 min</span></div>
+    <p>Share one moment: a re-query that changed the answer, a rerank that promoted the right chunk, the address-collision graph signal, a permission filter correctly blocking content, or a caught staleness flag.</p>
+    <div class="homework-block">
+      <h3>Before W2D3 PM</h3>
+      <p>Keep <code>rag_index.py</code> and your permission-aware <code>search_policies</code> tool handy — this afternoon's memory and event-driven topics extend directly from today's retrieval layer.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">Week 2 · Day 3 AM · Claude Code edition — agentic RAG &amp; GraphRAG, insurance thread primary</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

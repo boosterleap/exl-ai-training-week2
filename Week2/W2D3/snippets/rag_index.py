@@ -74,12 +74,21 @@ def build_index() -> "lancedb.table.Table":
     return table
 
 
-def search(query: str, k: int = 5) -> list[dict]:
-    """Vector search, then cross-encoder rerank -- returns the top k, best first."""
+def search(query: str, k: int = 5, source_prefixes: list[str] | None = None) -> list[dict]:
+    """Vector search, then cross-encoder rerank -- returns the top k, best first.
+
+    source_prefixes, if given, is applied as a LanceDB metadata pre-filter
+    (prefilter=True) on source_file BEFORE the vector search runs, restricting
+    which rows are even eligible candidates -- not a post-hoc filter on results.
+    """
     db = lancedb.connect(str(DB_PATH))
     table = db.open_table(TABLE_NAME)
     qvec = embedder().encode([query])[0].tolist()
-    candidates = table.search(qvec).limit(k * 3).to_list()
+    query_builder = table.search(qvec)
+    if source_prefixes is not None:
+        clause = " OR ".join(f"source_file LIKE '{prefix}%'" for prefix in source_prefixes)
+        query_builder = query_builder.where(clause or "false", prefilter=True)
+    candidates = query_builder.limit(k * 3).to_list()
     pairs = [(query, c["text"]) for c in candidates]
     scores = reranker().predict(pairs)
     ranked = sorted(zip(candidates, scores), key=lambda pair: -pair[1])[:k]

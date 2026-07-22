@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D1 AM · The Agentic Loop, via Claude Code</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">Week 2 · Day 1 · Concept Exploration (11:00–15:00)</p>
+  <h1>The agentic loop, reasoning, tools, memory &amp; guardrails — watched live in Claude Code</h1>
+  <p>No slides, no raw API key. Every concept today is demonstrated by directing and inspecting your own Claude Code session against real customer emails — and for each concept you'll see at least two contrasting runs, not just one, so the difference is visible, not just described.</p>
+  <div class="thread-badges">
+    <span class="thread-badge insurance">Insurance — primary, all six topics</span>
+    <span class="thread-badge logistics">Logistics — quick transfer check at the end</span>
+  </div>
+  <div class="timing-strip">
+    <span class="timing-chip">11:00–11:15 setup</span>
+    <span class="timing-chip">11:15–13:00 topics 01–03</span>
+    <span class="timing-chip">13:00–13:10 break</span>
+    <span class="timing-chip">13:10–14:45 topics 04–06</span>
+    <span class="timing-chip">14:45–15:00 showcase</span>
+  </div>
+</header>
+
+<nav class="page-nav" aria-label="Session sections">
+  <a href="#setup">Setup</a>
+  <a href="#topics-01-03">01 Loop</a>
+  <a href="#topic-02">02 Reasoning</a>
+  <a href="#topic-03">03 Tools</a>
+  <a href="#topics-04-06">04 Memory</a>
+  <a href="#topic-05">05 Agent vs pipeline</a>
+  <a href="#topic-06">06 Guardrails</a>
+  <a href="#showcase">Showcase</a>
+</nav>
+
+<main>
+
+<section id="setup">
+  <h2>Setup (11:00–11:15)</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">0</span><span class="step-title">Environment and auth check</span><span class="step-time">15 min</span></div>
+    <span class="where-tag where-vm">VM · VS Code terminal</span>
+    <p>Open the shared repo in VS Code on the Ubuntu VM (<code>code .</code> from the repo root if it isn't already open), then open a new terminal and run:</p>
+    <pre><code>conda activate ai_agent_env
+python --version
+claude --version
+claude auth status
+git -C . rev-parse --show-toplevel</code></pre>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You should see Python from <code>ai_agent_env</code> (not <code>base</code>), a Claude Code version string, and <code>"loggedIn": true</code> from the auth check. If <code>loggedIn</code> is <code>false</code>, stop and get the instructor — nothing else today works without this.
+    </div>
+    <div class="callout">
+      <b class="tag">Where things live</b>
+      Everything today reads from <code>data/insurance/</code> (primary) and <code>data/logistics/</code> (end-of-session transfer check). See <code>data/_DATA_README.md</code> for the full schema and the two deliberate "no policy grounding" gaps you'll meet in Topic 06.
+    </div>
+  </div>
+</section>
+
+<section id="topics-01-03">
+<h2 id="topic-01">Topic 01 · The agentic loop, in depth</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">1</span><span class="step-title">Perceive → reason → act → observe</span><span class="step-time">~40 min</span></div>
+  <p><b>Concept.</b> An agent isn't "a prompt that's a bit smarter" — it's a small distributed system where the LLM itself is the planner <i>and</i> the executor: it decides what to look up, does the looking-up (via tools), reads what came back, and decides what's next. That loop — perceive, reason, act, observe — repeats until the model decides it's done.</p>
+  <ul class="concept-list">
+    <li><b>Why "distributed system," specifically.</b> Each act/observe pair is a network or filesystem round-trip with its own latency and its own chance of partial failure (a tool can time out, return an error, or return something the model misreads) — reasoning has to account for that, the same way a distributed backend has to handle a flaky downstream service.</li>
+    <li><b>What a one-shot completion loses.</b> A single "perceive → reason → output text" call (no act/observe) can only answer from what's already in the prompt. The moment it needs a fact it doesn't have, a one-shot call either admits it can't help or — worse — guesses. The loop exists specifically to let the model go get the fact instead of guessing it.</li>
+    <li><b>How the loop knows when to stop.</b> There's no fixed step count. The model itself decides "I have enough to answer" and emits a final text response with no further tool call. That termination decision is itself part of what you're evaluating when you watch a transcript.</li>
+    <li><b>"Turn" vs "loop."</b> What you call one message to Claude Code can contain many internal act/observe cycles before you see a reply — the loop runs <i>inside</i> a single turn, not once per turn.</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/d1am_t1_agent_loop.png" alt="The bounded agent loop: observe gathers context and state, reason proposes actions, act-through-tool executes via application controls, tool result returns updates, repeating until a stop rule is satisfied — all inside application-owned controls (max turns, timeout per tool, bounded retry, trace every decision) that hand off to a final answer">
+    <figcaption>The agentic loop. Claude Code runs exactly this loop on every request you send it.</figcaption>
+  </figure>
+
+  <div class="callout predict">
+    <b class="tag">Predict, then verify</b>
+    Before running anything: open <code>data/insurance/fnol_emails.csv</code> and read row <code>CLN-001</code> (Jennifer Garcia, claim <code>CLM-424063</code>). If you asked an assistant to "handle this email," what would it need to look up before it could reply? Write down 2–3 things it needs to know that <i>aren't</i> in the email itself. Then also predict: if you forbade it from looking anything up, what would it do instead?
+  </div>
+
+  <p><b>Instructor drives live, variation A — the full loop.</b> <span class="where-tag where-claude">Claude Code chat panel, in VS Code</span> — open the Claude Code panel in this repo and paste:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt to paste into Claude Code</div>
+    <pre><code>Read data/insurance/fnol_emails.csv and find the row CLN-001. Then look up
+the matching claim and policy in data/insurance/claims.db (tables: claims,
+policies). Tell me, step by step, what you looked up and in what order,
+before you tell me your answer. Don't draft a reply yet — just narrate your
+process.</code></pre>
+  </div>
+  <p>Watch the transcript together. Point at the exact moment Claude Code reads the CSV (perceive), decides it needs the database (reason), runs a query (act), and reads the result back (observe) — then does another reason/act/observe pass before answering.</p>
+
+  <p><b>Instructor drives live, variation B — the loop disabled, for contrast.</b> Same row, but this time forbid tool use entirely:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt — no lookups allowed</div>
+    <pre><code>Without reading any file or database, using only what's in this message:
+row CLN-001 is "Property claim CLM-424063 — fence damage, Jennifer Garcia,
+6650 Broadway, estimated damage $5,834." Tell me whether this claim is
+covered and what happens next. Do not look anything up.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief — compare A and B directly</b>
+    Variation A should show real act/observe cycles and a grounded, specific answer (policy status, product, route queue). Variation B has no act/observe at all — it can only hedge, generalize, or ask for more information. That contrast <i>is</i> the concept: the loop is what turns "an LLM that can talk about insurance" into "an LLM that can actually resolve this specific claim."
+  </div>
+
+  <details class="instructor-reveal">
+    <summary>Instructor: what to point out (reveal after running both)</summary>
+    <p>Claude Code will typically: read the CSV row, notice <code>claim_number_ground_truth</code>/<code>policy_id_ground_truth</code>, then either grep/read <code>claims.db</code> directly or write a tiny script to query it. Emphasize: it chose <i>how</i> to look the data up — you didn't tell it "run a SQL query." That's the reasoning step making an executor decision, not you scripting it. In variation B, watch for the model correctly refusing to invent a policy status — that's a preview of Topic 06's guardrail theme.</p>
+  </details>
+
+  <p><b>Learners repeat, two rows.</b> <span class="where-tag where-vm">Your own VM, your own terminal + Claude Code panel</span> — pick <i>two</i> different rows (e.g. <code>CLN-004</code> and <code>CLN-008</code>) and run the full-loop prompt (variation A) on each. Fill in an observation note for each:</p>
+  <div class="callout">
+    <b class="tag">Observation log — fill this in for both rows</b>
+    For each row: (1) how many distinct act/observe cycles did it take before answering? (2) did it look up the claim before the policy, or the other way round? (3) did it use a different tool/approach (direct file read vs. a small script) between the two rows, and if so, why might that be?
+  </div>
+</div>
+
+<h2 id="topic-02">Topic 02 · Reasoning &amp; planning patterns</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">2</span><span class="step-title">ReAct, plan-and-execute, reflection, tree-of-thought</span><span class="step-time">~45 min</span></div>
+  <p><b>Concept.</b> There's more than one way for a model to organize its reasoning. ReAct interleaves one thought with one action, repeatedly. Plan-and-execute writes the whole plan first, then runs it. Reflection produces a draft, critiques it, and revises. Tree-of-thought explores multiple branches and picks the best one — powerful, but the most expensive, so it's used sparingly. 2026 "thinking" models can also do extended, visible reasoning before responding — a different lever from which pattern you prompt for.</p>
+  <ul class="concept-list">
+    <li><b>Cost/latency ordering.</b> Roughly cheapest-to-priciest: ReAct (one small step at a time, cheap per step but can take many steps) → plan-and-execute (one planning cost up front, then cheaper execution) → reflection (pay for a draft <i>and</i> a critique pass) → tree-of-thought (pay for multiple parallel branches, discard most of them).</li>
+    <li><b>When to reach for which.</b> ReAct suits tool-heavy, exploratory tasks where the next step genuinely depends on what came back. Plan-and-execute suits well-understood multi-step workflows where the steps are knowable in advance. Reflection suits anything where correctness matters more than speed (a coverage citation, a legal-sensitive statement). Tree-of-thought suits genuinely ambiguous, high-stakes single decisions — not routine triage.</li>
+    <li><b>Extended thinking is orthogonal.</b> A model can "think harder" (more internal deliberation before any output) independent of which of the four patterns you prompted for — it's a dial on depth, not a fifth pattern.</li>
+    <li><b>Production systems blend these.</b> A real triage agent might use ReAct to gather facts, then a short reflection pass just before sending a customer-facing reply — you rarely commit to exactly one pattern for an entire task.</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/d1am_t2_reasoning_patterns.png" alt="Decision tree for choosing the least-complex reasoning pattern: known steps route to a deterministic pipeline; unknown steps check for an irreversible or high-risk action, routing to bounded ReAct if not or plan-then-approval-then-execute if so; reflection and candidate-search sit alongside as fits for a mistake check and for comparing alternatives under a fixed budget; every path is audited for decision, evidence, tool call, and stop reason">
+    <figcaption>Four reasoning patterns. Same model, different scaffolding around it.</figcaption>
+  </figure>
+
+  <p><b>Instructor drives live — three patterns on the same claim.</b> <span class="where-tag where-claude">Claude Code chat panel</span> — run <code>CLM-597471</code> (Robert Chen, wind damage) through all three below and compare turn count, tone, and whether the answer actually changed:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt 1 — plan-first</div>
+    <pre><code>Before doing anything, write out your full plan as a numbered list for how
+you'll resolve claim CLM-597471 from data/insurance/fnol_emails.csv (row
+CLN-005). Then execute the plan step by step, referring back to your list.</code></pre>
+  </div>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt 2 — reflection</div>
+    <pre><code>Draft a reply to claim CLM-597471 (row CLN-005) right away. Then critique
+your own draft against data/insurance/policies/POL-HOME-010_water.md and
+POL-HOME-010_flood_rider.md — did you cite the right coverage? Revise if
+needed and show me the before/after.</code></pre>
+  </div>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt 3 — tree-of-thought</div>
+    <pre><code>For claim CLM-597471 (row CLN-005), generate three different possible
+framings of the reply (e.g. approve-leaning, needs-more-evidence, and
+partial-coverage), briefly evaluate each against the policy documents, then
+tell me which one you'd actually send and why you rejected the other two.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief prompt</b>
+    Ask the room: did the plan-first run ever deviate from its own plan mid-way? Did the reflection run catch a real mistake, or just restate the draft? Did tree-of-thought's rejected branches reveal a real ambiguity in the claim, or just restate the same answer three ways (a sign this claim didn't actually need it)? Extended thinking (if the model shows a thinking block) is a different axis from the pattern — it's "how hard did it think," not "in what order."
+  </div>
+
+  <p><b>Learners repeat — two claims, two patterns each.</b> Pick <i>two</i> different claims from the CSV. For the first, run the ReAct-style prompt below. For the second, choose whichever of plan-first/reflection/tree-of-thought you think best fits that claim's shape, and justify the choice before running it:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt 4 — ReAct style (claim 1)</div>
+    <pre><code>Work on claim &lt;your claim ID&gt; one step at a time: state a single next
+thought, take a single action (one lookup or check), tell me what you
+observed, then decide your next thought. Do not plan more than one step
+ahead at a time.</code></pre>
+  </div>
+  <div class="callout">
+    <b class="tag">Observation log</b>
+    For claim 1 (ReAct): how many thought/action/observation cycles did it take? For claim 2 (your chosen pattern): did the pattern you picked actually suit the claim, or would a different one have worked better in hindsight? Bring one answer to the showcase.
+  </div>
+</div>
+
+<h2 id="topic-03">Topic 03 · Tools as contracts</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">3</span><span class="step-title">JSON-schema, validation, idempotency, budgets</span><span class="step-time">~40 min</span></div>
+  <p><b>Concept.</b> A tool call is a contract, not a suggestion: the model must supply arguments matching a schema, the tool validates them, and the tool's output is itself validated before the model trusts it. A well-designed tool is also <i>idempotent</i> — calling it twice with the same input causes no extra side effect — and carries an explicit time/cost budget so one runaway call can't blow the whole session.</p>
+  <ul class="concept-list">
+    <li><b>Read tools vs. write tools need different contracts.</b> A read-only lookup only needs input validation and a "not found" path. A write tool (approve a payment, send an email) additionally needs idempotency — typically an idempotency key so a retried call doesn't double-charge or double-send — and usually a human approval gate before it fires.</li>
+    <li><b>What a validation failure looks like in practice.</b> If the model supplies a malformed argument (wrong type, missing field), the tool should reject it with a clear error <i>before</i> touching any data — that error becomes part of the model's next reasoning step, not a silent failure.</li>
+    <li><b>Budgets are a code-level check, not a polite request.</b> "Don't call this more than 3 times" only works reliably if your code counts calls and refuses the 4th — not if it's just a line in the prompt.</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/d1am_t3_tool_contracts.png" alt="Tool calls as governed contracts: a proposed call passes through a typed schema, then schema-valid and authorized checks (rejecting visibly if either fails), then a write-operation check that for writes requires an approval-plus-idempotency-key gate (failing closed if absent) before reaching the domain function, which returns a typed result and a trace">
+    <figcaption>Input schema → tool → output schema, validated on both sides.</figcaption>
+  </figure>
+
+  <p><b>Design together, out loud, before any code exists — read tool.</b> <span class="where-tag where-claude">Claude Code chat panel</span> — this is a design conversation, not a build yet (the build happens this afternoon in W2D1PM):</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt — read-only lookup tool</div>
+    <pre><code>I want a tool called get_claim_and_policy that takes a claim_id, looks it
+up in data/insurance/claims.db, joins to the matching policy row, and also
+tells me which policy document(s) under data/insurance/policies/ apply
+(see data/_DATA_README.md for the product-to-policy-doc mapping). Propose
+a JSON-schema for its input and output, and tell me: what should happen if
+the claim_id doesn't exist, and what should happen if the product has no
+matching policy doc.</code></pre>
+  </div>
+  <div class="callout success">
+    <b class="tag">What a good answer includes</b>
+    A strict input schema (just <code>claim_id: string</code>), an output schema that separates "found data" from "grounding available: yes/no," a clear <i>not found</i> path that doesn't guess, and — for the <code>commercial_package</code> product specifically — an explicit "no policy doc exists, flag for escalation" behavior rather than silence.
+  </div>
+
+  <p><b>Design together — now contrast with a write tool.</b> Same conversation, but for an action with real consequences:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt — write/approval tool, for contrast</div>
+    <pre><code>Now design approve_claim_payment(claim_id, amount_usd, idempotency_key).
+Compared to get_claim_and_policy: what extra validation does this need?
+Why does it need an idempotency_key when the read tool didn't? What should
+happen if this tool is called twice with the same idempotency_key? Should
+this tool ever run without a human approval step — why or why not?</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    The point isn't to build this tool today — it's to hear Claude Code (correctly) insist on an idempotency key and a human approval gate for anything that moves money, in a way it didn't need to for the read-only lookup. That distinction is exactly what Day 1 PM's permissions topic and Day 2's HITL topic build on.
+  </div>
+
+  <p><b>Learners repeat — design both directions for logistics.</b> Ask Claude Code to do the same two design passes for the logistics domain: a read tool <code>get_order_and_shipment_status(order_id)</code> against <code>data/logistics/shipments.db</code> + <code>shipment_events.jsonl</code>, <i>and</i> a write tool <code>issue_delay_compensation_credit(order_id, credit_pct, idempotency_key)</code>. Note where the "no grounding" case shows up in the read tool (hint: the <code>air</code> mode) and what the write tool's approval requirement should be.</p>
+</div>
+</section>
+
+<section id="topics-04-06">
+<h2 id="topic-04">Topic 04 · Memory, layered</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">4</span><span class="step-title">Working context, summaries, artifacts, long-term preferences</span><span class="step-time">~40 min</span></div>
+  <p><b>Concept.</b> "Memory" for an agent isn't one thing and it isn't just a vector database. It's layered: working context (this turn), summaries (compacted history once context fills up), artifacts (files written to disk — including <code>CLAUDE.md</code> itself), and long-term preferences (true across sessions). A long, unmanaged context also suffers the <i>lost-in-the-middle</i> effect: facts buried in the middle of a huge context get under-weighted by the model, even though they're technically "in there."</p>
+  <ul class="concept-list">
+    <li><b>What triggers compaction.</b> As a session's context approaches its limit, older turns get automatically summarized so the session can keep going — this is automatic, not something you request, and it's lossy by nature: detail is traded for space.</li>
+    <li><b>Artifacts are compaction-proof; working context isn't.</b> A fact that only lives in turn 3 of a long conversation can get summarized away by turn 40. The same fact written into <code>CLAUDE.md</code> gets re-read fresh at the start of every new session, regardless of how long any single conversation ran.</li>
+    <li><b>Session memory vs. project memory.</b> A session's working context is private to that one conversation. <code>CLAUDE.md</code> is project-level — every session, including brand-new ones, starts by reading it. That distinction matters again this afternoon (Day 1 PM Topic 04) when you resume a specific session by ID.</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/d1am_t4_layered_memory.png" alt="Layered memory with provenance: working context (active messages) compresses prior turns into summaries, while large output is stored as durable artifacts alongside long-term stable operator preferences, with every layer restoring needed context back to working memory and each entry carrying source, timestamp, retention, and deletion metadata — critical evidence stays near the decision, and memory is not the same thing as a vector DB">
+    <figcaption>Four memory layers. <code>CLAUDE.md</code> is the artifact layer for this project.</figcaption>
+  </figure>
+
+  <p><b>Instructor drives live, variation A — grow <code>CLAUDE.md</code>.</b> <span class="where-tag where-claude">Claude Code chat panel</span> — open the repo's root <code>CLAUDE.md</code> together and read the current "Daily build log" section, then:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Read CLAUDE.md. Based on what we just did in Topics 01-03, propose 3-4
+bullet points to add under "Day 1 — Agentic foundations" in the Daily
+build log section — the kind of thing a future session would need to know
+that isn't obvious from the code. Don't write it yet, just propose it.</code></pre>
+  </div>
+
+  <p><b>Instructor drives live, variation B — a live lost-in-the-middle experiment.</b> In the <i>same, now-long</i> session, process three or four more CSV rows back to back (quick, no need to fully resolve each — just have it read and briefly summarize each row), then ask:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt — test recall of an early fact</div>
+    <pre><code>Without re-reading data/insurance/fnol_emails.csv, what was the claim_id
+and named_insured for the very first row we looked at this session (row
+CLN-001)? Answer from memory of this conversation only.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief — compare A and B</b>
+    Variation A shows an artifact write surviving deliberately. Variation B tests whether an early fact, buried under several more recent rows, is still crisply recalled from working context alone — if the session is long enough, watch for it being vaguer or slightly wrong. That gap is exactly why the artifact layer (variation A) exists: don't rely on a long conversation's memory for anything that matters later.
+  </div>
+
+  <p><b>Learners repeat.</b> First, approve one bullet from variation A, have Claude Code actually append it to <code>CLAUDE.md</code> under today's section (never delete existing lines — see the standing instruction at the top of that file), then start a *new* Claude Code session and ask it "what is this project and what happened on Day 1?" — confirm it picks the answer up from <code>CLAUDE.md</code> alone. Second, run your own mini lost-in-the-middle test: process 3 different rows in one session, then ask about the first one's details from memory, and note whether recall held up.</p>
+</div>
+
+<h2 id="topic-05">Topic 05 · Agent vs pipeline</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">5</span><span class="step-title">When judgment earns its cost, and when it doesn't</span><span class="step-time">~35 min</span></div>
+  <p><b>Concept.</b> Not every email needs an agent. If the path is fully predictable — "shipment delivered, no exceptions, customer wants a confirmation" — a hardcoded pipeline is cheaper, faster, and fully deterministic. An agent earns its extra cost only when the next step genuinely depends on judgment the code can't pre-script.</p>
+  <ul class="concept-list">
+    <li><b>The cost math.</b> A hardcoded pipeline, once written, costs zero model calls to run. An agent loop costs one or more model calls every single time, for every email. That's the trade you're actually making — not "agents are smarter," but "agents cost recurring money and pipelines cost one-time engineering."</li>
+    <li><b>The hybrid pattern is what production systems actually do.</b> A deterministic pre-filter routes the easy, predictable majority of cases straight to a canned or templated response, and only hands the genuinely ambiguous minority to the agent. This is usually the right answer, not "pick one."</li>
+    <li><b>The trap to avoid.</b> Routing everything to an agent "to be safe" quietly turns a cheap, instant operation into a slow, costly one with no accuracy benefit — the model will just reach the same obvious conclusion the pipeline would have, more slowly and less predictably.</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/d1am_t5_agent_vs_pipeline.png" alt="Pipeline, agent, or hybrid: a pipeline runs known steps and branches (fast, cheap, predictable, testable); an agent's next action depends on uncertain evidence (handles novelty but costs more latency and risk); a hybrid combines a validated input and deterministic lookup with one narrow bounded-routing judgment step, allowlist validation, and deterministic output — autonomy is a design dial from fully deterministic to bounded judgment, not the objective itself">
+    <figcaption>Ask this question before reaching for an agent.</figcaption>
+  </figure>
+
+  <p><b>Instructor drives live, timed — two extremes.</b> <span class="where-tag where-claude">Claude Code chat panel</span> — run these two emails and compare turn count / time:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt A — the "obviously simple" case</div>
+    <pre><code>Row CLN-006 in data/insurance/fnol_emails.csv is a low-urgency policy
+question (adding glass coverage mid-term, no active claim). Just answer
+the customer's question directly and briefly — don't investigate a claim,
+there isn't one.</code></pre>
+  </div>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt B — the "needs judgment" case</div>
+    <pre><code>Row CLN-012 is a fraud tip about claim CLM-255335 possibly reusing photos
+from another address. Decide what you'd need to investigate, who should
+be notified, and what NOT to tell the customer directly while this is
+under review.</code></pre>
+  </div>
+  <div class="callout">
+    <b class="tag">Debrief</b>
+    Prompt A should resolve in one or two tool-free turns — a great candidate to eventually hardcode. Prompt B genuinely needs the model to weigh conflicting concerns (customer communication vs. active fraud review) — that's where agent judgment is worth the cost.
+  </div>
+
+  <p><b>Instructor drives live — now design the hybrid.</b> Have Claude Code propose the pre-filter itself:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt — design a deterministic pre-filter</div>
+    <pre><code>Look at all rows in data/insurance/fnol_emails.csv. Propose a simple,
+deterministic rule (using only the columns already in the CSV, no model
+call) that would route the "obviously simple" rows straight to a canned
+response, and send everything else to an agent. Show me which rows your
+rule would route each way, and flag any row you're not confident about.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    The rows it flags as "not confident" are usually the genuinely judgment-requiring ones — that uncertainty is itself useful signal for where to spend agent budget.
+  </div>
+
+  <p><b>Learners repeat.</b> Classify six rows from the CSV yourself as "pipeline" or "agent" (double the original three), and for one of the "pipeline" rows, write the one-line deterministic rule you'd use instead of an agent call. Be ready to defend one choice in the showcase.</p>
+</div>
+
+<h2 id="topic-06">Topic 06 · Failure modes &amp; guardrails (intro)</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">6</span><span class="step-title">Hallucinated calls, loops, runaway cost — deterministic control points</span><span class="step-time">~30 min</span></div>
+  <p><b>Concept.</b> Left unchecked, an agent loop can hallucinate a tool call, loop without making progress, or simply run up cost. The fix isn't "ask the model to be careful" — it's deterministic control points in your own code: budget checks, evidence checks, and approval gates that don't depend on the model choosing to stop.</p>
+  <ul class="concept-list">
+    <li><b>Budget guardrail, concretely.</b> A hard cap on tool calls or elapsed time per task, enforced by counting in code — once hit, the loop stops and reports "budget exceeded," it doesn't ask the model nicely to wrap up.</li>
+    <li><b>Loop-detection guardrail.</b> The same tool called repeatedly with the same (or near-identical) arguments with no new information is a sign of a stuck loop, not progress — worth detecting and halting explicitly.</li>
+    <li><b>Evidence guardrail.</b> No matching record/document found means the answer must say so — this is what you're about to test directly below.</li>
+    <li><b>Approval guardrail.</b> Anything irreversible (a payment, a policy change, a sent customer email) waits for an explicit human decision — this is Day 1 PM's Topic 05 in practice.</li>
+  </ul>
+  <figure class="concept-figure">
+    <img src="images/d1am_t6_failure_modes_guardrails.png" alt="Failure modes mapped to deterministic guardrails: fabricated tool to tool allowlist, invalid arguments to typed schema, stale observation to freshness check, repeated loop/runaway spend to step and cost budget, prompt injection to instruction boundary, unauthorized write to approval plus idempotency — every action proposal is checked as allowed and within budget before it is executed and traced, otherwise the loop stops and reports">
+    <figcaption>Same loop, with control points that live in your code — not the model's discretion.</figcaption>
+  </figure>
+
+  <div class="callout predict">
+    <b class="tag">Predict, then verify</b>
+    Claim <code>CLM-255335</code> (David Taylor) has product <code>commercial_package</code> — deliberately the one product with <b>no matching policy document</b> in <code>data/insurance/policies/</code> (see <code>data/_DATA_README.md</code>). What should a well-guarded assistant do when asked to explain this claimant's coverage? Separately predict: what should happen if you ask about a claim_id that doesn't exist <i>at all</i> — is that the same failure mode, or a different one?
+  </div>
+
+  <p><b>Instructor drives live, variation A — ungrounded but real.</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt — ungrounded product</div>
+    <pre><code>Row CLN-003 references claim CLM-255335, policy POL-441002118, product
+commercial_package. Look for a matching policy document under
+data/insurance/policies/ and tell me what the coverage terms say for this
+claim. If you can't find grounding, say so explicitly and tell me what you
+would do instead of guessing.</code></pre>
+  </div>
+  <div class="callout danger">
+    <b class="tag">Fail condition to watch for</b>
+    If Claude Code invents plausible-sounding coverage terms instead of stating it found no matching document, that's the exact failure mode this topic warns about — flag it immediately as a group and re-run with a follow-up asking it to double check its citation.
+  </div>
+
+  <p><b>Instructor drives live, variation B — a record that doesn't exist, for contrast.</b></p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt — nonexistent claim</div>
+    <pre><code>Look up claim CLM-999999 in data/insurance/claims.db and tell me its
+coverage status.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief — compare A and B</b>
+    Variation A is "the record exists, but nothing grounds a coverage answer" (escalate/flag). Variation B is "the record itself doesn't exist" (a plain not-found error). A well-built assistant should distinguish these two out loud, not collapse them into one vague "can't help" response — they call for different next actions.
+  </div>
+
+  <p><b>Learners repeat.</b> Try both variations again, but on the logistics thread: <code>ORD-3007</code> (air freight, no matching SLA doc — the ungrounded case) and an order ID that doesn't exist at all (the not-found case). Confirm Claude Code treats them differently, the same way it did for insurance.</p>
+</div>
+</section>
+
+<section id="showcase">
+  <h2>Showcase (14:45–15:00)</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-title">1–2 learners share, no formal grading</span><span class="step-time">15 min</span></div>
+    <p>Pick one moment from today where Claude Code did something you didn't expect — a different lookup order, a caught mistake during reflection, a refusal on the ungrounded claim, a surprising pipeline-vs-agent classification. Share the prompt and the surprising part of the transcript.</p>
+    <div class="homework-block">
+      <h3>Before W2D1 PM</h3>
+      <p>Skim <code>data/logistics/customer_emails.csv</code> and <code>data/_DATA_README.md</code>'s logistics section. You'll build a real MCP tool against this data as homework this afternoon, using the same shape as the insurance tool you designed in Topic 03.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">Week 2 · Day 1 AM · Claude Code edition — concept exploration, insurance thread primary</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

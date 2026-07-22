@@ -70,21 +70,25 @@ python -c "from langgraph.checkpoint.sqlite import SqliteSaver; print('ok now')"
 <h2 id="topic-01">Topic 01 · The 2026 framework landscape</h2>
 <div class="step">
   <div class="step-head"><span class="step-num">1</span><span class="step-title">LangGraph, Claude Agent SDK, CrewAI, OpenAI Agents SDK, Google ADK, Microsoft Agent Framework</span><span class="step-time">~35 min</span></div>
-  <p><b>Concept (8 min).</b> LangGraph models an agent as an explicit graph of states and transitions with durable checkpointing — it's in production at Klarna, Uber, LinkedIn, BlackRock, and JPMorgan. Claude Agent SDK (what Claude Code itself runs on) gives skills/subagents/hooks/permissions as first-class primitives. CrewAI organizes work as role-based crews of agents with defined tasks. OpenAI Agents SDK, Google ADK, and Microsoft Agent Framework are the other major 2026 options, each with their own take on the same core loop.</p>
+  <p><b>Concept.</b> LangGraph models an agent as an explicit graph of states and transitions with durable checkpointing — it's in production at Klarna, Uber, LinkedIn, BlackRock, and JPMorgan. Claude Agent SDK (what Claude Code itself runs on) gives skills/subagents/hooks/permissions as first-class primitives. CrewAI organizes work as role-based crews of agents with defined tasks. OpenAI Agents SDK, Google ADK, and Microsoft Agent Framework are the other major 2026 options, each with their own take on the same core loop.</p>
   <ul class="concept-list">
     <li><b>What "framework" actually buys you.</b> Every one of these still runs perceive/reason/act/observe underneath. The difference is how much of the state management, tool orchestration, and multi-agent coordination is handled for you vs. left for you to write — that's the real axis to evaluate on, not "which one is smartest."</li>
     <li><b>Why this matters for a hiring/build decision.</b> LangGraph's explicit graph state is valuable when you need durable, resumable, auditable workflows (this week's HITL topic depends on exactly that). CrewAI's role-based framing is valuable when the task naturally decomposes into named specialist roles. Claude Agent SDK is valuable when the coding-agent-style isolation spectrum (skills → subagents → teams) fits your task shape.</li>
     <li><b>Ecosystem maturity is also a real input.</b> Production references, community size, and documentation depth (LangGraph's named production users, for instance) reduce real delivery risk beyond the raw feature list.</li>
   </ul>
   <figure class="concept-figure">
-    <img src="images/framework-landscape.svg" alt="Six agent frameworks compared: LangGraph, Claude Agent SDK, CrewAI, OpenAI Agents SDK, Google ADK, Microsoft Agent Framework">
-    <figcaption>Six frameworks, one underlying loop. Green = hands-on this cohort, grey = awareness only.</figcaption>
+    <img src="images/d2am_t1_framework_landscape.png" alt="2026 agent framework landscape grid: LangGraph (graph-based orchestration, durable execution, lab depth) and Claude Agent SDK (built for Claude models, safety-first, first-party integrations) as the two lab-depth frameworks, alongside CrewAI (role-based multi-agent), OpenAI Agents SDK, Google ADK, and Microsoft Agent Framework, each with three key traits listed">
+    <figcaption>Six frameworks, one underlying loop. Starred = hands-on lab depth this cohort.</figcaption>
   </figure>
 
   <details class="setup-guide">
     <summary><span class="setup-tag gcp">GCP setup</span> Google ADK + Vertex AI (learner hands-on this cohort)</summary>
     <div class="setup-body">
       <p class="freshness">Current as of July 2026 — Google rebranded the Vertex AI console area to the <b>Gemini Enterprise Agent Platform</b> in April 2026 (Cloud Next '26); the underlying APIs (<code>aiplatform.googleapis.com</code>), ADC auth model, and <code>google-adk</code> package are unchanged, only the console navigation label moved. Claude models are now also available directly in Vertex/Gemini Enterprise Model Garden alongside Gemini — interesting context; AWS Bedrock (this afternoon's Topic 4) remains the one Claude-model call, so you can compare a Claude-native path against Vertex's Gemini path with hands-on experience on both.</p>
+        <figure class="concept-figure">
+          <img src="images/d2am_primer_google_adk.png" alt="Google ADK primer: a user's request flows through a Runner that orchestrates the session, to an Agent that reasons and picks tools/model, backed by Session State and Memory side stores, with an Evaluation/Tracing layer capturing metrics, traces, and quality across the whole flow">
+          <figcaption>ADK's Runner sits between the user and the Agent, managing session state and callbacks either side.</figcaption>
+        </figure>
         <h4>What you do (every learner, in your own GCP sandbox)</h4>
         <ol>
           <li>Open your assigned GCP sandbox, activate Cloud Shell.</li>
@@ -99,6 +103,10 @@ python -c "from langgraph.checkpoint.sqlite import SqliteSaver; print('ok now')"
     <summary><span class="setup-tag azure">Azure setup</span> Microsoft Agent Framework + standalone Azure OpenAI (learner hands-on this cohort)</summary>
     <div class="setup-body">
       <p class="freshness">Current as of July 2026 — Microsoft has been consolidating the old "Azure AI Foundry" branding into <b>Microsoft Foundry</b> (portal at <code>ai.azure.com</code>); a standalone Azure OpenAI resource still supports plain API-key auth and can be viewed/managed from either the classic Azure portal or the Microsoft Foundry portal without needing a full Foundry project. When creating the resource, the portal may highlight a consolidated "Foundry" option ahead of "Azure OpenAI" in search — pick the plain Azure OpenAI entry for this exercise.</p>
+        <figure class="concept-figure">
+          <img src="images/d2am_primer_microsoft_agent_framework.png" alt="Microsoft Agent Framework primer: agents, threads, tools, workflows, middleware, and durable state all connect into a central Agent Runtime, which also bridges out to model providers and enterprise tools/systems, supporting sequential, concurrent, handoff, and group-chat orchestration patterns">
+          <figcaption>Everything — agents, tools, workflows, durable state — routes through one Agent Runtime.</figcaption>
+        </figure>
         <h4>What you do (every learner, in your own Azure sandbox)</h4>
         <ol>
           <li>In the Azure portal, create your own standalone Azure OpenAI S0 resource (Basics: your assigned subscription/resource group, an allowed region, S0 tier; Network: All networks; Tags: none). <b>Verified live: this does not auto-deploy a model</b> — you still need the next step.</li>
@@ -114,7 +122,7 @@ python -c "from langgraph.checkpoint.sqlite import SqliteSaver; print('ok now')"
     A bank wants a durable, auditable, resumable claims-approval workflow that must survive a server restart mid-approval. A startup wants three named specialist roles (intake, research, writer) collaborating on a single support ticket. Which framework fits each better, and why? Write your guess before the debrief.
   </div>
 
-  <p><b>Instructor drives live, variation A — comparison for our exact use case (12 min).</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <p><b>Instructor drives live, variation A — comparison for our exact use case.</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
   <div class="prompt-box">
     <div class="prompt-label">Prompt</div>
     <pre><code>For our insurance ticket-resolution assistant specifically, compare
@@ -124,7 +132,11 @@ what would be awkward, and which one you'd actually recommend for THIS
 project and why.</code></pre>
   </div>
 
-  <p><b>Instructor drives live, variation B — scaffold a CrewAI crew, structure only (10 min).</b> <span class="where-tag where-vm">VS Code terminal + Claude Code</span> — this validates the crew's structure without calling any model (no API key needed — we're not calling <code>.kickoff()</code> yet):</p>
+  <p><b>Instructor drives live, variation B — scaffold a CrewAI crew, structure only.</b> <span class="where-tag where-vm">VS Code terminal + Claude Code</span> — this validates the crew's structure without calling any model (no API key needed — we're not calling <code>.kickoff()</code> yet):</p>
+  <figure class="concept-figure">
+    <img src="images/d2am_primer_crewai.png" alt="CrewAI primer: a user goal feeds a Crew that assembles agents, tasks, and a process to reach it, agents execute their tasks with tools, and outputs are reviewed for quality, with agents defined by role/goal/tools, tasks by description/expected output/success criteria, and process set to sequential or hierarchical">
+    <figcaption>Two roles, one task each, wired into a Crew — exactly the shape you're about to scaffold.</figcaption>
+  </figure>
   <div class="prompt-box">
     <div class="prompt-label">Prompt</div>
     <pre><code>Write a small Python script at W2D2/crew_scaffold.py using crewai
@@ -139,29 +151,29 @@ and show me the output.</code></pre>
     This confirms the crew's shape (agents, tasks, roles) is valid without spending any model call or needing credentials — we'll optionally point this at a real model via Bedrock this afternoon (Topic 4). Compare this two-role crew structure to what a Claude Code subagent dispatch will look like in Topic 03 — same idea (a named specialist doing one job), different mechanism.
   </div>
 
-  <p><b>Learners repeat (5 min).</b> Add a third role (<code>"compliance_reviewer"</code>) to your own copy of the scaffold, confirm it still constructs without error, and write one sentence on which of the three frameworks compared above you'd defend in the showcase.</p>
+  <p><b>Learners repeat.</b> Add a third role (<code>"compliance_reviewer"</code>) to your own copy of the scaffold, confirm it still constructs without error, and write one sentence on which of the three frameworks compared above you'd defend in the showcase.</p>
 </div>
 
 <h2 id="topic-02">Topic 02 · Scaffold effect on reliability</h2>
 <div class="step">
   <div class="step-head"><span class="step-num">2</span><span class="step-title">Same model, wildly different results depending on the scaffold around it</span><span class="step-time">~35 min</span></div>
-  <p><b>Concept (7 min).</b> The same underlying model can swing by a huge margin on a benchmark like GAIA purely based on the scaffold wrapped around it — planning discipline, evidence checks, retry logic. Architecture, not just the model, drives reliability.</p>
+  <p><b>Concept.</b> The same underlying model can swing by a huge margin on a benchmark like GAIA purely based on the scaffold wrapped around it — planning discipline, evidence checks, retry logic. Architecture, not just the model, drives reliability.</p>
   <ul class="concept-list">
     <li><b>What "scaffold" concretely means here.</b> The explicit rules you put around the model: does it have to cite evidence before answering? Does it retry once if uncertain? Is there a hard stop on tool-call count? Each of those is a scaffold decision, independent of which model you're using.</li>
     <li><b>Where this bites in practice.</b> A weak scaffold on a genuinely hard case doesn't usually fail loudly — it fails by confidently giving a plausible-but-wrong answer, exactly like Day 1's ungrounded-claim failure mode.</li>
   </ul>
   <figure class="concept-figure">
-    <img src="images/scaffold-effect.svg" alt="Illustrative bar chart showing task success rate increasing as scaffold strength increases from no retries to full evidence gates and retries">
-    <figcaption>Illustrative, not exact figures — the shape of the effect is the point.</figcaption>
+    <img src="images/d2am_t2_scaffold_reliability.png" alt="Reliability-first agent architecture diagram: inputs flow through typed contracts (schema validation, structured interfaces, preconditions, versioned contracts) into the agent runtime (reason/plan, act/orchestrate, state/memory, guardrails), out through tools to validated output, with configuration, timeouts/retries, checkpoints, and observability wrapped around the runtime, and a fail fast / recover safely / verify outcome loop underneath">
+    <figcaption>Reliability is architecture, not luck — fail fast, recover safely, verify outcome.</figcaption>
   </figure>
 
-  <p><b>Instructor drives live, variation A — weak scaffold (10 min).</b> <span class="where-tag where-claude">Claude Code chat panel</span> — a genuinely tricky case, minimally scaffolded:</p>
+  <p><b>Instructor drives live, variation A — weak scaffold.</b> <span class="where-tag where-claude">Claude Code chat panel</span> — a genuinely tricky case, minimally scaffolded:</p>
   <div class="prompt-box">
     <div class="prompt-label">Prompt — weak scaffold</div>
     <pre><code>Quickly tell me: is claim CLM-748422 (row CLN-002, commercial_property)
 fully covered? Just give me a yes/no and move on, don't overthink it.</code></pre>
   </div>
-  <p><b>Instructor drives live, variation B — strong scaffold, same case (10 min).</b></p>
+  <p><b>Instructor drives live, variation B — strong scaffold, same case.</b></p>
   <div class="prompt-box">
     <div class="prompt-label">Prompt — strong scaffold</div>
     <pre><code>Is claim CLM-748422 (row CLN-002, commercial_property) fully covered?
@@ -175,31 +187,31 @@ document and section in your answer.</code></pre>
     Look specifically for whether the weak-scaffold run skipped the tool lookup entirely (or did it superficially) versus the strong-scaffold run's explicit citation. Same model both times — the only difference is the scaffold you specified in the prompt itself.
   </div>
 
-  <p><b>Learners repeat (8 min).</b> Write your own 3-rule "scaffold checklist" (e.g. "always cite a source," "always state confidence," "never answer a product with no grounding doc without flagging it") and test it against two different claims. Note whether your checklist caught anything the weak-scaffold style would have missed.</p>
+  <p><b>Learners repeat.</b> Write your own 3-rule "scaffold checklist" (e.g. "always cite a source," "always state confidence," "never answer a product with no grounding doc without flagging it") and test it against two different claims. Note whether your checklist caught anything the weak-scaffold style would have missed.</p>
 </div>
 
 <h2 id="topic-03">Topic 03 · Claude Agent SDK isolation spectrum</h2>
 <div class="step">
   <div class="step-head"><span class="step-num">3</span><span class="step-title">Skills → subagents → agent teams — exercised as real Claude Code features</span><span class="step-time">~50 min</span></div>
-  <p><b>Concept (8 min).</b> Three levels of isolation, increasing in overhead: <b>skills</b> run in-context, in the same session and memory. <b>Subagents</b> run with an isolated context and a one-way handoff — they do their job and report back a result, without polluting your main conversation's context. <b>Agent teams</b> (separate processes, experimental) go further still. A common production pattern is an orchestrator on a deeper-reasoning model coordinating workers on a faster one.</p>
+  <p><b>Concept.</b> Three levels of isolation, increasing in overhead: <b>skills</b> run in-context, in the same session and memory. <b>Subagents</b> run with an isolated context and a one-way handoff — they do their job and report back a result, without polluting your main conversation's context. <b>Agent teams</b> (separate processes, experimental) go further still. A common production pattern is an orchestrator on a deeper-reasoning model coordinating workers on a faster one.</p>
   <ul class="concept-list">
     <li><b>Why isolation is worth the overhead.</b> A subagent doing a long, detail-heavy investigation (e.g. combing through many policy documents) would otherwise flood your main session's context with intermediate noise — subagent isolation means only the distilled result comes back, protecting your main context exactly the way Day 1's memory topic warned about.</li>
     <li><b>The one-way part matters.</b> A subagent typically can't ask your main session follow-up questions mid-task the way a peer could — it's dispatched, it works, it reports back. Design its brief accordingly: give it everything it needs up front.</li>
     <li><b>Agent teams are the experimental edge.</b> Separate processes coordinating is powerful but adds real failure modes (partial process crashes, coordination overhead) — treat this as a concept to know exists, not something to reach for by default.</li>
   </ul>
   <figure class="concept-figure">
-    <img src="images/isolation-spectrum.svg" alt="Spectrum from skills (in-context) through subagents (isolated, one-way) to agent teams (separate processes, experimental)">
-    <figcaption>More isolation costs more overhead — spend it deliberately.</figcaption>
+    <img src="images/d2am_t3_sdk_isolation.png" alt="SDK isolation boundary diagram: user request and host application on one side of the boundary; inside the sandboxed Agent SDK runtime, an agent, session, tools, and model client communicate outward only through controlled permissions, scoped environment variables, enforced resource limits, and audit logs to approved APIs, files, and network services; failures stay contained inside the sandbox and never impact the host">
+    <figcaption>Controlled access in, controlled access out — failures stay contained inside the sandbox.</figcaption>
   </figure>
 
-  <p><b>Instructor drives live, variation A — an in-context "skill" (12 min).</b> <span class="where-tag where-claude">Claude Code chat panel</span> — keep this fully in the main session's context:</p>
+  <p><b>Instructor drives live, variation A — an in-context "skill".</b> <span class="where-tag where-claude">Claude Code chat panel</span> — keep this fully in the main session's context:</p>
   <div class="prompt-box">
     <div class="prompt-label">Prompt</div>
     <pre><code>Right here, in this conversation, summarize POL-HOME-010_water.md and
 POL-HOME-010_flood_rider.md into one short paragraph I can quote to a
 customer.</code></pre>
   </div>
-  <p><b>Instructor drives live, variation B — dispatch a real subagent (18 min).</b> Have Claude Code define and use an actual isolated subagent:</p>
+  <p><b>Instructor drives live, variation B — dispatch a real subagent.</b> Have Claude Code define and use an actual isolated subagent:</p>
   <div class="prompt-box">
     <div class="prompt-label">Prompt — define and dispatch a subagent</div>
     <pre><code>Define a subagent named "policy-research-specialist" whose only job is to
@@ -214,7 +226,7 @@ is that deadline for each?" Show me what it reports back.</code></pre>
     Variation A's summary work happened in your main session's own context — it's now part of what could get compacted later. Variation B's detailed document-reading happened in the subagent's isolated context; only the distilled answer came back to your main session. Ask the room: which approach would you want for a much bigger research task, and why?
   </div>
 
-  <p><b>Learners repeat — test the isolation directly (12 min).</b> Dispatch a second subagent task, but this time ask the subagent something that depends on your <i>main session's</i> earlier conversation (something only the main session would know, not written to any file):</p>
+  <p><b>Learners repeat — test the isolation directly.</b> Dispatch a second subagent task, but this time ask the subagent something that depends on your <i>main session's</i> earlier conversation (something only the main session would know, not written to any file):</p>
   <div class="prompt-box">
     <div class="prompt-label">Prompt — probe the isolation boundary</div>
     <pre><code>Dispatch the policy-research-specialist subagent again, and ask it: "what
@@ -232,17 +244,17 @@ memory only, without reading any file?" Report exactly what it says.</code></pre
 <h2 id="topic-04">Topic 04 · Lifecycle hooks</h2>
 <div class="step">
   <div class="step-head"><span class="step-num">4</span><span class="step-title">Deterministic validate/log/block/transform, in your own code</span><span class="step-time">~35 min</span></div>
-  <p><b>Concept (7 min).</b> Claude Code exposes real lifecycle hooks — <code>PreToolUse</code>, <code>PostToolUse</code>, <code>Stop</code>, <code>SubagentStop</code>, <code>SessionStart</code>/<code>End</code>, <code>UserPromptSubmit</code> — each a point where your own code runs deterministically, not the model's discretion. This is the same category of control point as Day 1's guardrails, just implemented as a first-class SDK feature rather than a prompt instruction.</p>
+  <p><b>Concept.</b> Claude Code exposes real lifecycle hooks — <code>PreToolUse</code>, <code>PostToolUse</code>, <code>Stop</code>, <code>SubagentStop</code>, <code>SessionStart</code>/<code>End</code>, <code>UserPromptSubmit</code> — each a point where your own code runs deterministically, not the model's discretion. This is the same category of control point as Day 1's guardrails, just implemented as a first-class SDK feature rather than a prompt instruction.</p>
   <ul class="concept-list">
     <li><b>Pre vs. post.</b> A <code>PreToolUse</code> hook can inspect (and even block) a call before it happens — useful for enforcing "never call this tool with these arguments." A <code>PostToolUse</code> hook runs after, useful for logging, redaction, or validating the result shape.</li>
     <li><b>Hooks are code, not prompts.</b> A hook is a script your settings point to — it runs every time, with no dependence on the model remembering to follow an instruction.</li>
   </ul>
   <figure class="concept-figure">
-    <img src="images/lifecycle-hooks.svg" alt="Timeline of Claude Code lifecycle hooks: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop/SubagentStop, SessionEnd">
+    <img src="images/d2am_t4_lifecycle_hooks.png" alt="Circular agent lifecycle hook diagram: Initialize (configure context), Before Run (enforce policy), Before Tool (validate inputs), After Tool (capture results), After Run (emit metrics), Shutdown (release resources) — with a side panel showing the error path of retry, escalate, and clean up">
     <figcaption>Six lifecycle events — each a deterministic control point in your code.</figcaption>
   </figure>
 
-  <p><b>Configure it together, variation A — <code>PreToolUse</code> logging (14 min).</b> <span class="where-tag where-vm">Repo root, VS Code</span> — have Claude Code add a hook that logs every tool call before it runs:</p>
+  <p><b>Configure it together, variation A — <code>PreToolUse</code> logging.</b> <span class="where-tag where-vm">Repo root, VS Code</span> — have Claude Code add a hook that logs every tool call before it runs:</p>
   <div class="prompt-box">
     <div class="prompt-label">Prompt</div>
     <pre><code>Add a PreToolUse hook in .claude/settings.json that appends a one-line
@@ -252,7 +264,7 @@ config and the small script it runs.</code></pre>
   </div>
   <p>Trigger a couple of tool calls (e.g. re-run a lookup from earlier), then check the log file was written.</p>
 
-  <p><b>Configure it together, variation B — <code>PostToolUse</code> redaction, for contrast (14 min).</b></p>
+  <p><b>Configure it together, variation B — <code>PostToolUse</code> redaction, for contrast.</b></p>
   <div class="prompt-box">
     <div class="prompt-label">Prompt</div>
     <pre><code>Now add a PostToolUse hook specifically for the get_claim_and_policy tool
@@ -265,23 +277,23 @@ see and use in your answer.</code></pre>
     <code>PreToolUse</code> ran before the call existed — it's about deciding whether/how a call happens. <code>PostToolUse</code> ran after, with the real result in hand — it's about what you do with what came back. Notice both are deterministic code, not something you had to ask the model to remember to do.
   </div>
 
-  <p><b>Learners repeat (7 min).</b> Add one more hook yourself: a <code>SessionStart</code> hook that prints a short reminder ("remember: commercial_package has no policy grounding") every time a new session begins. Start a fresh session and confirm it fires exactly once.</p>
+  <p><b>Learners repeat.</b> Add one more hook yourself: a <code>SessionStart</code> hook that prints a short reminder ("remember: commercial_package has no policy grounding") every time a new session begins. Start a fresh session and confirm it fires exactly once.</p>
 </div>
 
 <h2 id="topic-05">Topic 05 · Reliability engineering</h2>
 <div class="step">
   <div class="step-head"><span class="step-num">5</span><span class="step-title">Retries, fallback, and knowing which faults deserve which response</span><span class="step-time">~35 min</span></div>
-  <p><b>Concept (7 min).</b> Not every failure should be retried, and not every failure should be given up on immediately. Reliability engineering means classifying the fault first — transient (network blip, rate limit) gets a retry with exponential backoff; permanent (not found, invalid input) gets an immediate fallback or clear error, never a retry loop.</p>
+  <p><b>Concept.</b> Not every failure should be retried, and not every failure should be given up on immediately. Reliability engineering means classifying the fault first — transient (network blip, rate limit) gets a retry with exponential backoff; permanent (not found, invalid input) gets an immediate fallback or clear error, never a retry loop.</p>
   <ul class="concept-list">
     <li><b>Why retrying a permanent fault is actively harmful.</b> Retrying a "record not found" error just delays the correct answer (there's nothing to find) while burning budget — this is the same budget guardrail from Day 1 Topic 06, applied specifically to fault handling.</li>
     <li><b>Backoff exists to avoid making things worse.</b> Retrying instantly on a rate-limited or overloaded dependency just adds to the load that caused the problem — exponential backoff spaces retries out deliberately.</li>
   </ul>
   <figure class="concept-figure">
-    <img src="images/reliability-engineering.svg" alt="Flow diagram: a failed tool call gets its fault classified, then either retried with backoff (transient) or falls back/routes (permanent)">
+    <img src="images/d2am_t5_reliability_engineering.png" alt="Layered reliability engineering loop: Prevent (schemas, guardrails, input validation), Detect (traces, metrics, evaluations), Recover (retries, fallbacks, checkpoints), Learn (incident review, test updates, knowledge growth) in a continuous feedback loop, with reliability measures listed below: success rate, latency, cost, recovery rate">
     <figcaption>Classify first, then respond — never retry blindly.</figcaption>
   </figure>
 
-  <p><b>Build it together, variation A — transient fault, retried (15 min).</b> <span class="where-tag where-vm">VS Code terminal + Claude Code</span> — no API key needed, this uses a local mock:</p>
+  <p><b>Build it together, variation A — transient fault, retried.</b> <span class="where-tag where-vm">VS Code terminal + Claude Code</span> — no API key needed, this uses a local mock:</p>
   <div class="prompt-box">
     <div class="prompt-label">Prompt</div>
     <pre><code>Write W2D2/reliability_demo.py using tenacity. Define a mock
@@ -291,7 +303,7 @@ exponential backoff, and a max of 3 attempts. Run it and show me the
 timing between attempts in the log.</code></pre>
   </div>
 
-  <p><b>Build it together, variation B — permanent fault, NOT retried, for contrast (12 min).</b></p>
+  <p><b>Build it together, variation B — permanent fault, NOT retried, for contrast.</b></p>
   <div class="prompt-box">
     <div class="prompt-label">Prompt</div>
     <pre><code>Add a second mock, permanent_not_found(claim_id), that always raises a
@@ -305,23 +317,23 @@ TimeoutError still retries.</code></pre>
     Confirm the permanent-fault path returns quickly with a clear error rather than retrying 3 times uselessly — that distinction (not "retry everything") is the actual skill here.
   </div>
 
-  <p><b>Learners repeat (8 min).</b> Add a third path: when <code>permanent_not_found</code> fires, fall back to a secondary mock (e.g. checking a "recently closed claims" mock list) instead of just erroring out. Confirm the fallback triggers only for the permanent case, never the transient one.</p>
+  <p><b>Learners repeat.</b> Add a third path: when <code>permanent_not_found</code> fires, fall back to a secondary mock (e.g. checking a "recently closed claims" mock list) instead of just erroring out. Confirm the fallback triggers only for the permanent case, never the transient one.</p>
 </div>
 
 <h2 id="topic-06">Topic 06 · Human-in-the-loop</h2>
 <div class="step">
   <div class="step-head"><span class="step-num">6</span><span class="step-title">Durable, resumable approval checkpoints</span><span class="step-time">~50 min</span></div>
-  <p><b>Concept (8 min).</b> An approval gate is only meaningful if it's durable — the pause has to survive a process restart, not just be a confirmation dialog inside one running script. LangGraph's SQLite checkpointing is exactly this: a graph can pause at a human-approval node, get killed, and resume later from exactly where it stopped.</p>
+  <p><b>Concept.</b> An approval gate is only meaningful if it's durable — the pause has to survive a process restart, not just be a confirmation dialog inside one running script. LangGraph's SQLite checkpointing is exactly this: a graph can pause at a human-approval node, get killed, and resume later from exactly where it stopped.</p>
   <ul class="concept-list">
     <li><b>Where this differs from Day 1's permission prompts.</b> Claude Code's own permission approval (Day 1 PM Topic 05) pauses within one live session. A durably checkpointed graph can pause, have the entire process end, and still resume correctly hours later from disk — a stronger guarantee, needed for anything that might sit waiting for a human for a long time.</li>
     <li><b>Idempotency ties in directly.</b> If "resume and execute" can ever be triggered twice (e.g. a double-click, a retried resume call), the executed action needs an idempotency key so it doesn't fire twice — the same concept from Day 1 Topic 03's write-tool design.</li>
   </ul>
   <figure class="concept-figure">
-    <img src="images/hitl.svg" alt="Flow: agent proposes an action, a durable checkpoint pauses it, a human decides, then it resumes and executes once">
+    <img src="images/d2am_t6_orchestration_hitl.png" alt="Insurance underwriting LangGraph with HITL: start leads to intake, then risk_check, which branches to auto_approve, request_documents, or human_approve (marked as an interrupt point); human_approve persists state to a SQLite checkpoint and resumes after the human acts, then flows to end">
     <figcaption>The pause must survive a restart — that's what makes it durable HITL, not just a dialog box.</figcaption>
   </figure>
 
-  <p><b>Build it together, variation A — checkpoint and pause (20 min).</b> <span class="where-tag where-vm">VS Code terminal + Claude Code</span> — no API key needed, the graph nodes are plain Python:</p>
+  <p><b>Build it together, variation A — checkpoint and pause.</b> <span class="where-tag where-vm">VS Code terminal + Claude Code</span> — no API key needed, the graph nodes are plain Python:</p>
   <div class="prompt-box">
     <div class="prompt-label">Prompt</div>
     <pre><code>Write W2D2/hitl_demo.py using langgraph with a SqliteSaver
@@ -333,7 +345,7 @@ after "propose" until a human clears the flag. Run it and confirm it
 pauses.</code></pre>
   </div>
 
-  <p><b>Build it together, variation B — kill it, then resume from disk (18 min).</b></p>
+  <p><b>Build it together, variation B — kill it, then resume from disk.</b></p>
   <div class="prompt-box">
     <div class="prompt-label">Prompt</div>
     <pre><code>Now end this terminal session (or kill the Python process) entirely.
@@ -347,7 +359,7 @@ runs. Confirm the state survived the restart.</code></pre>
     The critical proof point is that variation B's resume happened in a <i>completely new process</i> with no memory of variation A except what's on disk in the SQLite file. That's the actual meaning of "durable" here — contrast it with Day 1 PM's session resume, which is a related but distinct mechanism (Claude Code's own conversation state, not a LangGraph checkpoint).
   </div>
 
-  <p><b>Learners repeat (4 min).</b> Add an idempotency key to the "execute" node (e.g. skip execution if a <code>already_executed</code> flag is already set) and confirm calling resume a second time doesn't double-execute the payout.</p>
+  <p><b>Learners repeat.</b> Add an idempotency key to the "execute" node (e.g. skip execution if a <code>already_executed</code> flag is already set) and confirm calling resume a second time doesn't double-execute the payout.</p>
 </div>
 </section>
 

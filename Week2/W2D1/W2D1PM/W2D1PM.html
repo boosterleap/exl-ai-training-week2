@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D1 PM · Claude Agent SDK Primitives, on Your Own Claude Code</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">Week 2 · Day 1 · Applied Build Lab (16:00–20:00)</p>
+  <h1>Claude Agent SDK primitives — configured directly on your own Claude Code</h1>
+  <p>Claude Code is a real application built on the Claude Agent SDK. Today's six topics are properties of the exact tool open in front of you — no simulation, no separate demo notebook. You'll build a real MCP tool, configure real permissions, and read your own session's real cost — each with at least one contrasting run so you can see the difference, not just hear about it.</p>
+  <div class="thread-badges">
+    <span class="thread-badge insurance">Insurance — primary build, all six topics</span>
+    <span class="thread-badge homework">Logistics — start in-session, finish as homework</span>
+  </div>
+  <div class="timing-strip">
+    <span class="timing-chip">16:00–16:05 bridge</span>
+    <span class="timing-chip">16:05–17:45 topics 01–03</span>
+    <span class="timing-chip">17:45–17:55 break</span>
+    <span class="timing-chip">17:55–19:00 topics 04–06</span>
+    <span class="timing-chip">19:00–19:30 app build</span>
+    <span class="timing-chip">19:30–20:00 MCQ assessment</span>
+  </div>
+</header>
+
+<nav class="page-nav" aria-label="Session sections">
+  <a href="#bridge">Bridge</a>
+  <a href="#topics-01-03">01 SDK framing</a>
+  <a href="#topic-02">02 Custom tool</a>
+  <a href="#topic-03">03 Message blocks</a>
+  <a href="#topics-04-06">04 Sessions</a>
+  <a href="#topic-05">05 Permissions</a>
+  <a href="#topic-06">06 Cost</a>
+  <a href="#appbuild">App build</a>
+  <a href="#homework">Logistics homework</a>
+</nav>
+
+<main>
+
+<section id="bridge">
+  <h2>Bridge (16:00–16:05)</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">0</span><span class="step-title">Runtime check</span><span class="step-time">5 min</span></div>
+    <span class="where-tag where-vm">VM · VS Code terminal</span>
+    <pre><code>conda activate ai_agent_env
+claude --version
+claude auth status
+python -c "import mcp; print(mcp.__version__ if hasattr(mcp,'__version__') else 'mcp ok')"</code></pre>
+    <div class="callout">
+      <b class="tag">Note on <code>claude-agent-sdk</code></b>
+      The Python package <code>claude-agent-sdk</code> is <b>not</b> installed in <code>ai_agent_env</code>, and you won't need it today. Claude Code (the CLI/VS Code extension you already have open) <i>is</i> the reference application built on that SDK — everything below maps 1:1 onto that library's concepts. You're studying the real thing, not a stand-in for it.
+    </div>
+  </div>
+</section>
+
+<section id="topics-01-03">
+<h2 id="topic-01">Topic 01 · The Claude Agent SDK</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">1</span><span class="step-title"><code>query()</code> vs <code>ClaudeSDKClient</code> — seen through the app built on them</span><span class="step-time">~25 min</span></div>
+  <p><b>Concept.</b> The SDK gives two shapes: <code>query()</code> is one-shot — send a prompt, get a response, session ends. <code>ClaudeSDKClient</code> is a persistent connection — you keep a conversation, tool state, and permission context alive across many turns. Every conversation you've been having in the Claude Code panel all week is a <code>ClaudeSDKClient</code>-shaped session: it persists context, remembers tool results from three turns ago, and keeps running until you end it.</p>
+  <figure class="concept-figure">
+    <img src="images/d1pm_t1_claude_agent_sdk.png" alt="Claude Agent SDK as bounded application control: the application sends query() or opens a client session, the Agent SDK returns initialization/content and sends a validated tool request to a governed tool, which returns a tool result relayed back as a ResultMessage — query() is a bounded one-shot, while the client gives continuity plus cleanup, all inside application-owned controls for allowed tools, max turns, workspace, spend cap, and cleanup">
+    <figcaption><code>query()</code> is a bounded one-shot; a client session is continuity plus cleanup — the same distinction, drawn as a sequence.</figcaption>
+  </figure>
+  <ul class="concept-list">
+    <li><b>When real code would actually use each shape.</b> <code>query()</code> fits a one-off automation script — e.g. a nightly job that classifies overnight emails and exits. <code>ClaudeSDKClient</code> fits anything interactive or multi-step where later turns depend on earlier ones — exactly what an operations assistant needs.</li>
+    <li><b>What "ending a session" actually clears.</b> It clears working context and any live tool/permission state for that conversation. It does <i>not</i> clear <code>CLAUDE.md</code> or anything already written to disk — those are project-level, read fresh by the very next session.</li>
+    <li><b>Why Claude Code is obviously client-shaped, not query-shaped.</b> A one-shot call couldn't have remembered your Topic 03 tool design from this morning, couldn't reference a file you read four turns ago, and couldn't keep a running plan across a 70-minute build — all things you're about to rely on this session.</li>
+  </ul>
+
+  <p><b>Instructor drives live, variation A — a brand-new session.</b> <span class="where-tag where-claude">Claude Code chat panel</span> — start a brand new session (not a resumed one) and ask it directly:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Explain, from the inside: are you currently running as a one-shot query or
+as a persistent client session? What evidence would show the difference —
+what do you retain between my messages that a one-shot call wouldn't?</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    Point at: it remembers your Topic 01–06 work from this morning if you're in the same long-running session, it can reference a tool result from several turns back, and it maintains a coherent plan across turns — all persistent-client behavior, not one-shot query behavior.
+  </div>
+
+  <p><b>Instructor drives live, variation B — three-way memory comparison.</b> Open <i>three</i> things side by side if your setup allows it (or run them one after another): (1) this morning's original AM session if it's still open, (2) a <code>claude --resume</code> of that same session from a fresh terminal, (3) a brand-new session. Ask all three the identical question:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt — run identically in all three</div>
+    <pre><code>What is the very first claim_id we discussed together, if anything?</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    The original/resumed session should answer correctly from conversation memory. The brand-new session should have no idea — unless you already wrote that fact into <code>CLAUDE.md</code>, in which case it might mention it from the artifact layer, not from "remembering." Distinguishing those two sources of a correct-sounding answer is the whole point of this comparison.
+  </div>
+
+  <p><b>Learners repeat.</b> Open a second, separate Claude Code session (new terminal tab or new window) and ask it the same question yourself — confirm it has <i>no</i> memory of anything from your first session (aside from <code>CLAUDE.md</code>).</p>
+</div>
+
+<h2 id="topic-02">Topic 02 · Built-in &amp; custom tools</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">2</span><span class="step-title">Build a real in-process MCP tool — then a second one, on the same server</span><span class="step-time">~70 min</span></div>
+  <p><b>Concept.</b> Claude Code ships with built-in tools (Read, Write, Bash, web fetch, ...) out of the box. Custom domain tools are added via MCP servers — in Claude Code's case, an <b>in-process (stdio)</b> server it launches itself as a subprocess, with each tool addressable as <code>mcp__&lt;server&gt;__&lt;tool&gt;</code>. This is exactly the tool you designed on paper in this morning's Topic 03.</p>
+  <figure class="concept-figure">
+    <img src="images/d1pm_t2_builtin_custom_tools.png" alt="Built-in tools versus governed domain tools: an agent passes through a smallest-capability allowlist to either built-in tools (filesystem, shell, web access — good for exploration and operational tasks, but not an authoritative data source) or custom MCP domain tools like mcp__ops__shipment_lookup, which pair a typed input/output contract with an authoritative fixture or system for factual records and stronger auditability">
+    <figcaption>Built-in tools explore; a governed MCP tool like <code>mcp__insurance-lookup__get_claim_and_policy</code> is the authoritative source.</figcaption>
+  </figure>
+  <ul class="concept-list">
+    <li><b>One server, many tools.</b> A single MCP server process can expose several tools — you're about to add a second tool to the same server rather than standing up a whole new process, which is the normal pattern for a related family of lookups.</li>
+    <li><b>How Claude Code chooses between multiple available tools.</b> It reads each tool's name and description and picks based on what the current request actually needs — a good tool description is part of the contract, not an afterthought.</li>
+  </ul>
+
+  <p><b>Build it together — first tool.</b> <span class="where-tag where-claude">Claude Code chat panel</span> — have Claude Code write the server, don't hand-copy the reference file yet:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Build a local MCP server named insurance-lookup using mcp.server.fastmcp
+.FastMCP, stdio transport. It should expose one tool, get_claim_and_policy
+(claim_id: str), that:
+  1. Looks up the claim in data/insurance/claims.db (tables: claims,
+     policies; join on policy_id)
+  2. Uses the product -> policy-doc-prefix mapping in data/_DATA_README.md
+     to find matching files under data/insurance/policies/
+  3. Returns a validated pydantic model including a grounding_available
+     boolean, true only if a matching policy doc file exists
+Put it at W2D1/my_insurance_lookup_server.py. Then show me how to
+register it in .mcp.json at the repo root.</code></pre>
+  </div>
+  <div class="callout">
+    <b class="tag">Where the config goes</b>
+    <span class="where-tag where-vm">Repo root, VS Code file explorer or terminal</span> — Claude Code should create or edit <code>.mcp.json</code> at the repo root. A worked reference is at <a href="snippets/mcp_config_example.json"><code>snippets/mcp_config_example.json</code></a> if you want to compare after building your own.
+  </div>
+  <p>After Claude Code registers the server, <b>restart the Claude Code session</b> (MCP servers are loaded at session start) and confirm the tool is available:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt (in a fresh session, after restart)</div>
+    <pre><code>What MCP tools do you currently have available? Then call
+get_claim_and_policy for claim CLM-597471 and show me the raw result.</code></pre>
+  </div>
+  <div class="checkpoint">
+    <b class="tag">Checkpoint</b>
+    Claude Code should list a tool named <code>mcp__insurance-lookup__get_claim_and_policy</code> (or similar) and return a real, validated result — not a guessed answer. If the tool doesn't appear, check <code>.mcp.json</code> syntax and that you restarted the session.
+  </div>
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>A complete, tested version is at <a href="snippets/insurance_lookup_server.py"><code>snippets/insurance_lookup_server.py</code></a> — it passes its own self-check (<code>python snippets/insurance_lookup_server.py --self-check</code>). Use it to compare, not as the first attempt.</p>
+  </details>
+
+  <p><b>Build it together — second tool, same server.</b> Now extend the same server rather than starting a new one:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt — add a second tool</div>
+    <pre><code>Add a second tool to the same insurance-lookup server:
+list_claims_by_route_queue(route_queue: str), returning every claim in
+that queue from data/insurance/claims.db with its urgency and reserve_usd.
+Update .mcp.json only if needed, then restart and confirm both tools are
+now available.</code></pre>
+  </div>
+  <p>Then give Claude Code a request that could plausibly use either tool, and watch which one it picks and why:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt — force a tool choice</div>
+    <pre><code>Are there any other open, high-urgency claims in the same route queue as
+CLM-424063 that I should know about before responding to Jennifer Garcia?</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    This request needs both tools in sequence — first find <code>CLM-424063</code>'s route queue, then list that queue. Watch whether Claude Code chains them correctly on its own, and discuss what would happen if the second tool's description were vague ("get claims") instead of specific.
+  </div>
+</div>
+
+<h2 id="topic-03">Topic 03 · Structured outputs &amp; message blocks</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">3</span><span class="step-title">Reading <code>TextBlock</code> / <code>ToolUseBlock</code> / <code>ToolResultBlock</code> / <code>ThinkingBlock</code></span><span class="step-time">~25 min</span></div>
+  <p><b>Concept.</b> Under the hood, every Claude Code turn is a sequence of typed message blocks: <code>TextBlock</code> (prose), <code>ToolUseBlock</code> (a tool call with validated arguments), <code>ToolResultBlock</code> (what came back), and optionally <code>ThinkingBlock</code> (visible extended reasoning). The pydantic model your MCP tool returns in Topic 02 is exactly what ends up inside a <code>ToolResultBlock</code>.</p>
+  <figure class="concept-figure">
+    <img src="images/d1pm_t3_structured_outputs.png" alt="Message blocks flowing to a valid TriageDecision: TextBlock, ToolUseBlock, ToolResultBlock, and optional ThinkingBlock feed a block parser (which retains the raw trace and ResultMessage) into a candidate output, checked for TriageDecision validity (malformed output rejected if not) and for grounding in tool evidence (unsupported facts rejected if not), before reaching the operator result — with the TriageDecision schema fields lane, action, reason, requires_approval, and evidence_refs shown below">
+    <figcaption>The pydantic model your tool returns is exactly what lands inside a <code>ToolResultBlock</code> — and what gets checked before it becomes a decision.</figcaption>
+  </figure>
+  <ul class="concept-list">
+    <li><b>Streaming, in a real application.</b> In a live app these blocks typically arrive incrementally as the model produces them, not all at once at the end — Claude Code's live-updating transcript is exactly that stream rendered for you.</li>
+    <li><b>Thinking vs. text.</b> A <code>ThinkingBlock</code> is the model's own visible deliberation, shown separately from its actual reply (<code>TextBlock</code>) — useful for debugging <i>why</i> it did something, not meant to be the final answer itself.</li>
+  </ul>
+
+  <p><b>Instructor drives live, variation A — narrate the blocks.</b> <span class="where-tag where-claude">Claude Code chat panel</span> — ask Claude Code to call the tool again, but this time narrate its own message structure:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Call get_claim_and_policy for claim CLM-424063. Then describe, in terms of
+message blocks, what just happened: what was your ToolUseBlock's
+arguments, what came back in the ToolResultBlock, and what — if anything —
+did you reason about before or after in a way that would be a
+TextBlock/ThinkingBlock?</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    If your Claude Code plan/model shows a visible thinking section, point at it directly as the <code>ThinkingBlock</code>. Emphasize the output your MCP tool returned is validated pydantic data, not free text — that's why it can slot cleanly into a <code>ToolResultBlock</code> the model can trust.
+  </div>
+
+  <p><b>Instructor drives live, variation B — call it twice, check idempotency.</b> Call the exact same tool with the exact same argument twice in a row:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt — repeat call</div>
+    <pre><code>Call get_claim_and_policy for claim CLM-424063 again, a second time. Are
+the two ToolResultBlocks identical? Did calling it twice cause any side
+effect, or was it safe to repeat?</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    This should be a clean, boring "yes, identical, no side effect" — that's what idempotent looks like in practice, and it's exactly why this was safe to demonstrate live twice, unlike the write-tool contract discussed this morning.
+  </div>
+
+  <p><b>Learners repeat.</b> Deliberately call your tool with two different bad inputs — an empty string, and something the wrong shape entirely (e.g. a number instead of a claim ID) — and read how each error surfaces through the message blocks. Is it a clean <code>ToolResultBlock</code> error both times, or does one crash the tool?</p>
+</div>
+</section>
+
+<section id="topics-04-06">
+<h2 id="topic-04">Topic 04 · Memory &amp; sessions</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">4</span><span class="step-title"><code>session_id</code> resume, <code>CLAUDE.md</code>, context compaction</span><span class="step-time">~40 min</span></div>
+  <p><b>Concept.</b> Two different memory mechanisms, easy to conflate: <b>session resume</b> (continuing one specific conversation later via its <code>session_id</code>) and <b>project context</b> (<code>CLAUDE.md</code>/<code>AGENTS.md</code>, loaded fresh into every new session regardless of which one it is). Long sessions also trigger automatic <b>context compaction</b> — older turns get summarized so the session can keep going without hitting a context limit.</p>
+  <figure class="concept-figure">
+    <img src="images/d1pm_t4_memory_sessions.png" alt="Resumable sessions with minimal durable state: turn 1's transient chatter is discarded while its session state (summary, sourced facts, pending approvals, artifact references, each tagged with source, time, and session scope) carries forward to a resumed turn 2 — project context sits alongside as stable instructions, not customer state, with compaction able to lose detail and a balance needed between continuity, privacy, and staleness">
+    <figcaption>A <code>session_id</code> resumes durable state, not raw transcript — and compaction can still lose detail along the way.</figcaption>
+  </figure>
+  <ul class="concept-list">
+    <li><b><code>AGENTS.md</code> as an emerging shared standard.</b> Some tools look for <code>CLAUDE.md</code> specifically; <code>AGENTS.md</code> is an emerging cross-tool convention for the same idea — project context any agentic coding tool should read, not just one vendor's.</li>
+    <li><b>Compaction is automatic and lossy by design.</b> You don't request it — it triggers as context fills, and it trades detail for space. That's exactly why anything you'll need <i>later</i>, in a different session or after heavy compaction, belongs in an artifact, not just in the conversation.</li>
+  </ul>
+
+  <p><b>Instructor drives live, variation A — resume and recall.</b> <span class="where-tag where-vm">VS Code terminal</span> — find your current session and resume it explicitly:</p>
+  <pre><code>claude --resume
+# or, if you know the session id:
+claude --resume &lt;session_id&gt;</code></pre>
+  <p>Ask the resumed session a question that only makes sense if it remembers earlier work:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt (in the resumed session)</div>
+    <pre><code>Without re-reading any files, tell me: what claim_id did we look up
+together earlier this session, and what did get_claim_and_policy return
+for it?</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    Contrast this with Topic 01's brand-new session, which had none of this. Then ask explicitly: "has this session's context been compacted at any point?" — discuss what that implies about trusting a very early instruction in a very long-running session.
+  </div>
+
+  <p><b>Instructor drives live, variation B — interrupt mid-task, then resume.</b> Start a small multi-step task, deliberately stop partway through (close the terminal or end the session), then resume it:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt — start a multi-step task, then interrupt it</div>
+    <pre><code>Look up claims CLM-424063, CLM-748422, and CLM-988147 one at a time, and
+after each one tell me whether it needs escalation. Start with the first
+one now.</code></pre>
+  </div>
+  <p>After the first result, end the session, then <code>claude --resume</code> it back and ask:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt — after resuming</div>
+    <pre><code>Continue exactly where we left off — which claim comes next?</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    A resumed session should pick the task back up correctly. Compare this recoverability against what a brand-new session would do with the same instruction (it would have to start over from claim 1) — that's the practical value of session resume over relying on <code>CLAUDE.md</code> alone.
+  </div>
+
+  <p><b>Learners repeat.</b> First, confirm the <code>CLAUDE.md</code> bullet you added this morning is still there (<code>git diff CLAUDE.md</code> or just open the file) and append one new line under Day 1 summarizing the MCP tools you built this afternoon — following the file's own standing rule: extend, don't delete. Second, try your own interrupt-and-resume test on a different pair of claims.</p>
+</div>
+
+<h2 id="topic-05">Topic 05 · Permissions &amp; model choice</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">5</span><span class="step-title">Real permission modes, a real approval gate, Sonnet vs Opus</span><span class="step-time">~35 min</span></div>
+  <p><b>Concept.</b> <code>allowed_tools</code>/permission rules decide what Claude Code may do <i>without asking</i> — but that's a pre-approval list, not a substitute for authorization logic inside a sensitive tool itself. Approval prompts exist for exactly the actions you haven't pre-approved. Model choice is a separate lever: Opus for reasoning depth on hard judgment calls, Sonnet for speed on routine ones.</p>
+  <figure class="concept-figure">
+    <img src="images/d1pm_t5_provider_model_routing.png" alt="Routing by task risk with independent authorization: an independent permission policy applies least-privilege scopes equally across all model paths; low-risk work routes to a fast model with narrow read tools, high-risk work routes to a deeper-reasoning model, and any sensitive write from either path must clear an authorization gate (explicit approval, idempotency key present) before executing once, otherwise the write is denied and explained — a stronger model does not justify broader permissions">
+    <figcaption>A stronger model does not justify broader permissions — the authorization gate is independent of which model is routing.</figcaption>
+  </figure>
+  <ul class="concept-list">
+    <li><b>Three states, not two.</b> A permission rule can <code>allow</code> (never ask), <code>ask</code> (prompt every time), or <code>deny</code> (never allowed, no prompt at all) — you're about to see all three behave differently on the same tool.</li>
+    <li><b>Model choice interacts with judgment-heavy tasks.</b> The ungrounded-claim refusal from this morning is exactly the kind of case where a deeper-reasoning model's extra care can matter — a faster model optimized for routine throughput may need an explicit instruction to double-check before answering.</li>
+  </ul>
+
+  <p><b>Configure it together.</b> <span class="where-tag where-vm">Repo root, VS Code file explorer</span> — create <code>.claude/settings.json</code> (or edit it if Claude Code already made one). A worked example is at <a href="snippets/settings_example.json"><code>snippets/settings_example.json</code></a> — read it together, then adapt it rather than copy it blind: understand what each of <code>allow</code>/<code>ask</code>/<code>deny</code> does before saving.</p>
+  <div class="callout danger">
+    <b class="tag">Pitfall</b>
+    Putting a sensitive action in <code>allow</code> means Claude Code never asks before doing it — that's appropriate for a read-only lookup tool, not for anything that writes, sends, or approves something on a customer's behalf. Keep writes in <code>ask</code> (or fully in <code>deny</code> for this exercise) and enforce the real authorization check inside the tool's own code, not just the permission file.
+  </div>
+  <p><b>Variation A — trigger a real approval prompt.</b> Trigger a real approval prompt on purpose:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Draft a reply to claim CLM-424063's customer and write it to
+outputs/day1_draft_reply.md.</code></pre>
+  </div>
+  <div class="checkpoint">
+    <b class="tag">Checkpoint</b>
+    You should see a real permission prompt for the <code>Write</code> tool (since it's in <code>ask</code>, not <code>allow</code>). Approve it once, watch the file get created, then discuss: what would change if <code>Write</code> were in <code>allow</code> instead?
+  </div>
+
+  <p><b>Variation B — now try <code>deny</code>.</b> Temporarily move your MCP lookup tool into <code>deny</code> in <code>.claude/settings.json</code>, restart the session, and try to use it:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt — with the tool denied</div>
+    <pre><code>Call get_claim_and_policy for claim CLM-597471.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief — all three states now observed</b>
+    <code>allow</code> = silent and immediate (Topic 02's original setup). <code>ask</code> = a real prompt you had to approve (variation A). <code>deny</code> = refused outright, no prompt, no path around it. Move the tool back to <code>allow</code> (or its original setting) before continuing.
+  </div>
+
+  <p><b>Model choice.</b> If your Claude Code setup lets you switch models (check <code>/model</code> or the model picker), run the fraud-tip claim (<code>CLM-255335</code>) once on the faster model and once on the deeper-reasoning model, and compare how each handles the ungrounded-policy situation from this morning's Topic 06.</p>
+</div>
+
+<h2 id="topic-06">Topic 06 · Cost awareness</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">6</span><span class="step-title">Reading your own session's real token/cost usage</span><span class="step-time">~15 min</span></div>
+  <p><b>Concept.</b> Every Claude Code session tracks token-weighted cost as you go — this isn't a metering system you build, it's already reporting on the session you've been running all afternoon.</p>
+  <figure class="concept-figure">
+    <img src="images/d1pm_t6_cost_awareness.png" alt="Cost-aware bounded agent run: a request is first estimated for cost and steps (input tokens, output tokens, tool calls, turns, price assumptions); if within turn and spend caps it runs the bounded assistant and logs actual usage, otherwise it degrades through a deterministic lookup, then a smaller model, then a human queue — measuring completion quality and task value, not cost alone">
+    <figcaption>Estimate before you run, log what it actually cost — and measure quality, not cost alone.</figcaption>
+  </figure>
+  <ul class="concept-list">
+    <li><b>What actually drives the number up.</b> Input tokens (everything read into context — including a large file read in full), output tokens (everything generated, including a long narrated explanation), and each additional tool round-trip all add up. A verbose "narrate everything" prompt like several you used earlier today costs more than a terse one that just asks for the answer.</li>
+  </ul>
+  <p><b>Do this, variation A.</b> <span class="where-tag where-claude">Claude Code chat panel or CLI</span> — check your session's own usage:</p>
+  <pre><code>/cost</code></pre>
+  <p>or ask directly in the chat panel:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Summarize this session's token and cost usage so far, broken down if you
+can by which turns were the most expensive (likely the MCP tool-building
+turns vs. the short lookup calls).</code></pre>
+  </div>
+  <p><b>Do this, variation B — quantify the verbose-vs-terse gap.</b> Run the same lookup two ways and compare the cost delta directly:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt 1 — verbose</div>
+    <pre><code>Call get_claim_and_policy for CLM-597471 and narrate, in full detail,
+every single field of the result and what it means.</code></pre>
+  </div>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt 2 — terse</div>
+    <pre><code>Call get_claim_and_policy for CLM-597471. Reply with one short sentence:
+covered or not, and why.</code></pre>
+  </div>
+  <div class="checkpoint">
+    <b class="tag">Checkpoint</b>
+    You should be able to name a real, non-trivial difference between the two costs — a concrete number, not a guess. Note it down — Day 4 revisits this same idea (cost/perf) at the level of a whole eval suite, not just one session.
+  </div>
+</div>
+</section>
+
+<section id="appbuild">
+  <h2>App build (19:00–19:30) · Day 1 of the progressive insurance app</h2>
+  <p>Everything above was topic-scoped practice. This slot is different: it's the first increment of one continuous pipeline you'll keep extending every PM this week — <code>resolve_email(email_id)</code>, an insurance capstone thread distinct from the logistics transfer exercise below. Today it does the smallest useful thing: read one inbound email, look up its claim and policy through Topic 02's stdio MCP tool, and either draft a grounded reply or escalate rather than guess.</p>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">App</span><span class="step-title">Build <code>resolve_email(email_id)</code> for one FNOL email</span><span class="step-time">~20 min</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <p>Direct Claude Code to build your <b>own</b> file — do not overwrite anything under <code>app/</code>:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Create app/my_day1_resolve.py with a function resolve_email(email_id: str)
+that:
+1. Reads data/insurance/fnol_emails.csv and finds the row with this email_id.
+2. Takes its claim_number_ground_truth column. If it's empty, return a result
+   with found=False, escalate=True, and an escalate_reason explaining there's
+   no claim number to look up -- do not call the lookup tool at all.
+3. Otherwise call the insurance-lookup MCP tool's get_claim_and_policy(claim_id)
+   (the same tool you built in Topic 02 this afternoon) to fetch the claim and
+   policy.
+4. If the lookup's grounding_available field is false, return found=True,
+   escalate=True, draft_reply=None, and an escalate_reason saying no policy
+   document exists for that product -- never draft a coverage statement
+   without a grounding document.
+5. Otherwise return escalate=False and a draft_reply naming the claim ID,
+   policy ID, named insured, claim status, route_queue, and which policy
+   document(s) it's grounded on.
+Print the result as JSON when run with an email_id argument, e.g.
+python -m app.my_day1_resolve CLN-001.</code></pre>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">App</span><span class="step-title">Predict, then verify, on three real emails</span><span class="step-time">~7 min</span></div>
+    <p>Before running anything, predict out loud which of these three will escalate and why, then run each through your <code>resolve_email</code> and check yourself:</p>
+    <ul class="concept-list">
+      <li><code>CLN-001</code> — has a claim number.</li>
+      <li><code>CLN-003</code> — has a claim number, product <code>commercial_package</code>.</li>
+      <li><code>CLN-007</code> — an <code>inquiry</code>-category email.</li>
+    </ul>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Run app/my_day1_resolve.py for CLN-001, then CLN-003, then CLN-007, and show
+me each JSON result.</code></pre>
+    </div>
+  </div>
+
+  <div class="checkpoint">
+    <b class="tag">Checkpoint</b>
+    <code>CLN-001</code> resolves to claim <code>CLM-424063</code>, grounded on the homeowners policy docs (<code>POL-HOME-010_flood_rider.md</code> and <code>POL-HOME-010_water.md</code>), with <code>escalate: false</code> and a real <code>draft_reply</code>. <code>CLN-003</code> resolves to claim <code>CLM-255335</code>, product <code>commercial_package</code> — the deliberate no-policy-doc gap — so <code>grounding_available: false</code>, <code>escalate: true</code>, <code>draft_reply: null</code>. <code>CLN-007</code> has no claim number at all, so <code>found: false</code>, <code>escalate: true</code> — a different kind of escalation than CLN-003's (nothing to look up, versus looked-up-but-ungrounded). If your output disagrees with any of these, that's the bug to chase before moving on.
+  </div>
+
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>A complete, tested version is at <a href="../app/claims_lookup.py"><code>app/claims_lookup.py</code></a> (the stdio MCP tool) and <a href="../app/day1_resolve.py"><code>app/day1_resolve.py</code></a> (<code>resolve_email</code> itself) — verified against all three cases above. Use it to compare after you've built your own, not as the first attempt. Day 2's PM app-build slot picks up from here and adds triage/urgency classification on top.</p>
+  </details>
+</section>
+
+<section id="homework">
+  <h2>Logistics thread — start now, finish as homework</h2>
+  <div class="homework-block">
+    <h3>Build the parallel tool for the logistics thread</h3>
+    <p>Repeat Topic 02's exercise for the logistics data: have Claude Code build a second MCP server, <code>logistics-lookup</code>, exposing <code>get_order_and_shipment(order_id: str)</code> against <code>data/logistics/shipments.db</code> and <code>shipment_events.jsonl</code>/<code>delay_events.jsonl</code>, using the <code>mode</code> → SLA-doc-prefix mapping in <code>data/_DATA_README.md</code>. Remember: <code>air</code> mode has no matching SLA doc on purpose — your tool's <code>grounding_available</code> field should reflect that honestly, the same way the insurance tool does for <code>commercial_package</code>.</p>
+    <p>Then, mirroring this afternoon's Topic 02 second-tool exercise, add a second tool to the same server: <code>list_delayed_shipments(min_severity: str)</code> against <code>delay_events.jsonl</code>.</p>
+    <p>Register both in <code>.mcp.json</code> alongside <code>insurance-lookup</code>, and by the start of W2D2 AM be ready to show one real call for <code>ORD-3007</code> (the air-freight order with no SLA doc) and one call to <code>list_delayed_shipments</code>, and explain what each tool returned.</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">Week 2 · Day 1 PM · Claude Code edition — Claude Agent SDK primitives, insurance thread primary</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

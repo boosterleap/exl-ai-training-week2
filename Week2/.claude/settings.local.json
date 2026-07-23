@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find \"d:/Ambilio/EXL-CampusHire\" -iname \"week2_instructor_guide.html\" 2>/dev/null)",
+      "Read(//d/Ambilio/EXL-CampusHire/**)",
+      "Bash(mkdir -p \"d:/Ambilio/EXL-CampusHire/Week2-Claude/data\")",
+      "Bash(cp -r \"d:/Ambilio/EXL-CampusHire/Week2/data/insurance\" \"d:/Ambilio/EXL-CampusHire/Week2-Claude/data/insurance\")",
+      "Bash(cp -r \"d:/Ambilio/EXL-CampusHire/Week2/data/logistics\" \"d:/Ambilio/EXL-CampusHire/Week2-Claude/data/logistics\")",
+      "Bash(cp -r \"d:/Ambilio/EXL-CampusHire/Week2/data/supply\" \"d:/Ambilio/EXL-CampusHire/Week2-Claude/data/supply\")",
+      "Bash(cp -r \"d:/Ambilio/EXL-CampusHire/Week2/data/rag\" \"d:/Ambilio/EXL-CampusHire/Week2-Claude/data/rag\")",
+      "WebSearch",
+      "Bash(\"C:/Users/Asus/.venv/Scripts/python.exe\" -m pip list)",
+      "Bash(\"C:/Users/Asus/.venv/Scripts/python.exe\" -c \"import spacy; print\\(spacy.util.get_installed_models\\(\\)\\)\")",
+      "Bash(cp \"d:/Ambilio/EXL-CampusHire/Week2/W2D2/W2D2PM/Images/d2pm_t1_multi_agent_patterns.png\" \\\\ *)",
+      "Bash(cp \"/d/Ambilio/EXL-CampusHire/Week2/W2D4/W2D4AM/Images/d4am_t1_ai_dlc.png\" .)",
+      "Bash(cp \"/d/Ambilio/EXL-CampusHire/Week2/W2D4/W2D4AM/Images/d4am_t2_reference_architecture.png\" .)",
+      "Bash(cp \"/d/Ambilio/EXL-CampusHire/Week2/W2D4/W2D4AM/Images/d4am_t3_guardrails_policy_as_code.png\" .)",
+      "Bash(cp \"/d/Ambilio/EXL-CampusHire/Week2/W2D4/W2D4AM/Images/d4am_t4_prompt_injection.png\" .)",
+      "Bash(cp \"/d/Ambilio/EXL-CampusHire/Week2/W2D4/W2D4AM/Images/d4am_t5_identity_secrets_sandboxing.png\" .)",
+      "Bash(cp d:/Ambilio/EXL-CampusHire/Week2/W2D1/W2D1AM/Images/d1am_t1_agent_loop.png d:/Ambilio/EXL-CampusHire/Week2-Claude/W2D1/images/)",
+      "Bash(cp d:/Ambilio/EXL-CampusHire/Week2/W2D1/W2D1AM/Images/d1am_t2_reasoning_patterns.png d:/Ambilio/EXL-CampusHire/Week2-Claude/W2D1/images/)",
+      "Bash(cp d:/Ambilio/EXL-CampusHire/Week2/W2D1/W2D1AM/Images/d1am_t3_tool_contracts.png d:/Ambilio/EXL-CampusHire/Week2-Claude/W2D1/images/)",
+      "Bash(cp d:/Ambilio/EXL-CampusHire/Week2/W2D1/W2D1AM/Images/d1am_t4_layered_memory.png d:/Ambilio/EXL-CampusHire/Week2-Claude/W2D1/images/)",
+      "Bash(cp d:/Ambilio/EXL-CampusHire/Week2/W2D1/W2D1AM/Images/d1am_t5_agent_vs_pipeline.png d:/Ambilio/EXL-CampusHire/Week2-Claude/W2D1/images/)",
+      "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless --disable-gpu --screenshot=C:/Users/Asus/AppData/Local/Temp/claude/d--Ambilio-EXL-CampusHire-Week2-Claude/c608b8b6-c255-4643-b902-b1b19af4ebca/scratchpad/d4am_t1_ai_dlc_v3.png --window-size=1280,880 file:///D:/Ambilio/EXL-CampusHire/Week2-Claude/W2D4/images/d4am_t1_ai_dlc.svg)"
+    ],
+    "additionalDirectories": [
+      "d:\\Ambilio\\EXL-CampusHire\\Week2\\W2D2\\W2D2PM\\Images"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "claims-network",
+    "policy-search"
+  ]
+}

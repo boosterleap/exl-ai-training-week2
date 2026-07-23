@@ -39,6 +39,7 @@ def redact(text: str, analyzer: AnalyzerEngine, anonymizer: AnonymizerEngine) ->
 
 if __name__ == "__main__":
     analyzer = build_analyzer()
+    
     anonymizer = AnonymizerEngine()
 
     sample = (

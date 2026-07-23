@@ -1,0 +1,49 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(./data/**)",
+      "mcp__insurance-lookup__get_claim_and_policy"
+    ],
+    "ask": [
+      "Bash",
+      "Write",
+      "Edit"
+    ],
+    "deny": []
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash hooks/block-delete.sh \"${CLAUDE_TOOLCALL_COMMAND}\""
+          }
+        ]
+      }
+    ],
+    "PostToolBatch": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/show-tokens.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c \"echo '' && C:\\users\\asus\\.venv\\Scripts\\python.exe .claude/hooks/parse-usage.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

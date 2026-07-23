@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D4 PM · Observability, Evaluation &amp; Cost in Production</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">Week 2 · Day 4 · Applied Build Lab (16:00–20:00)</p>
+  <h1>Observability, evaluation &amp; cost in production — a real trace, a real eval gate, a real CI (Continuous Integration) file</h1>
+  <p>A local JSONL (JSON Lines) trace analyzer that catches a stuck-loop pattern, a trajectory eval that correctly localizes one intentional failure among 26, and a <code>pytest</code> gate that actually fails the build if quality regresses. Everything verified, nothing simulated.</p>
+  <div class="thread-badges">
+    <span class="thread-badge insurance">Insurance — primary build, all six topics</span>
+    <span class="thread-badge homework">Logistics — add a logistics eval case as homework</span>
+  </div>
+  <div class="timing-strip">
+    <span class="timing-chip">16:00–16:05 bridge</span>
+    <span class="timing-chip">16:05–17:45 topics 01–03</span>
+    <span class="timing-chip">17:45–17:55 break</span>
+    <span class="timing-chip">17:55–19:00 topics 04–06</span>
+    <span class="timing-chip">19:00–19:30 app build</span>
+    <span class="timing-chip">19:30–20:00 MCQ (Multiple-Choice Questions) assessment</span>
+  </div>
+</header>
+
+<nav class="page-nav" aria-label="Session sections">
+  <a href="#bridge">Bridge</a>
+  <a href="#topics-01-03">01 Observability</a>
+  <a href="#topic-02">02 Trajectory eval</a>
+  <a href="#topic-03">03 Three-layer eval</a>
+  <a href="#topics-04-06">04 Test data</a>
+  <a href="#topic-05">05 Eval-gated CI</a>
+  <a href="#topic-06">06 Cost/perf</a>
+  <a href="#appbuild">App build</a>
+  <a href="#homework">Logistics homework</a>
+</nav>
+
+<main>
+
+<section id="bridge">
+  <h2>Bridge (16:00–16:05)</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">0</span><span class="step-title">Fixture check</span><span class="step-time">5 min</span></div>
+    <span class="where-tag where-vm">VM · VS Code terminal</span>
+    <pre><code>conda activate ai_agent_env
+python -c "import pytest; print('pytest', pytest.__version__)"
+python -c "import mlflow; print('mlflow', mlflow.__version__)"</code></pre>
+  </div>
+</section>
+
+<section id="topics-01-03">
+<h2 id="topic-01">Topic 01 · Agent observability</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">1</span><span class="step-title">A real trace, analyzed for a real anomaly</span><span class="step-time">~30 min</span></div>
+  <p><b>Concept.</b> Agent observability means reconstructing a full session end to end — request, model/tool decisions, retrieval, policy outcomes, latency, tokens, cost, and final status — not just HTTP (HyperText Transfer Protocol) request/response hops. Traces must redact secrets and PII (Personally Identifiable Information) before they're stored. Day 2 AM's <code>PreToolUse</code> hook already writes exactly this shape of trace; named backends (LangSmith, Langfuse, MLflow, Arize Phoenix, Galileo) add span-level detail and dashboards on top of the same underlying idea, but a local, redacted JSONL file is the mandatory offline fallback — classroom (and production) completion should never depend on having a vendor key.</p>
+  <figure class="concept-figure">
+    <img src="images/d4pm_t1_observability.png" alt="Reconstructing an agent session end to end: request, model decision, retrieval, policy decision, tool call, and outcome each emit sequence, span, latency, token, cost, and status metadata, a recorded denial loops back from policy decision to outcome, and everything passes through a redaction gateway (mask sensitive fields, retain approved ones) into local JSONL trace sinks required for reconstruction by correlation key, with an optional export for approved fields only">
+    <figcaption>You already built the hook on Day 2 — today it becomes a trace.</figcaption>
+  </figure>
+  <ul class="concept-list">
+    <li><b>Ordered IDs make a session replayable without re-running paid calls.</b> A stable run ID plus a strict sequence number lets an operator reconstruct exactly what happened after the fact; a missing span is a defect in your instrumentation, not "unknown model behavior" to shrug at.</li>
+    <li><b>The tradeoff is completeness versus cost/privacy.</b> Richer traces make debugging dramatically easier and can retain sensitive payloads if redaction is weak; sparse logs are cheaper and leave real failures unexplained when you need them most.</li>
+  </ul>
+
+  <p><b>Run it together, variation A — the sample trace.</b> <span class="where-tag where-vm">VS Code terminal</span>:</p>
+  <pre><code>uv run python W2D4/snippets/trace_analyzer.py</code></pre>
+  <p>You should see it correctly flag <code>CLM-999999</code> called 3 times with rising latency — a strong stuck-loop signal (Day 1 Topic 06's guardrail, now caught by a trace instead of just described).</p>
+
+  <p><b>Run it together, variation B — your own real trace, for contrast.</b> If you completed Day 2 AM's <code>PreToolUse</code> logging hook, point the analyzer at your own log instead:</p>
+  <pre><code>uv run python W2D4/snippets/trace_analyzer.py outputs/tool_call_log.jsonl</code></pre>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    Compare the sample trace's obviously-synthetic anomaly against whatever your own real trace shows (probably no anomaly, or a different one) — real traces are messier and less obviously scripted than the fixture, which is itself a useful observation about the gap between test fixtures and production traffic.
+  </div>
+
+  <p><b>Learners repeat.</b> Add one more field to the trace analyzer's report: the single most-called tool overall, across the whole trace.</p>
+</div>
+
+<h2 id="topic-02">Topic 02 · Trajectory evaluation</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">2</span><span class="step-title">Score the whole path — with the failure correctly localized</span><span class="step-time">~30 min</span></div>
+  <p><b>Concept.</b> Trajectory evaluation judges the path, not just whether the final answer happened to look right: rubrics check tool selection and order, step budget, policy compliance, and task success as separate, localized dimensions. A trajectory that reaches a correct-looking answer via a policy violation is still a failing trajectory — a plausible final answer can hide unsafe tools or wasted steps just as easily as it can hide a real violation, which is exactly why final-answer-only grading isn't sufficient for deciding whether an agent is safe to release.</p>
+  <figure class="concept-figure">
+    <img src="images/d4pm_t2_trajectory_evaluation.png" alt="Trajectory evaluation judges the path, not just the answer: a task's actual observed path (plan, tool A, tool B, answer) is compared against its golden expected path by a path evaluator checking tool order, valid arguments, step budget, latency/cost, policy compliance, and task success, producing either a pass with a dimension scorecard and final outcome, or a failed-dimension result routed to remediation and a requirement review that feeds corrections back into the golden path (never altering the golden to match observed behavior) and reruns the task">
+    <figcaption>Same final action, very different path — only one of them is compliant.</figcaption>
+  </figure>
+  <ul class="concept-list">
+    <li><b>Localized dimensions are what make a failure actionable.</b> Knowing <code>TRJ-026</code> failed is much less useful than knowing it failed specifically on policy compliance (skipped the approval step) rather than tool selection or step budget — the dimension tells you what to actually go fix.</li>
+    <li><b>The tradeoff is diagnostic power versus suite cost.</b> Fine-grained trajectory checks catch regressions earlier and more precisely, and they require curated goldens (like today's 26-case fixture) that someone has to build and keep maintained.</li>
+  </ul>
+
+  <p><b>Run it together, variation A — the eval as shipped.</b> <span class="where-tag where-vm">VS Code terminal</span>:</p>
+  <pre><code>uv run python W2D4/snippets/trajectory_eval.py</code></pre>
+  <p>You should see 25/26 pass, with <code>TRJ-026-INTENTIONAL-FAIL</code> caught. Have Claude Code explain why:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Look at TRJ-026-INTENTIONAL-FAIL in data/eval/trajectory_goldens.json.
+It expected check_permission then request_approval, but actual_tools was
+just [release_hold]. In plain terms: what real-world mistake does this
+simulate, and why does the FINAL action alone (release_hold happened)
+not tell you whether the trajectory was safe?</code></pre>
+  </div>
+
+  <p><b>Run it together, variation B — break the eval, for contrast.</b> Have Claude Code temporarily change the scorer to only check <code>task_success</code>, ignoring <code>policy_compliant</code> and tool match entirely:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>In a scratch copy, change score_trajectory to pass based on task_success
+alone. Re-run against the goldens. Does TRJ-026-INTENTIONAL-FAIL now
+incorrectly pass? What does that prove about outcome-only evaluation?</code></pre>
+  </div>
+  <div class="callout danger">
+    <b class="tag">The failure this proves</b>
+    An outcome-only eval would rate the unauthorized hold release as a success (the hold WAS released, which the fixture marks <code>task_success: true</code>) — exactly the blind spot trajectory evaluation exists to close.
+  </div>
+
+  <p><b>Learners repeat.</b> Restore the full scorer and confirm 25/26 again.</p>
+</div>
+
+<h2 id="topic-03">Topic 03 · The three-layer eval model &amp; judges</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">3</span><span class="step-title">Heuristic, LLM (Large Language Model)-as-judge, and where distilled evaluators fit</span><span class="step-time">~35 min</span></div>
+  <p><b>Concept.</b> Three layers, different cost/accuracy tradeoffs, each validating something different: component checks validate contracts and mocked tools, trajectory checks validate steps and policy (last topic), and outcome checks validate grounding and task success. Deterministic heuristics (today's injection scanner and trajectory eval) are the mandatory CI baseline — cheap, runs on everything. An LLM-as-judge adds real semantic review, but only counts as a legitimate layer when its rubric version, calibration, sampling rate, rationale, and audit trail are all explicit; an unaudited model call dropped into mandatory CI isn't a judge, it's an unreliable dependency. Distilled evaluators (e.g. Galileo Luna-2 — cheap enough to run on 100% of production traffic, purpose-built small models) sit between the two.</p>
+  <figure class="concept-figure">
+    <img src="images/d4pm_t3_three_layer_eval.png" alt="Three-layer agent evaluation: a deterministic CI baseline of mandatory heuristics runs the component (contracts + tools), trajectory (steps + policy), and outcome (grounding + success) layers in sequence with validated evidence passed upward; failing any layer routes to failure diagnosis by ownership (schema/behavior, order/authorization, or grounding/quality), while the outcome layer also samples a supplement to a calibrated, audited semantic judge applying a versioned rubric before declaring an overall evaluation pass">
+    <figcaption>Different cost/accuracy tradeoffs — use the cheap layer first.</figcaption>
+  </figure>
+  <ul class="concept-list">
+    <li><b>Every failed assertion should name its layer.</b> "It failed" tells an owner nothing; "it failed at the component layer, a tool contract mismatch" tells them exactly where to look — the layer IS the diagnosis, not just a score.</li>
+    <li><b>The tradeoff is automation versus judgment quality.</b> Heuristics are cheap and reliably brittle on language nuance; judges add real coverage for the things regex can't see, at the cost of variance, spend, and a governance burden someone has to own.</li>
+  </ul>
+
+  <p><b>Instructor drives live, variation A — Layer 1, heuristic.</b> <span class="where-tag where-vm">VS Code terminal</span> — this is just re-running what you already have:</p>
+  <pre><code>uv run python W2D4/snippets/injection_scanner.py</code></pre>
+  <p><b>Instructor drives live, variation B — Layer 2, Claude Code as judge, for contrast.</b> <span class="where-tag where-claude">Claude Code chat panel</span> — write a rubric first, then judge with it:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Write a short, explicit rubric (3-4 numbered criteria) for judging
+whether a claim-response draft is grounded: (1) cites a specific policy
+document, (2) doesn't state a coverage amount not found in that document,
+(3) flags escalation when appropriate. Then, using ONLY that rubric,
+judge the draft reply you wrote for CLM-424063 earlier this week. Score
+each criterion pass/fail and justify each score with a specific quote.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief — compare Layer 1 and Layer 2</b>
+    Layer 1 (regex) can only match surface patterns — it has no idea whether a coverage claim is actually grounded in a cited document. Layer 2 can evaluate that semantic property, but costs a full model call per judgment and needs its rubric kept auditable (published, versioned) so "the judge said so" is never the end of the explanation.
+  </div>
+
+  <p><b>Learners repeat.</b> Apply the same rubric to one more draft reply from earlier this week (or write a quick new one) and judge it yourself using Claude Code.</p>
+</div>
+</section>
+
+<section id="topics-04-06">
+<h2 id="topic-04">Topic 04 · Building test data</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">4</span><span class="step-title">A versioned, checksummed eval manifest</span><span class="step-time">~25 min</span></div>
+  <p><b>Concept.</b> A golden set (50-100 hand-crafted cases is the usual anchor-set size; we have smaller real fixtures this week) needs the same versioning discipline as Day 3's KB (Knowledge Base) checksums — if a golden changes, you need to know, the same way a stale policy document needs to be caught. A well-formed anchor set deliberately covers normal, edge, safety, and permission cases, not just the happy path; production traces are allowed to propose new cases too, but only after they've been redacted, deduplicated, labeled, and reviewed — never dropped in raw.</p>
+  <figure class="concept-figure">
+    <img src="images/d4pm_t4_test_data.png" alt="Versioned test data pipeline: untrusted candidate production evidence passes through a privacy pipeline (redact, deduplicate, label) into human review, which approves provenance or rejects/quarantines it; approved cases join a curated anchor set (normal, edge, safety, permission categories plus adversarial fixtures and golden trajectories) tagged with category, expected behavior, provenance, reviewer role, manifest version, and fixture hash, then become stable fixtures with immutable hashes feeding reproducible offline CI">
+    <figcaption>A golden set needs the same versioning discipline as any other source data.</figcaption>
+  </figure>
+  <ul class="concept-list">
+    <li><b>Category coverage is a release requirement, not a nice-to-have.</b> "We have 40 eval cases" says nothing on its own; "we have zero safety-category cases" is the finding that should actually block a release, the same way a missing test suite would.</li>
+    <li><b>The tradeoff is representativeness versus curation cost.</b> Mining production broadly finds novel failures no one anticipated and risks leaking real customer data into your fixtures if the review gate is weak — the redact/dedupe/label/review step isn't optional overhead, it's what makes broad mining safe to do at all.</li>
+  </ul>
+
+  <p><b>Instructor drives live, variation A — measure current coverage.</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Across data/insurance/rag_goldens.json, data/eval/trajectory_goldens.json,
+and data/eval/adversarial_prompts.json, count how many total eval cases
+we have, broken down by category. What's NOT covered yet — any topic
+from this week with zero eval cases?</code></pre>
+  </div>
+  <p><b>Instructor drives live, variation B — version the manifest, for contrast.</b> Reuse Day 3's checksum pattern directly:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Extend Day 3's SHA-256 manifest script to also cover the three eval
+files above. Save it to W2D4/outputs/eval_manifest.json. Then
+add one new case to adversarial_prompts.json (a scratch copy) and confirm
+the manifest correctly flags that file as changed.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    The exact same drift-detection mechanic from Day 3's policy docs applies unchanged to eval data — a golden set is source data too, and needs the same governance.
+  </div>
+
+  <p><b>Learners repeat.</b> Name the one gap you found in variation A and describe (don't necessarily write) one case that would close it.</p>
+</div>
+
+<h2 id="topic-05">Topic 05 · Eval-gated CI/CD (Continuous Integration/Continuous Deployment)</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">5</span><span class="step-title">A quality floor that actually fails the build</span><span class="step-time">~30 min</span></div>
+  <p><b>Concept.</b> A trajectory or faithfulness regression should block a deploy automatically, not rely on someone noticing. The gate treats floors differently by kind: a safety or permission regression blocks immediately and hard, while a quality regression reports exactly which evaluation layer it hit. CI mocks tools/data to avoid API (Application Programming Interface) spend on every push — everything in today's gate is already fully deterministic and local, so this is a natural fit, not a compromise — and online evaluation can only ever alert on top of this, never replace the offline gate itself.</p>
+  <figure class="concept-figure">
+    <img src="images/d4pm_t5_eval_gated_cicd.png" alt="Eval-gated CI/CD: a ready candidate runs a zero-API-spend offline eval against fixed fixtures, deterministic mocks, and the three-layer eval, then a gate decision checks safety, permission, component, and trajectory/outcome floors — passing publishes release evidence, a safety or permission hard-blocker routes to block diagnostics; published releases feed online signals, which flow through a reviewed eval intake (redact, deduplicate, label, provenance review) into versioned fixtures that become future evaluation input">
+    <figcaption>The gate enforces the floor — it doesn't just report on it.</figcaption>
+  </figure>
+  <ul class="concept-list">
+    <li><b>A release decision should be reconstructable from its gate inputs, not tribal knowledge.</b> "We shipped it because it looked fine" isn't an audit trail; a logged pass/fail against named floors is — the same discipline as Day 5's audit chain, applied to releases instead of claims.</li>
+    <li><b>The tradeoff is shipping speed versus regression risk.</b> Strict floors reliably block bad releases, and they can also stall good work if a floor is mis-tuned or genuinely flaky — a floor is only trustworthy once it's been watched to fail correctly at least once (this afternoon's own exercise).</li>
+  </ul>
+
+  <p><b>Run it together, variation A — the gate passing.</b> <span class="where-tag where-vm">VS Code terminal</span>:</p>
+  <pre><code>uv run pytest W2D4/snippets/test_eval_gate.py -v</code></pre>
+  <p>All 3 checks should pass, including the specific assertion that <code>TRJ-026-INTENTIONAL-FAIL</code> is caught, not silently passed.</p>
+
+  <p><b>Run it together, variation B — the gate actually failing, for contrast.</b> Deliberately break a quality floor and watch the build fail:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>In a scratch copy of test_eval_gate.py, raise MIN_INJECTION_SCORE to
+0.90 (above what the scanner currently achieves, 17/20 = 0.85). Re-run
+pytest. Confirm it now correctly FAILS the build, and read the assertion
+message it prints.</code></pre>
+  </div>
+  <div class="checkpoint">
+    <b class="tag">Checkpoint</b>
+    You should see a clear <code>AssertionError</code> naming the actual score and the floor it missed by — that message is what a real CI log would show a developer deciding whether to fix the scanner or adjust the floor.
+  </div>
+  <p>Look at <a href="snippets/eval-gate.yml"><code>snippets/eval-gate.yml</code></a> — a GitHub Actions workflow that runs this exact same <code>pytest</code> command on every push. Copying it to <code>.github/workflows/eval-gate.yml</code> activates it on a real repo.</p>
+
+  <p><b>Learners repeat.</b> Restore <code>MIN_INJECTION_SCORE</code> and confirm the gate passes again.</p>
+</div>
+
+<h2 id="topic-06">Topic 06 · Cost &amp; performance optimisation</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">6</span><span class="step-title">Routing, caching, and tiering — under a declared quality floor</span><span class="step-time">~20 min</span></div>
+  <p><b>Concept.</b> Model tiering (fast model for routine cases, deeper model for hard judgment calls — Day 1 PM Topic 05), caching (Day 3 Topic 05), and routing all trade cost for quality — the discipline is declaring the quality floor FIRST, then optimizing cost per <i>resolved task</i> without crossing it, not optimizing cost per call and hoping quality holds. A cache key that doesn't include identity/permissions, the normalized input, and the data or embedding version isn't just imprecise — it can leak one principal's cached answer to a different principal entirely, the exact cross-contamination failure mode Day 3's own semantic cache bug demonstrated.</p>
+  <figure class="concept-figure">
+    <img src="images/d4pm_t6_cost_performance.png" alt="Optimizing cost per resolved task under quality and safety floors: an authorized request checks a permission-scoped cache for a safe hit before a complexity router sends it to an efficient or escalated model tier under token/latency budgets; every result must clear a mandatory quality-and-safety gate — lower cost can never override the floors — before being accepted as a resolved task, otherwise it's rejected as a floor violation">
+    <figcaption>The floor comes first — cost only gets optimized underneath it.</figcaption>
+  </figure>
+  <ul class="concept-list">
+    <li><b>Report cost, quality, latency, and cache behavior together — never cost alone.</b> Activity counts (calls made, tokens saved) are not outcomes; a cheaper system that quietly answers worse isn't an optimization, it's a regression wearing a lower price tag.</li>
+    <li><b>The tradeoff is spend versus quality/latency.</b> Aggressive caching and small-model routing measurably reduce cost, and they can serve stale or under-qualified answers the moment a quality floor or a cache scope is too loose to catch it.</li>
+  </ul>
+
+  <p><b>Instructor drives live.</b> <span class="where-tag where-claude">Claude Code chat panel</span> — pull together everything measured this week:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Using this week's real numbers — Day 1's /cost readings, Day 3's exact/
+semantic cache hit behavior, and today's eval quality floors — propose a
+routing policy: which claim types should use a faster/cheaper model, which
+need the deeper one, and where semantic caching would save the most,
+without dropping below today's 0.80 injection-scanner / 0.90 trajectory
+quality floors.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    A good answer names a concrete floor (today's exact numbers) before proposing any savings — "cheaper and probably still fine" isn't a policy, it's a hope.
+  </div>
+
+  <p><b>Learners repeat.</b> Name one routing decision from the proposal you'd personally be uncomfortable shipping without a human spot-check first, and why.</p>
+</div>
+</section>
+
+<section id="appbuild">
+  <h2>App build (19:00–19:30) · Day 4 of the progressive insurance app</h2>
+  <p>Days 1–3 built a pipeline that trusted the inbound email body completely — it read the claim number straight out of it and moved on. Today's increment stops doing that: before <code>resolve_email</code> ever calls a lookup tool, the raw body is scanned for prompt injection (this afternoon's Topic 02/05 quality-floor discipline, applied to a second artifact) and, once cleared, PII-redacted for anything that gets logged.</p>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">App</span><span class="step-title">Extend your Day 3 file into a Day 4 version</span><span class="step-time">~15 min</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <p>Direct Claude Code to build your <b>own</b> file, importing your Day 3 one rather than editing it in place — the same pattern <code>app/day4_resolve.py</code> uses on top of <code>app/day3_resolve.py</code>:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Create app/my_day4_resolve.py, importing resolve_email from your Day 3
+file but NOT calling it yet. Before any claim lookup happens:
+1. Scan the raw inbound email body with this morning's injection scanner
+   (app/injection_scanner.py's scan()). If it's flagged, stop immediately
+   and return found=False, injection_blocked=True, escalate=True, with an
+   escalate_reason explaining the body matched a prompt-injection pattern
+   -- do not call your Day 3 resolve_email, or any lookup tool, on that
+   body at all.
+2. If the scan is clean, redact the body for PII using app/pii_guardrail.py's
+   redact() (build the analyzer/anonymizer once, not per call), THEN call
+   your Day 3 resolve_email as before.
+3. Attach injection_blocked=False, redacted_body, and pii_findings to the
+   Day 3 result and return it.
+Run it for CLN-001 and show me the full JSON result.</code></pre>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">App</span><span class="step-title">Confirm the quality floor still holds, then read the redaction findings</span><span class="step-time">~10 min</span></div>
+    <p>The injection scanner and trajectory evaluator are both standalone checks against their own established fixtures (<code>data/eval/adversarial_prompts.json</code>, <code>data/eval/trajectory_goldens.json</code>) — not re-derived per FNOL (First Notice of Loss) email. Re-deriving an "expected" tool sequence from the same code path that produces the "actual" one would make the trajectory check trivially always pass; the point is applying this afternoon's quality-floor discipline to a second, independent artifact, not inventing new data to test it against.</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Run uv run python -m app.injection_scanner and uv run python -m
+app.trajectory_eval. Show me both final score lines. Then run
+uv run python -m app.day4_resolve CLN-001 and show me redacted_body
+and pii_findings from the result.</code></pre>
+    </div>
+  </div>
+
+  <div class="checkpoint">
+    <b class="tag">Checkpoint</b>
+    The standalone quality floors from this afternoon hold unchanged: the injection scanner is still 17/20 correct (3 known misses left deliberately unfixed — that was this morning's exercise, not today's), and the trajectory evaluator is still 25/26, with <code>TRJ-026-INTENTIONAL-FAIL</code> correctly localized. None of the real FNOL emails in the fixture trip the injection scanner — it's real customer mail, not adversarial input — so <code>CLN-001</code> resolves with <code>injection_blocked: false</code> and a normal Day 3 result, plus <code>redacted_body</code> and <code>pii_findings</code>. Look at the findings closely: the <code>US_DRIVER_LICENSE</code> detector fires a couple of false positives on CLN-001's body — a policy number and a date-like string, both landing right at its 0.4 score threshold. That's expected, honest behavior for a real PII detector operating near its threshold, the same kind of imperfection as this morning's 3 scanner misses — not a bug to quietly patch.
+  </div>
+
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>A complete, tested version is at <a href="../app/day4_resolve.py"><code>app/day4_resolve.py</code></a> (the orchestration — scan before lookup, redact after), <a href="../app/injection_scanner.py"><code>app/injection_scanner.py</code></a> (the same deterministic pattern scanner from this morning), and <a href="../app/pii_guardrail.py"><code>app/pii_guardrail.py</code></a> (Presidio-based redaction). Use these to compare after you've built your own, not as the first attempt. Day 5's PM app-build slot picks up from here and adds a tamper-evident audit chain plus a governance autonomy gate on top.</p>
+  </details>
+</section>
+
+<section id="homework">
+  <h2>Logistics thread — homework</h2>
+  <div class="homework-block">
+    <h3>Add one eval case</h3>
+    <p>Add one new trajectory golden to a scratch copy of <code>trajectory_goldens.json</code> modeling a logistics scenario (e.g. releasing a delay-compensation credit without checking permission first, mirroring <code>TRJ-026</code>). Confirm <code>trajectory_eval.py</code> correctly scores it.</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">Week 2 · Day 4 PM · Claude Code edition — observability, evaluation &amp; cost, insurance thread primary</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

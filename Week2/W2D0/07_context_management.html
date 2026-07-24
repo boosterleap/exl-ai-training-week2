@@ -18,50 +18,264 @@
 <main>
 
 <section id="concept">
-  <h2>Concept</h2>
+  <h2>Concept: Context Windows and Compaction</h2>
   <div class="step">
-    <p>The context window is a real, finite budget: your system prompt, <code>CLAUDE.md</code>, every message, every tool call and result. As a session runs long, Claude Code automatically summarizes older turns to keep going — that's compaction, and it's lossy by design. <code>/compact</code> lets you trigger it on your own schedule instead of waiting for the automatic threshold.</p>
-    <ul class="concept-list">
-      <li><b>Why trigger it manually.</b> Compacting right after finishing a noisy sub-task (e.g. a long debugging session) clears the noise while it's still fresh, rather than losing detail unpredictably later mid-task.</li>
-      <li><b>What survives compaction and what doesn't.</b> Artifacts — <code>CLAUDE.md</code>, files written to disk — survive because they're re-read fresh, not carried in conversational memory. Anything that only exists as "something we discussed 40 turns ago" is exactly what compaction risks losing.</li>
+    <h3>The Big Picture</h3>
+    <p>Claude Code has a <b>context window</b> — a finite bucket of tokens that holds everything Claude is currently aware of:</p>
+    <ul>
+      <li>Your system prompt (the instructions you're reading right now, roughly)</li>
+      <li>All your CLAUDE.md files (user, project, subdirectory)</li>
+      <li>Every message you've sent</li>
+      <li>Every tool call result</li>
+      <li>Your custom commands, skills, subagent specs</li>
     </ul>
+
+    <p>This bucket has a limit (usually very large — 200k+ tokens for recent models). When a session runs long and the context gets full, Claude Code automatically compresses older turns into a summary, making room for new work. This process is called <b>compaction</b>, and it's <b>lossy</b> — some detail gets dropped to fit the summary.</p>
+
+    <h3>What Gets Lost in Compaction</h3>
+    <p>When Claude Code compacts context:</p>
+    <ul>
+      <li><b>Conversational detail is summarized.</b> You discussed "let me trace through the recursive function," and Claude spent 5 turns analyzing it. Compaction might reduce that to "we discussed recursion depth" — gist preserved, detail lost.</li>
+      <li><b>Tool results older than a few turns get summarized.</b> You read 10 files; compaction might reduce that to "we reviewed multiple files." The exact contents might be forgotten unless they're important to the summary.</li>
+      <li><b>Reasoning and intermediate thoughts disappear.</b> When Claude worked through a problem step-by-step, those intermediate steps vanish. Only the conclusion survives.</li>
+    </ul>
+
+    <h3>What Survives Compaction (Always)</h3>
+    <p>Artifacts and disk state always survive:</p>
+    <ul>
+      <li><b>CLAUDE.md files</b> — Re-read fresh at the start of any session. They don't depend on being carried in conversational memory.</li>
+      <li><b>Written files</b> — A Python script you edited is on disk. Compaction doesn't touch it. A new session reads it fresh.</li>
+      <li><b>Git history</b> — Commits are permanent. Compaction never affects them.</li>
+      <li><b>Custom commands, skills, subagents you defined</b> — Stored on disk in .claude/, not in memory. (One nuance: the one-line skill <i>index</i> Claude sees at startup is not automatically re-added after compaction — only skills actually invoked during the conversation get re-injected. The skill files themselves are never touched; invoking one again brings it right back.)</li>
+    </ul>
+
+    <p><b>Key insight:</b> If you want something to survive compaction reliably, write it to disk (CLAUDE.md, a file, git). Don't rely solely on "we discussed this 20 turns ago."</p>
+
+    <h3>Manual Compaction (<code>/compact</code>)</h3>
+    <p>You can trigger compaction yourself:</p>
+    <pre><code>/compact</code></pre>
+
+    <p><b>When to use it:</b> After finishing a big, noisy sub-task (like debugging, reading 50 files, running a test suite), compacting clears the noise while it's still fresh. Rather than waiting for automatic compaction to happen unpredictably later, you control when the loss occurs.</p>
+
+    <p><b>What happens:</b> Claude summarizes the current conversation, clears the old detail, and starts fresh with the summary. The rest of your session continues, but with reduced context.</p>
+
+    <h3>Compaction Lifecycle Diagram</h3>
+    <pre><code>Session starts (context empty)
+    ↓
+Turns accumulate (context fills)
+    ↓
+Context approaches limit (automatic compaction triggers, OR you run /compact)
+    ↓
+Compaction summarizes older turns
+    ↓
+Detail is lost, summary is kept
+    ↓
+Session continues with more room, but less historical detail
+    ↓
+If you need that detail again, it's gone—reread files from disk</code></pre>
+
+    <h3>Context Window Sizes</h3>
+    <p>Claude Code's context window is <b>200,000 tokens by default — the same for every model</b> (Haiku, Sonnet, or Opus). This is a Claude-Code-level limit, not a raw per-model ceiling:</p>
+    <ul>
+      <li><b>Default, any model:</b> 200k tokens (roughly 150k words)</li>
+      <li><b>Extended context (opt-in):</b> Opus (4.6 and later) and Sonnet 4.6 can switch to a 1-million-token window for long sessions with large codebases — select it with <code>/model opus[1m]</code> or <code>/model sonnet[1m]</code> (included automatically on some subscription plans, or via usage credits on others).</li>
+      <li><b>Newest models (e.g. Sonnet 5, Fable 5):</b> run at the 1M-token window by default on the Anthropic API — no <code>[1m]</code> suffix needed.</li>
+    </ul>
+
+    <p>For most projects, 200k is enormous — you'd have to read thousands of files or have extremely long conversations to hit it naturally. <i>(Correction: an earlier draft of this page referenced a "Claude 5 (coming)" model with "even larger" context — no such model exists. The real mechanism for a bigger window is the 1M-token extended context option above, already available today on qualifying models/plans.)</i></p>
+
+    <figure class="concept-figure">
+      <img src="images/context-compaction.svg" alt="A long session with full context gets compacted, trading detail for room to continue">
+      <figcaption>Compaction trades detail for capacity. Put permanent things on disk, not in memory.</figcaption>
+    </figure>
   </div>
-  <figure class="concept-figure">
-    <img src="images/context-compaction.svg" alt="A long session with full context gets compacted, trading detail for room to continue">
-    <figcaption>Lossy by design — put anything durable into an artifact, not just the conversation.</figcaption>
-  </figure>
+</section>
+
+<section id="use-cases">
+  <h2>Real-World Use Cases</h2>
+  <div class="step">
+    <h3>1. Long Debugging Sessions</h3>
+    <p><b>The problem:</b> You're debugging a complex issue. You read 30 files, run 20 test cases, trace through the code step-by-step. Your context is now full of debugging noise — tool results, intermediate reasoning, failed attempts.</p>
+    <p><b>The solution:</b> When you finally find and fix the bug, immediately run <code>/compact</code>. This clears the debugging noise while you're fresh on the solution.</p>
+    <p><b>The result:</b> Your context is fresh for the next task. If you need to reference the bug fix again, it's in git; you don't need it in memory.</p>
+
+    <h3>2. Large Codebase Exploration</h3>
+    <p><b>The problem:</b> You're exploring an unfamiliar codebase. You ask Claude to find all API endpoints, trace through a workflow, read 50 files to understand the architecture. Context fills fast.</p>
+    <p><b>The solution:</b> Once you have the insights you need, compaction clears the file-reading noise. Write your findings (architecture diagram, notes) to CLAUDE.md or a file, then compact.</p>
+    <p><b>The result:</b> You keep the insights (written to disk), lose the noise (tool results, intermediate steps). Clean context for the next task.</p>
+
+    <h3>3. Test Suite Runs</h3>
+    <p><b>The problem:</b> You run 200 test cases to validate your changes. The output fills context with pass/fail results, logs, and traces.</p>
+    <p><b>The solution:</b> After reviewing test results and fixing issues, run <code>/compact</code> to clear the test logs.</p>
+    <p><b>The result:</b> The test passes remain in git; context is clean for development.</p>
+
+    <h3>4. Documentation Reviews</h3>
+    <p><b>The problem:</b> You review 20 documentation files, each 10k words, looking for outdated content. Context is consumed by file contents that are now no longer relevant.</p>
+    <p><b>The solution:</b> Document your findings (which files need updating), then compact to clear the file contents.</p>
+    <p><b>The result:</b> You keep your actionable findings, lose the raw docs (still available on disk if needed). Clean context.</p>
+
+    <h3>5. Multi-Step Refactoring with Exploratory Sub-Tasks</h3>
+    <p><b>The problem:</b> You're refactoring a module. Step 1 involves exploring the current code (noisy). Step 2 is making the actual changes (needs clarity). After step 1, context is full of exploration noise.</p>
+    <p><b>The solution:</b> After exploring, document your refactoring plan in CLAUDE.md, then run <code>/compact</code> before starting step 2.</p>
+    <p><b>The result:</b> Step 2 starts fresh. Your plan (in CLAUDE.md) survives; exploration noise doesn't.</p>
+  </div>
 </section>
 
 <section id="handson">
-  <h2>Hands-on</h2>
-  <div class="step">
-    <div class="step-head"><span class="step-num">1</span><span class="step-title">Check your current context usage</span></div>
-    <span class="where-tag where-claude">Claude Code chat panel</span>
-    <pre><code>/context</code></pre>
-    <p>(If your build doesn't expose this directly, ask: "roughly how full is your current context window?")</p>
+  <h2>Hands-on Practice: Five Examples</h2>
 
-    <div class="step-head"><span class="step-num">2</span><span class="step-title">Deliberately generate some noise, then compact</span></div>
+  <div class="step">
+    <h3>Example 1: Check Your Current Context Status</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Ask Claude about context usage:</p>
     <div class="prompt-box">
       <div class="prompt-label">Prompt</div>
-      <pre><code>Read every .html file in W2D0/ one at a time and give me a one-sentence
-summary of each (this is just to fill context — don't overthink it).</code></pre>
+      <pre><code>How much of your context window are you currently using? Give me an estimate
+as a percentage, and tell me what the main components are (system prompt,
+CLAUDE.md, conversation history, etc.).</code></pre>
     </div>
-    <p>Then:</p>
-    <pre><code>/compact</code></pre>
+
+    <p><b>What you'll see:</b> Claude gives you an estimate of context usage. Early in a session, it's typically 5-10%. After many turns or large file reads, it might be 40-60%.</p>
+
     <div class="checkpoint">
       <b class="tag">Checkpoint</b>
-      Ask immediately afterward: "summarize what we just did in the last few turns" — it should still know the gist, but likely not word-for-word detail. That gap is compaction, made visible.
-    </div>
-
-    <div class="step-head"><span class="step-num">3</span><span class="step-title">Prove the artifact-survives-compaction claim</span></div>
-    <div class="prompt-box">
-      <div class="prompt-label">Prompt</div>
-      <pre><code>Append one line to CLAUDE.md noting that we tested /compact in W2D0 Topic
-07. Then run /compact again immediately. Now tell me: is that line still on
-disk, and would a BRAND NEW session (not just a compacted one) still see
-it?</code></pre>
+      You now have a baseline for your current context usage.
     </div>
   </div>
+
+  <div class="step">
+    <h3>Example 2: Deliberately Fill Context, Then Compact</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Ask Claude to read many files (to generate noise):</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Read every .html file in W2D0/ and give me a one-line summary of what each
+one teaches. Don't overthink it—just a quick summary of the topic.</code></pre>
+    </div>
+
+    <p><b>What happens:</b> Claude reads all the W2D0 HTML files. Your context is now filled with file contents and summaries.</p>
+
+    <p><b>Step 2:</b> Check context usage again:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Check your context usage now. How much has it grown from your earlier estimate?</code></pre>
+    </div>
+
+    <p><b>What you'll see:</b> Context usage has noticeably increased—maybe from 10% to 40% or higher, depending on file sizes.</p>
+
+    <p><b>Step 3:</b> Now trigger manual compaction:</p>
+    <pre><code>/compact</code></pre>
+
+    <p><b>What happens:</b> Claude summarizes the conversation and clears old detail.</p>
+
+    <p><b>Step 4:</b> Check context usage after compaction:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Check your context usage now. How much has it shrunk after compaction?</code></pre>
+    </div>
+
+    <p><b>What you'll see:</b> Context is significantly reduced. The detailed file contents are gone; only a summary remains.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You've seen context fill up and compaction shrink it. This is the real trade-off.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 3: Prove Context Loss After Compaction</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Setup:</b> You just compacted. Now ask Claude to recall detailed information from before compaction.</p>
+
+    <p><b>Step 1:</b> Ask for detailed recall:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Recall the exact content of the CLAUDE.md file we read earlier. Quote
+the first 3 bullet points word-for-word.</code></pre>
+    </div>
+
+    <p><b>What should happen:</b> Claude can't recall exact text. It might say "I don't have that detail anymore" or give you a paraphrase. This is compaction at work—detail is lost.</p>
+
+    <p><b>Step 2:</b> Prove files are still on disk:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Now read CLAUDE.md fresh from disk and give me the actual first 3 bullet points.</code></pre>
+    </div>
+
+    <p><b>What should happen:</b> Claude reads the file fresh and gives you exact text. The file survived compaction because it's on disk, not in memory.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You've proven that conversational detail is lost, but disk artifacts survive.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 4: Write Important Details to CLAUDE.md Before Compacting</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Setup:</b> You want to preserve important findings across compaction.</p>
+
+    <p><b>Step 1:</b> Ask Claude to add a section to CLAUDE.md with your findings:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Add a new section to CLAUDE.md called "## W2D0 Context Management Learnings"
+and list 3 key takeaways from our discussion about context compaction and
+what survives.</code></pre>
+    </div>
+
+    <p><b>Step 2:</b> Verify the addition:</p>
+    <pre><code># On Mac/Linux
+tail -20 CLAUDE.md
+
+# On Windows (PowerShell)
+Get-Content CLAUDE.md | Select-Object -Last 20</code></pre>
+
+    <p><b>Step 3:</b> Now run compaction:</p>
+    <pre><code>/compact</code></pre>
+
+    <p><b>Step 4:</b> Verify that your added section is still there:</p>
+    <pre><code># On Mac/Linux
+grep -A 5 "W2D0 Context Management" CLAUDE.md
+
+# On Windows (PowerShell)
+Select-String "W2D0 Context Management" CLAUDE.md -Context 0,5</code></pre>
+
+    <p><b>What should happen:</b> Your addition is still there. CLAUDE.md always survives compaction because it's on disk and gets re-read fresh.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You've proven that disk artifacts survive compaction reliably.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 5: Simulate a New Session to Confirm Persistence</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Setup:</b> A real proof that your additions to CLAUDE.md aren't just in memory—they'd survive a new session entirely.</p>
+
+    <p><b>Step 1:</b> Ask Claude to imagine a completely new session:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Imagine you're a brand-new Claude Code session starting from scratch in
+this repo (you have zero memory of our conversation). You load CLAUDE.md.
+Do you see the "W2D0 Context Management Learnings" section we added? What does it say?</code></pre>
+    </div>
+
+    <p><b>What should happen:</b> Claude reads CLAUDE.md fresh and sees the section we added. It's not a memory of our conversation—it's a real file on disk.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You've proven that anything written to disk survives compaction and even session boundaries. It's durable.
+    </div>
+
+    <p><b>Key insight:</b> This is why CLAUDE.md is powerful. It's not just a conversation artifact—it's a durable, persistent knowledge base that survives compaction and session boundaries.</p>
+  </div>
+
 </section>
 
 </main>

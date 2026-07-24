@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · Capstone Phase 5 · HITL, Observability &amp; Eval</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Capstone Phase 5 of 6 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="CP4_capstone_guardrails_memory_cache.html" style="color:#cbd8ff;">← Phase 4</a> · <a href="CP6_capstone_testing_ui_deployment.html" style="color:#cbd8ff;">Phase 6 →</a></p>
+  <h1>Capstone Phase 5 — Human-in-the-Loop, Observability &amp; Evaluation</h1>
+  <p>Every phase so far has been building toward one line in this project's own <code>CLAUDE.md</code>-style ground rules: <i>sensitive or irreversible actions require an explicit human approval step — never auto-send those without one.</i> Phase 5 makes that real — an approval queue and a tamper-evident audit chain — and adds the two things that let you trust the pipeline at all: a structured trace log, and an eval gate with a quality floor instead of a demand for perfection.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept: Governance, not just grounding</h2>
+  <div class="step">
+    <h3>What counts as "sensitive" here</h3>
+    <p>Phases 2-4 made sure every reply is grounded and every gap is escalated rather than fabricated. But an escalation is itself a disposition someone has to actually act on, and this capstone treats two dispositions as sensitive enough to require a human decision before anything is considered final: an <b>escalation</b> (grounding was unavailable) and a <b>fraud-review</b> case. Everything else — a routine, grounded status or policy reply — doesn't need a human in the loop; it's not the kind of action <code>CLAUDE.md</code>'s ground rules are talking about.</p>
+
+    <h3>An append-only, tamper-evident audit chain</h3>
+    <p>Every decision — queued, approved, rejected, or auto-approved-as-routine — gets one entry in a hash chain (<code>W2D5/snippets/audit_chain.py</code>, reused verbatim): each entry hashes in the previous entry's hash, so editing any past entry breaks verification for everything after it. This is append-only by construction, not by convention.</p>
+
+    <h3>Observability: a structured trace, not print statements</h3>
+    <p>Phase 2's <code>agent_loop.py</code> now logs every tool call — which tool, what arguments, how long it took, which email it belongs to — to a JSONL trace file. An analyzer (adapted from <code>W2D4/snippets/trace_analyzer.py</code>) surfaces per-tool call counts, average latency, and a repeated-identical-call anomaly detector — the same "is this agent stuck in a loop" signal from Day 1's guardrail topic, now watching a real trace.</p>
+
+    <h3>An eval gate with a floor, not a demand for perfection</h3>
+    <p>A golden set derived straight from <code>inbound_emails.csv</code>'s own ground-truth columns scores every reply on two things: did it escalate exactly the cases with no grounding, and did it cite the right product's policy file. The gate asserts a floor (0.90) — not 100% — because model output varies run to run, and Phase 4 already taught this lesson once with the injection scanner. This phase gives you a second, real instance of the same principle.</p>
+  </div>
+</section>
+
+<section id="use-cases">
+  <h2>Key Learning Objectives</h2>
+  <div class="step">
+    <h3>By the end of Phase 5, you will:</h3>
+    <ul>
+      <li>Build a human-approval queue that gates sensitive dispositions, not every reply</li>
+      <li>Build an append-only audit chain and watch it correctly detect tampering</li>
+      <li>Add structured tool-call tracing to an agent loop you already built, and read a real trace for anomalies</li>
+      <li>Build an eval gate against a golden set derived from your own data's ground truth</li>
+      <li>See, first-hand, why the right target is a quality floor and not a perfect score</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Add tracing to the Phase 2 agent loop</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Add structured tool-call tracing to W2D0/capstone/agent_loop.py. Every time
+run_tool() executes, time it and append one JSON line to
+outputs/tool_trace.jsonl: {email_id, tool, arguments, duration_ms}. Thread
+an optional email_id parameter through process_email() so each call site in
+main() passes the current row's email_id. Clear the trace file at the start
+of each full run in main() so it reflects only the latest run.</code></pre>
+    </div>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Re-run the pipeline and analyze the trace</span></div>
+    <span class="where-tag where-vm">VM terminal — real, billed API calls</span>
+    <pre><code>"C:\Users\Asus\.venv\Scripts\python.exe" W2D0/capstone/agent_loop.py</code></pre>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Build W2D0/capstone/observability.py: read outputs/tool_trace.jsonl and
+report total calls, calls-by-tool, average latency per tool, and any tool
+called 3+ times with byte-identical arguments (a stuck-loop signal) --
+same structure as W2D4/snippets/trace_analyzer.py.</code></pre>
+    </div>
+    <span class="where-tag where-vm">VM terminal</span>
+    <pre><code>"C:\Users\Asus\.venv\Scripts\python.exe" W2D0/capstone/observability.py</code></pre>
+    <div class="callout predict">
+      <b class="tag">Predict first</b>
+      <code>get_loan_record</code> is a local SQLite lookup; <code>search_policy</code> embeds the query with a sentence-transformer before comparing it to cached policy chunk vectors. Which tool do you expect to have the higher average latency, and by roughly how much?
+    </div>
+    <div class="callout">
+      <b class="tag">Debrief</b>
+      Verified reference run: <b>22</b> total tool calls across the 12 emails — <code>get_loan_record</code> averaged <b>~1.0ms</b> (a local SQLite row lookup), <code>search_policy</code> averaged <b>~1,642ms</b> (a real embedding model call per query). That three-orders-of-magnitude gap is exactly what "search calls a model, lookups hit a database" should look like — and it's also exactly the kind of cost Phase 4's semantic cache exists to avoid paying twice for a paraphrased question. No repeated-identical-call anomalies were found in this run.
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Build the eval gate against your own golden set</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Build W2D0/capstone/eval_gate.py. Derive a golden set directly from
+inbound_emails.csv's own ground-truth columns: expected_escalated is True
+iff product_ground_truth is gold_loan; expected_citation_prefix is that
+product's policy-file prefix (None for gold_loan). Score each reply in
+outputs/draft_replies.json on escalation-correctness and citation-
+correctness. Add a pytest test that asserts the overall score is at or
+above a MIN_SCORE = 0.90 floor -- not a demand for a perfect 12/12.</code></pre>
+    </div>
+    <span class="where-tag where-vm">VM terminal</span>
+    <pre><code>"C:\Users\Asus\.venv\Scripts\python.exe" W2D0/capstone/eval_gate.py</code></pre>
+    <div class="callout predict">
+      <b class="tag">Predict first</b>
+      Phase 2 and Phase 3 both ran this exact pipeline and both times every non-gap case cited correctly without over-escalating. Given that this is a live model call and not a fixed script, do you expect every future run to score a perfect 12/12 too?
+    </div>
+    <div class="callout">
+      <b class="tag">Debrief</b>
+      No — and the reference run proves it. This run scored <b>11/12 (0.92)</b>, clearing the 0.90 floor but not perfect: <code>LN-006</code> (a documented <code>education_loan</code> case) correctly cited <code>LOAN-EDU-040_underwriting.md</code> but <i>also</i> escalated it unnecessarily — a real instance of the model being more cautious than strictly required, not a fabrication. That's precisely why the gate asserts a floor instead of exact equality: a single non-deterministic over-caution shouldn't fail a release, but a collapse in grounding accuracy should. Compare this to Phase 4's injection scanner, which scored 21/23 against a fixed, deterministic scanner — <i>this</i> gate's 11/12 comes from live model variance instead, a different source of the same floor-not-perfection lesson.
+    </div>
+
+    <div class="step-head"><span class="step-num">4</span><span class="step-title">Build the approval queue and audit chain</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Build W2D0/capstone/governance.py with an AuditChain class (copy
+W2D5/snippets/audit_chain.py verbatim -- it's already minimal) and an
+ApprovalQueue backed by SQLite (email_id, loan_id, disposition, status,
+decided_by, decided_at).
+
+Process outputs/draft_replies.json: for every reply with escalated=true,
+enqueue it (disposition "fraud_review" for LN-012 specifically, else
+"escalation"), log a queued_for_review audit entry, then simulate a human
+decision as "simulated_underwriter_jane" -- approve ordinary escalations,
+but REJECT the fraud_review case with a reason (it gets routed to a fraud
+team instead of an auto-sent escalation notice). For every non-escalated
+reply, log a single auto_approved_routine_reply audit entry (no queue
+entry -- it's not a sensitive action). Print the final queue contents,
+the audit chain's entry count and validity, then deliberately mutate one
+past entry and print validity again to prove tampering is detected.</code></pre>
+    </div>
+    <span class="where-tag where-vm">VM terminal</span>
+    <pre><code>"C:\Users\Asus\.venv\Scripts\python.exe" W2D0/capstone/governance.py</code></pre>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Verified reference run: <b>22</b> tool calls traced (<code>get_loan_record</code> avg ~1.0ms, <code>search_policy</code> avg ~1,642ms), no anomalies. Eval gate: <b>11/12 (0.92)</b>, above the 0.90 floor. Approval queue: <b>4</b> items — <code>LN-004</code>, <code>LN-005</code>, <code>LN-006</code> disposed <code>escalation</code> → <code>approved</code>, <code>LN-012</code> disposed <code>fraud_review</code> → <b>rejected</b> (routed to the fraud team instead of auto-sent). Audit chain: <b>16</b> entries, <code>valid=True</code> before tampering, <code>valid=False</code> after mutating entry 0.
+    </div>
+  </div>
+
+  <p>Next: Phase 6 wraps everything in a pytest suite with quality floors, a Streamlit review UI for the approval queue you just built, and a Dockerfile.</p>
+
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>Tested versions are at <a href="capstone_ref/observability.py">capstone_ref/observability.py</a>, <a href="capstone_ref/eval_gate.py">capstone_ref/eval_gate.py</a>, <a href="capstone_ref/governance.py">capstone_ref/governance.py</a>, and the updated <a href="capstone_ref/agent_loop.py">capstone_ref/agent_loop.py</a> (with tracing added) — verified end to end against the numbers above. Use it to compare, not as the first attempt.</p>
+  </details>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — Capstone Phase 5: Human-in-the-Loop, Observability &amp; Evaluation</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

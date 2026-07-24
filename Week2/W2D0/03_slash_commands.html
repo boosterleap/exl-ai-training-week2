@@ -18,48 +18,279 @@
 <main>
 
 <section id="concept">
-  <h2>Concept</h2>
+  <h2>Concept: Slash Commands — Built-In and Custom</h2>
   <div class="step">
-    <p><b>Built-in commands</b> are typed directly in the chat panel — things like <code>/help</code>, <code>/compact</code> (Topic 07), <code>/agents</code>, <code>/mcp</code>. <b>Custom commands</b> are your own — a markdown file that becomes a reusable, named prompt template, scoped project- or user-wide the same way <code>CLAUDE.md</code> and settings are.</p>
+    <h3>The Big Picture</h3>
+    <p>A <b>slash command</b> is a shortcut in Claude Code: type <code>/something</code> and Claude does it immediately, without you typing a full prompt.</p>
+
+    <p>There are two kinds:</p>
     <ul class="concept-list">
-      <li><b>Why bother, if you could just type the prompt again?</b> A custom command is versioned (checked into the repo, so your whole team gets it), and can take arguments — turning a paragraph you'd retype every time into <code>/review-pr 142</code>.</li>
-      <li><b>Project- vs user-scoped, the same pattern as everything else.</b> A command that only makes sense for this repo's conventions belongs at project scope (shared, committed). A command you want in every project you touch belongs at user scope.</li>
+      <li><b>Built-in commands</b> — Included with Claude Code. Examples: <code>/help</code>, <code>/compact</code>, <code>/agents</code>, <code>/code-review</code>. These are always available.</li>
+      <li><b>Custom commands</b> — You create them. They're markdown files that become reusable, parametrized prompts, just like CLAUDE.md is versioned and shared.</li>
     </ul>
+
+    <h3>Why Custom Commands Matter</h3>
+    <p>Suppose you have a recurring workflow:</p>
+    <pre><code>Read the git diff for this branch. Summarize it in 3 bullets, mentioning file paths.
+Only include changes that aren't test files.</code></pre>
+
+    <p>You could type that every time you want a summary. Or you create a custom command <code>/summarize-pr</code> once, commit it to git, and your whole team runs <code>/summarize-pr</code> forever. One more benefit: commands can take arguments, turning <code>/review-pr 142</code> into a full, structured review.</p>
+
+    <h3>File Structure and Scoping</h3>
+    <p>Custom commands live here:</p>
+    <ul>
+      <li><b>Project-scoped:</b> <code>.claude/commands/command_name.md</code> — Shared, committed, for the whole team</li>
+      <li><b>User-scoped:</b> <code>~/.claude/commands/command_name.md</code> — Personal, in your home directory only</li>
+    </ul>
+
+    <p>A command file looks simple:</p>
+    <pre><code">---
+name: summarize-pr
+description: Summarize the current git branch, excluding tests
+arguments: branch
+---
+
+Read `git diff origin/main...HEAD` on the branch "$branch".
+Summarize the changes in 3-4 bullets. Exclude test files.
+Focus on logic changes, not formatting.</code></pre>
+
+    <p>The frontmatter (the YAML at the top) defines metadata. The rest is the prompt template. The <code>arguments</code> field declares named positional arguments (a space-separated string or a YAML list of names); each name becomes a <code>$name</code> placeholder in the body&mdash;here, <code>$branch</code> is replaced with whatever you pass when you run the command. You can also use <code>$ARGUMENTS</code> for the entire raw argument string, or <code>$1</code>/<code>$2</code> (shorthand for <code>$ARGUMENTS[0]</code>/<code>$ARGUMENTS[1]</code>) for positional access without naming arguments. Claude Code custom commands do <b>not</b> use <code>{{variable}}</code>-style templating.</p>
+
+    <h3>Built-In Commands You'll Use</h3>
+    <table>
+      <tr>
+        <th>Command</th>
+        <th>What It Does</th>
+        <th>Example</th>
+      </tr>
+      <tr>
+        <td><code>/help</code></td>
+        <td>Lists all available commands (built-in and custom)</td>
+        <td><code>/help</code></td>
+      </tr>
+      <tr>
+        <td><code>/compact</code></td>
+        <td>Manually triggers context compaction (Topic 07)</td>
+        <td><code>/compact</code></td>
+      </tr>
+      <tr>
+        <td><code>/agents</code></td>
+        <td>Prints a reminder to ask Claude to create/manage subagents, or to edit <code>.claude/agents/</code> directly (older Claude Code versions opened an interactive list/creation wizard instead)</td>
+        <td><code>/agents</code></td>
+      </tr>
+      <tr>
+        <td><code>/mcp</code></td>
+        <td>Manages MCP server connections (Topic 08)</td>
+        <td><code>/mcp list</code></td>
+      </tr>
+      <tr>
+        <td><code>/code-review</code></td>
+        <td>Runs a security or quality review on pending changes</td>
+        <td><code>/code-review</code></td>
+      </tr>
+      <tr>
+        <td><code>/fast</code></td>
+        <td>Toggles fast mode (faster responses, less reasoning)</td>
+        <td><code>/fast</code></td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<section id="use-cases">
+  <h2>Real-World Use Cases</h2>
+  <div class="step">
+    <h3>1. Code Review Shortcuts for Your Team</h3>
+    <p><b>The problem:</b> Your team reviews PRs frequently. Each review follows the same template: "check for edge cases, look for security issues, verify test coverage." Without automation, reviewers paste the same prompt over and over.</p>
+    <p><b>The solution:</b> Create a custom command <code>/review-checklist</code> that runs your team's standard review prompt. Commit it to git, and everyone on the team runs it with a real PR number, e.g. <code>/review-checklist 142</code>.</p>
+    <p><b>The result:</b> Consistent reviews, saved time, and the prompt lives in your repo (versioned and evolves with your team's standards).</p>
+
+    <h3>2. Setup and Onboarding for New Team Members</h3>
+    <p><b>The problem:</b> A new engineer joins. They need to set up their environment, run the test suite, check their access to databases. Instructions are scattered across wikis and Slack.</p>
+    <p><b>The solution:</b> Create <code>/onboard</code> command that guides them through every step, including permission checks and environment variable setup.</p>
+    <p><b>The result:</b> Onboarding is reliable, repeatable, and automatically updated when your setup process changes.</p>
+
+    <h3>3. Daily Report Generation</h3>
+    <p><b>The problem:</b> Your manager asks for a daily standup report: commits made, files changed, tests passed. Same request every day.</p>
+    <p><b>The solution:</b> Custom command <code>/daily-report</code> that gathers stats and formats them as a markdown report.</p>
+    <p><b>The result:</b> Type <code>/daily-report</code> every morning, get a structured report to paste into your standup.</p>
+
+    <h3>4. Deployment Safety Checks</h3>
+    <p><b>The problem:</b> Before deploying, you need to check: are there uncommitted changes? Do tests pass? Is the main branch clean? It's easy to forget one step and break prod.</p>
+    <p><b>The solution:</b> Custom command <code>/pre-deploy</code> that runs all checks and refuses to proceed if anything is amiss.</p>
+    <p><b>The result:</b> <code>/pre-deploy</code> becomes your deployment gatekeeper. Humans can't skip steps.</p>
+
+    <h3>5. Bug Triage and Analysis</h3>
+    <p><b>The problem:</b> A bug report arrives with a stack trace. You need to understand what happened: which code path, what data state, what was the user doing. You manually trace through the logic each time.</p>
+    <p><b>The solution:</b> Custom command <code>/analyze-bug &lt;file&gt; &lt;line&gt;</code> that reads the code, traces the logic, and identifies likely root causes.</p>
+    <p><b>The result:</b> <code>/analyze-bug my_module.py 42</code> returns a detailed analysis. Faster debugging, fewer mysteries.</p>
   </div>
 </section>
 
 <section id="handson">
-  <h2>Hands-on</h2>
+  <h2>Hands-on Practice: Five Examples</h2>
+
   <div class="step">
-    <div class="step-head"><span class="step-num">1</span><span class="step-title">Tour the built-ins</span></div>
+    <h3>Example 1: Explore Built-In Commands</h3>
     <span class="where-tag where-claude">Claude Code chat panel</span>
-    <p>Type <code>/help</code> and skim what's available. Try <code>/agents</code> (you'll use it for real in Topic 05) and <code>/mcp</code> (Topic 08) just to see their empty-state output for now.</p>
 
-    <div class="step-head"><span class="step-num">2</span><span class="step-title">Have Claude Code build you a real custom command</span></div>
-    <div class="prompt-box">
-      <div class="prompt-label">Prompt</div>
-      <pre><code>Create a project-scoped custom slash command called /summarize-changes that,
-when run, looks at `git diff` for the current working tree and writes a
-short, plain-English summary of what changed. Show me exactly what file you
-created and where, and explain the project- vs user-scope convention you
-used.</code></pre>
-    </div>
-    <div class="callout">
-      <b class="tag">What to look for</b>
-      Claude Code should create a markdown file under a project-scoped commands location (not your home directory) and explain how it would differ if you'd asked for a user-scoped one instead.
-    </div>
+    <p><b>Step 1:</b> Type the help command:</p>
+    <pre><code>/help</code></pre>
 
-    <div class="step-head"><span class="step-num">3</span><span class="step-title">Use it</span></div>
-    <p>Make a small, harmless edit to any file (e.g. add a blank line somewhere), then run your new command:</p>
-    <div class="prompt-box">
-      <div class="prompt-label">Prompt</div>
-      <pre><code>/summarize-changes</code></pre>
-    </div>
+    <p><b>What you'll see:</b> A list of all built-in commands (like <code>/help</code>, <code>/compact</code>, <code>/agents</code>) and any custom commands you've created. Each entry includes a description and usage.</p>
+
+    <p><b>Step 2:</b> Try one of the built-in commands:</p>
+    <pre><code>/agents</code></pre>
+
+    <p><b>What you'll see:</b> On current Claude Code versions, a short reminder to ask Claude to create/manage subagents or edit <code>.claude/agents/</code> directly (older versions opened an interactive list instead). This will be important in Topic 05.</p>
+
+    <p><b>Step 3:</b> Try another:</p>
+    <pre><code>/mcp</code></pre>
+
+    <p><b>What you'll see:</b> MCP servers you have connected. This will be important in Topic 08. For now, it shows what's available.</p>
+
     <div class="checkpoint">
       <b class="tag">Checkpoint</b>
-      It should describe your actual pending change, not a generic answer — confirming the command is really reading live repo state, not just returning canned text. Revert your throwaway edit afterward (<code>git checkout -- &lt;file&gt;</code>) if you don't want it kept.
+      You've discovered the built-in command interface. These are the "meta" commands that manage your Claude Code setup itself.
     </div>
   </div>
+
+  <div class="step">
+    <h3>Example 2: Create a Simple Custom Command</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Ask Claude to create a project-scoped custom command:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Create a project-scoped custom slash command called /git-status-summary that runs
+`git status` and then writes a plain-English summary of what files are staged,
+unstaged, and untracked. Show me the exact file you created and its location.</code></pre>
+    </div>
+
+    <p><b>What's happening:</b> Claude creates a markdown file in <code>.claude/commands/git_status_summary.md</code> with frontmatter and a prompt template. This file becomes your command.</p>
+
+    <p><b>Step 2:</b> Verify the file was created:</p>
+    <pre><code># On Mac/Linux
+ls -la .claude/commands/
+
+# On Windows (PowerShell)
+Get-ChildItem .\.claude\commands\</code></pre>
+
+    <p><b>Step 3:</b> Read the file to see its structure:</p>
+    <pre><code># On Mac/Linux
+cat .claude/commands/git_status_summary.md
+
+# On Windows (PowerShell)
+Get-Content .\.claude\commands\git_status_summary.md</code></pre>
+
+    <p><b>What you'll see:</b> A markdown file with YAML frontmatter (name, description) and a prompt template. This is exactly how custom commands work.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      The command file exists and has the right structure.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 3: Use Your Custom Command</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Make a small, harmless edit to any file (to create some git status output):</p>
+    <pre><code># On Mac/Linux
+echo "# test" >> testfile.txt
+
+# On Windows (PowerShell)
+Add-Content testfile.txt "# test"</code></pre>
+
+    <p><b>Step 2:</b> Now run your custom command:</p>
+    <pre><code>/git-status-summary</code></pre>
+
+    <p><b>What's happening:</b> Claude Code looks up your command definition, interpolates any arguments, and runs the prompt. Claude reads your actual git status and summarizes it.</p>
+
+    <p><b>What you should see:</b> A description of testfile.txt as an untracked file, not generic text — proving the command runs against live state, not a template.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      The command output reflects your actual git status, not a generic example.
+    </div>
+
+    <p><b>Step 3:</b> Clean up your test file:</p>
+    <pre><code># On Mac/Linux
+git checkout -- testfile.txt 2>/dev/null || rm testfile.txt
+
+# On Windows (PowerShell)
+git checkout -- testfile.txt -ErrorAction SilentlyContinue; if ($LASTEXITCODE -ne 0) { Remove-Item testfile.txt -ErrorAction SilentlyContinue }</code></pre>
+  </div>
+
+  <div class="step">
+    <h3>Example 4: Create a Command With Arguments</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Ask Claude to create a more advanced command that takes arguments:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Create a project-scoped custom command called /explain-function that takes one
+argument (a file path) and explains what that file does at a high level, listing
+all the main functions/classes and what they do. Show me the file location and
+explain how arguments work in custom commands.</code></pre>
+    </div>
+
+    <p><b>Step 2:</b> Verify it was created:</p>
+    <pre><code># On Mac/Linux
+cat .claude/commands/explain_function.md
+
+# On Windows (PowerShell)
+Get-Content .\.claude\commands\explain_function.md</code></pre>
+
+    <p><b>What you'll see:</b> The frontmatter should have an <code>arguments</code> field (e.g. <code>arguments: file_path</code>). The template references it with a <code>$file_path</code> placeholder — or the command may simply use <code>$ARGUMENTS</code> for the whole raw input.</p>
+
+    <p><b>Step 3:</b> Use it with an argument. Pick any Python or JS file in your project:</p>
+    <pre><code>/explain-function W2D0/capstone/app.py</code></pre>
+
+    <p><b>What's happening:</b> The <code>$file_path</code> (or <code>$ARGUMENTS</code>) placeholder gets replaced with your argument. Claude reads that file and explains it.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      The command explanation references the actual file you specified, with real functions/classes from it.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 5: Create a User-Scoped Command</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Setup:</b> This command is personal—something you want in every project, not just this one. Create it at user scope.</p>
+
+    <p><b>Step 1:</b> Ask Claude to create a user-scoped command:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Create a user-scoped custom command at ~/.claude/commands/my-quick-test.md that
+takes no arguments. It should explain what testing frameworks are in use
+(by searching package.json, requirements.txt, or similar), then offer to run
+the test suite. Show me the exact file path and explain why this is user-scoped,
+not project-scoped.</code></pre>
+    </div>
+
+    <p><b>Step 2:</b> Verify it was created in your home directory:</p>
+    <pre><code># On Mac/Linux
+ls -la ~/.claude/commands/
+
+# On Windows (PowerShell)
+Get-ChildItem $env:USERPROFILE\.claude\commands\</code></pre>
+
+    <p><b>Step 3:</b> This command is now available in every project you open. Test it:</p>
+    <pre><code>/my-quick-test</code></pre>
+
+    <p><b>What's happening:</b> Your user-scoped command loads automatically, just like your user-level CLAUDE.md. It's personal to you, not specific to this project, so it lives in your home directory.</p>
+
+    <p><b>Key difference:</b> A project-scoped command lives in <code>.claude/commands/</code> (checked into git, shared). A user-scoped command lives in <code>~/.claude/commands/</code> (personal, not shared).</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      The command file exists in your home directory, not in the project. It works in this session and will be available in every other project you open.
+    </div>
+  </div>
+
 </section>
 
 </main>

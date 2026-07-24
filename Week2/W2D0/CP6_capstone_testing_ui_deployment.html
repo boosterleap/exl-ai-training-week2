@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · Capstone Phase 6 · Testing, UI &amp; Deployment</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Capstone Phase 6 of 6 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="CP5_capstone_hitl_observability_eval.html" style="color:#cbd8ff;">← Phase 5</a></p>
+  <h1>Capstone Phase 6 — Testing, UI &amp; Deployment</h1>
+  <p>Five phases built a grounded, multi-agent, guarded, governed loan-servicing assistant. Phase 6 closes the loop: a pytest suite that gates every quality floor this project has built up, a small Streamlit review queue a real loan officer would actually click through, and a container image — packaged honestly, including the one part of this phase that could not be verified on this machine.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept: Prove it, don't just build it</h2>
+  <div class="step">
+    <h3>One suite, every floor</h3>
+    <p>Each phase set its own quality bar: Phase 1's data shape, Phase 2/3's escalation-and-citation correctness, Phase 4's injection-scanner floor, Phase 5's audit-chain integrity and the fraud case's disposition. Phase 6 doesn't invent new checks — it collects all of them into one <code>pytest</code> run with clear failure messages telling you which earlier phase's script to re-run if something's missing.</p>
+
+    <h3>A headless UI test catches what unit tests miss</h3>
+    <p>The data can be sound and the eval gate can pass and the Streamlit app can still crash on load, or a button can silently do nothing. <code>streamlit.testing.v1.AppTest</code> runs the actual app script in a simulated session — no browser, no human clicking — and asserts on real widget state: title, button count, and (this project's own real bug, caught during this build) whether a cached SQLite connection survives Streamlit's rerun threading model.</p>
+
+    <h3>Never bake a secret into an image</h3>
+    <p>The static grounding data (the dataset, the policy docs) can be baked into the image at build time — it needs network access but no credential. The live pipeline needs <code>ANTHROPIC_API_KEY</code>, and that is never baked in; it's supplied at <code>docker run</code> time and the container's entrypoint runs the pipeline once, on first start, if it hasn't already.</p>
+
+    <h3>Honesty about what got verified</h3>
+    <p>Every other reference file in this capstone was run for real and its output quoted here. The Dockerfile is the one exception on this particular authoring machine — there is no Docker daemon available here, so it follows a standard pattern (slim base image, dependency-then-code layering, non-root user, a stdlib healthcheck) but <b>has not itself been built</b>. If your VM has Docker, your build is the first real verification this Dockerfile has ever had.</p>
+  </div>
+</section>
+
+<section id="use-cases">
+  <h2>Key Learning Objectives</h2>
+  <div class="step">
+    <h3>By the end of Phase 6 — and this capstone — you will:</h3>
+    <ul>
+      <li>Consolidate every phase's quality floor into one pytest suite with actionable failure messages</li>
+      <li>Smoke-test a Streamlit app headlessly, and find (and fix) a real cross-thread SQLite bug that only a rerun-aware test surfaces</li>
+      <li>Wire a review UI to a governance layer you built two phases ago, not a mock</li>
+      <li>Package a project honestly, including saying plainly what you could not verify</li>
+      <li>Have completed a full end-to-end agentic build: grounded data → tools + RAG → multi-agent + MCP → guardrails + memory + cache → HITL + observability + eval → tests + UI + deployment</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Build the pytest suite</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Build W2D0/capstone/test_capstone.py covering, in order:
+1. loans.db shape (491 applicants, 12 live cases) -- clear message to
+   re-run seed_loans_db.py if missing
+2. exactly 4 policy docs, none for gold_loan
+3. eval_gate.run_eval() scores >= 0.90 -- message to re-run agent_loop.py
+   if outputs/draft_replies.json is missing
+4. an INDEPENDENT, always-true guarantee: every gold_loan reply has an
+   empty cited_sources list (never just folded into the overall floor)
+5. guardrails.run_injection_eval() scores >= 0.80
+6. a fresh AuditChain (not reading any file) that appends two entries,
+   verifies True, then confirms verify() goes False after mutating a past
+   entry -- must not depend on any other script having run first
+7. governance.py's approval_queue.db: LN-012 (the fraud case) has
+   status == "rejected" -- message to re-run governance.py if the db file
+   is missing
+
+Then run it for me.</code></pre>
+    </div>
+    <span class="where-tag where-vm">VM terminal</span>
+    <pre><code>"C:\Users\Asus\.venv\Scripts\python.exe" -m pytest W2D0/capstone/test_capstone.py -v</code></pre>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Build the Streamlit review UI</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Build W2D0/capstone/app.py: a Streamlit app titled "Loan officer review
+queue". Cache a governance.ApprovalQueue with @st.cache_resource and the
+outputs/draft_replies.json contents with @st.cache_data. For each row in
+the queue, show the email_id, loan_id, disposition, its drafted reply
+text, a status metric, who decided it (if anyone), and Approve/Reject
+buttons that call queue.decide(...) and st.rerun(). Handle the case where
+draft_replies.json or the queue db don't exist yet with a clear st.error
+telling me which earlier script to run.</code></pre>
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Smoke-test it headlessly, then run it for real</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Use streamlit.testing.v1.AppTest to load W2D0/capstone/app.py, run it,
+assert no exception, assert the title, and assert 2 buttons per queued
+case. Then click one Approve button and re-run, asserting still no
+exception. Show me any exception in full if one occurs.</code></pre>
+    </div>
+    <div class="callout predict">
+      <b class="tag">Predict first</b>
+      <code>governance.ApprovalQueue</code> opens its SQLite connection once, then Streamlit's testing harness caches and reruns the app. Do you expect a plain <code>sqlite3.connect(...)</code> to survive being reused across a rerun, or do you expect a specific, nameable error?
+    </div>
+    <div class="callout">
+      <b class="tag">Debrief</b>
+      It does not survive by default — the real reference build hit exactly this: <code>ProgrammingError: SQLite objects created in a thread can only be used in that same thread</code>, because Streamlit's rerun model can hand a cached resource to a different thread than the one that created it. The fix is one keyword argument, <code>sqlite3.connect(db_path, check_same_thread=False)</code> — but you only find out you need it by actually running the interaction, not by reading the code and assuming it's fine. That's the entire argument for a headless UI test over "the code looks right."
+    </div>
+
+    <div class="step-head"><span class="step-num">4</span><span class="step-title">Run it in a browser</span></div>
+    <span class="where-tag where-vm">VM terminal</span>
+    <pre><code>"C:\Users\Asus\.venv\Scripts\python.exe" -m streamlit run W2D0/capstone/app.py</code></pre>
+    <p>Open the printed local URL. You should see one card per queued case (the escalations and the fraud case from Phase 5), its drafted reply, its current status, and working Approve/Reject buttons.</p>
+
+    <div class="step-head"><span class="step-num">5</span><span class="step-title">Package it — and be honest about what you can't verify here</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Create W2D0/capstone/requirements.txt (anthropic, pandas, numpy,
+sentence-transformers, mcp, presidio-analyzer, presidio-anonymizer, spacy,
+streamlit, pytest, python-dotenv) and W2D0/capstone/Dockerfile:
+- FROM python:3.12-slim
+- install deps, then `python -m spacy download en_core_web_sm`
+- COPY data/ and RUN the seed script at build time (no API key needed for
+  that step)
+- COPY the rest of the .py files and an entrypoint.sh
+- create a non-root user, switch to it
+- EXPOSE 8501, HEALTHCHECK using a stdlib urllib call against
+  /_stcore/health (python:3.12-slim has no curl)
+- ENTRYPOINT the entrypoint script
+
+entrypoint.sh: if outputs/draft_replies.json doesn't exist yet, run
+agent_loop.py then governance.py (this needs ANTHROPIC_API_KEY passed in
+via `docker run -e`, never baked into the image), then exec streamlit run
+app.py bound to 0.0.0.0:8501.
+
+If Docker is actually available on my machine, build and run it for real
+and tell me honestly whether it worked. If it isn't, say so plainly
+instead of claiming it's verified.</code></pre>
+    </div>
+    <div class="callout instructor">
+      <b class="tag">Honesty note</b>
+      On the machine that authored this guide, there was no Docker daemon available, so the Dockerfile above was written but <b>not build-tested</b> — unlike every other file in this capstone, which was actually run and its real output quoted in these six phases. It follows a standard, defensible pattern, so there's good reason to expect it works, but "should work" and "verified" are different claims. If your environment has Docker, your build is the first real test this file has ever had — treat a failure there as the exercise working as intended, not a sign you did something wrong.
+    </div>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Verified reference run: <code>pytest -v</code> → <b>7 passed in 15.51s</b>. Headless UI smoke test: no exception, title "Loan officer review queue" renders, <b>8 buttons</b> (2 per each of the 4 queued cases), 4 status metrics matching Phase 5's queue (3 <code>approved</code>, 1 <code>rejected</code>), and a real button click round-trips cleanly after the <code>check_same_thread=False</code> fix. Docker: written to a standard pattern, honestly flagged as unbuilt on this machine.
+    </div>
+  </div>
+</section>
+
+<section id="wrap">
+  <h2>Capstone complete</h2>
+  <div class="step">
+    <p>Six phases, one real public dataset, one continuous thread: you took a real, messy 491-row loan dataset through grounded tool-use and RAG, split it into a multi-agent system served over a real network MCP protocol, hardened it with PII redaction, injection scanning, durable memory, and a semantic cache, gated every sensitive disposition behind a human-approval queue backed by a tamper-evident audit chain, watched a real eval gate score something short of perfect and understood why that's the right target, and closed with a tested UI and an honestly-packaged container. At every stage, Claude Code did the building — you directed it, read what it produced, and used the reference files only for comparison, never as a starting point to copy from.</p>
+    <p>That's the same lesson the whole of Week 2 has been making with the insurance and logistics threads, now in your own hands end to end: the skill isn't any single script, it's directing an agent through a real, multi-phase build and verifying each phase before trusting the next one. If you want to revisit any topic that fed into this capstone, <a href="00_orientation.html">the W2D0 index</a> is the place to start.</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — Capstone Phase 6: Testing, UI &amp; Deployment</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

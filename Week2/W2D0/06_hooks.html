@@ -18,56 +18,374 @@
 <main>
 
 <section id="concept">
-  <h2>Concept</h2>
+  <h2>Concept: Hooks — Deterministic Automation</h2>
   <div class="step">
-    <p>Hooks fire at named lifecycle events — <code>PreToolUse</code> (before a tool call), <code>PostToolUse</code> (after), <code>SessionStart</code>/<code>SessionEnd</code>, <code>UserPromptSubmit</code>, <code>Stop</code>/<code>SubagentStop</code> — and run a script you define, deterministically, every time. They're configured in <code>.claude/settings.json</code>.</p>
-    <ul class="concept-list">
-      <li><b>Pre vs. post.</b> A <code>PreToolUse</code> hook can inspect — and block — a call before it happens. A <code>PostToolUse</code> hook runs after, with the real result in hand: good for logging, redaction, or validating shape.</li>
-      <li><b>Why a hook beats "just ask the model nicely."</b> A prompt instruction can be forgotten under context pressure. A hook runs every single time, unconditionally — the same reliability argument behind every guardrail in Week 2.</li>
+    <h3>The Big Picture</h3>
+    <p>A <b>hook</b> is code that Claude Code runs automatically at specific lifecycle events. Example events:</p>
+    <ul>
+      <li><code>PreToolUse</code> — Before any tool is called (Read, Edit, Bash, etc.)</li>
+      <li><code>PostToolUse</code> — After any tool completes</li>
+      <li><code>SessionStart</code> / <code>SessionEnd</code> — When a session begins or ends</li>
+      <li><code>UserPromptSubmit</code> — When you press enter to submit a prompt</li>
+      <li><code>Stop</code> / <code>SubagentStop</code> — When Claude stops generating or a subagent finishes</li>
+      <li><code>PostToolBatch</code> — After a batch of parallel tool calls all resolve (this project's real <code>.claude/settings.json</code> uses this one to print a token-usage summary)</li>
     </ul>
+    <p>These aren't the only events — Claude Code also has hooks for session-lifecycle edges, subagent start, file/config changes, and more — but the ones above are the ones you'll reach for most often.</p>
+
+    <p><b>Key point:</b> Hooks are deterministic. They run every time, unconditionally. No human judgment, no context pressure — just code that executes.</p>
+
+    <h3>PreToolUse vs. PostToolUse</h3>
+    <p><b>PreToolUse:</b> Runs before the tool call happens. You have the tool name and parameters, but no result yet. Good for:</p>
+    <ul>
+      <li>Blocking dangerous commands (e.g., "don't allow `rm -rf`")</li>
+      <li>Logging what tools are about to be called</li>
+      <li>Validating parameters before execution</li>
+      <li>Adding metadata or context to the call</li>
+    </ul>
+
+    <p><b>PostToolUse:</b> Runs after the tool completes and you have the actual result. Good for:</p>
+    <ul>
+      <li>Logging what happened (with actual results)</li>
+      <li>Redacting sensitive information from results</li>
+      <li>Validating the result shape or contents</li>
+      <li>Augmenting the result (adding context, timestamps)</li>
+      <li>Triggering side effects (saving to database, alerting)</li>
+    </ul>
+
+    <h3>Hook Configuration in settings.json</h3>
+    <p>Hooks are defined in <code>.claude/settings.json</code>. Each event name maps to an array of <b>matcher groups</b>, and each matcher group runs one or more <b>hook handlers</b>:</p>
+    <pre><code>{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/pre_tool_hook.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          { "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/post_tool_hook.sh" }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.sh" }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/validate_prompt.sh" }
+        ]
+      }
+    ]
+  }
+}</code></pre>
+
+    <p>For each level:</p>
+    <ul>
+      <li><code>matcher</code> — Filters which occurrences of the event trigger this group. For tool events this is a tool name (or regex, e.g. <code>"Edit|Write"</code> or <code>"mcp__.*"</code>); leave it <code>""</code> (or omit) to match every occurrence. This project's real <code>.claude/settings.json</code> uses exactly this shape — see the <code>PreToolUse</code> → <code>matcher: "Bash"</code> entry there.</li>
+      <li><code>hooks</code> — An array of handlers to run for that matcher. The most common <code>type</code> is <code>"command"</code>, which runs a shell command; other types (<code>http</code>, <code>mcp_tool</code>, <code>prompt</code>, <code>agent</code>) exist for more advanced setups.</li>
+      <li><code>command</code> — The shell command or script to execute. <code>${CLAUDE_PROJECT_DIR}</code> expands to the project root so the path works regardless of your current directory.</li>
+    </ul>
+    <p><b>How blocking actually works:</b> there's no <code>onFailure</code> setting. A command hook communicates its decision through its <b>exit code</b> and, optionally, JSON printed to stdout:</p>
+    <ul>
+      <li>Exit <code>0</code> — success; if the script printed JSON to stdout, Claude Code parses it for an explicit decision, otherwise execution just continues.</li>
+      <li>Exit <code>2</code> — blocking error; stderr is treated as the reason and the action is blocked (only <code>PreToolUse</code>, <code>UserPromptSubmit</code>, <code>Stop</code>, and <code>SubagentStop</code> can actually block this way — <code>PostToolUse</code>/<code>SessionStart</code>/<code>SessionEnd</code> cannot, since the tool has already run or there's no action to stop).</li>
+      <li>Any other exit code — non-blocking error; the transcript shows the hook failed, but execution continues.</li>
+    </ul>
+    <p>For <code>PreToolUse</code> specifically, a script can instead print structured JSON like <code>{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "..."}}</code> to deny (or allow) the call with a reason, instead of relying on the exit code.</p>
+    <p><b>How hooks receive data:</b> command hooks get a JSON payload on <b>stdin</b> — not CLI arguments and not custom environment variables — containing fields like <code>session_id</code>, <code>hook_event_name</code>, and (for tool events) <code>tool_name</code>/<code>tool_input</code>. A script reads it with something like <code>jq -r '.tool_input.command' &lt; /dev/stdin</code>. The only environment variables Claude Code itself sets for hooks are things like <code>CLAUDE_PROJECT_DIR</code> (project root) — always prefer stdin JSON for tool call details.</p>
+
+    <h3>Real-World Hook Examples</h3>
+    <table>
+      <tr>
+        <th>Hook Type</th>
+        <th>Example Use</th>
+        <th>What It Does</th>
+      </tr>
+      <tr>
+        <td>PreToolUse</td>
+        <td>Prevent accidental deletion</td>
+        <td>Block any Bash command with "rm -rf" before it runs</td>
+      </tr>
+      <tr>
+        <td>PreToolUse</td>
+        <td>Audit tool usage</td>
+        <td>Log every tool call with timestamp and parameters</td>
+      </tr>
+      <tr>
+        <td>PostToolUse</td>
+        <td>Redact secrets</td>
+        <td>Remove API keys and passwords from tool results before Claude sees them</td>
+      </tr>
+      <tr>
+        <td>PostToolUse</td>
+        <td>Trace analysis</td>
+        <td>After file reads, store them in a local trace database</td>
+      </tr>
+      <tr>
+        <td>SessionStart</td>
+        <td>Setup automation</td>
+        <td>Activate a Python virtual environment before the session starts</td>
+      </tr>
+      <tr>
+        <td>UserPromptSubmit</td>
+        <td>Input validation</td>
+        <td>Check that prompts don't contain accidental secrets before submitting</td>
+      </tr>
+    </table>
+
+    <h3>Hook Lifecycle Diagram</h3>
+    <pre><code>User submits prompt
+    ↓
+UserPromptSubmit hook (if defined)
+    ↓
+Claude generates and prepares a tool call
+    ↓
+PreToolUse hook (if defined) — can BLOCK here
+    ↓
+Tool executes
+    ↓
+PostToolUse hook (if defined) — can redact results
+    ↓
+Claude receives result and continues</code></pre>
+  </div>
+</section>
+
+<section id="use-cases">
+  <h2>Real-World Use Cases</h2>
+  <div class="step">
+    <h3>1. Audit and Compliance Logging</h3>
+    <p><b>The problem:</b> You're in a regulated industry. You need a complete audit trail: who ran what tools, when, with what inputs and outputs.</p>
+    <p><b>The solution:</b> A <code>PreToolUse</code> hook that logs every tool call (tool name, parameters, timestamp) to a file. A <code>PostToolUse</code> hook that logs the result (status, result size).</p>
+    <p><b>The result:</b> Complete, deterministic audit log. No human judgment, no missing entries. Compliance requirement satisfied.</p>
+
+    <h3>2. Secret Redaction</h3>
+    <p><b>The problem:</b> A developer accidentally includes an API key in a config file. When Claude reads it, the key shows up in the chat and potentially in logs.</p>
+    <p><b>The solution:</b> A <code>PostToolUse</code> hook that scans all Read results for patterns that look like secrets (AWS keys, tokens, passwords) and redacts them before Claude sees them.</p>
+    <p><b>The result:</b> Secrets are never exposed. Claude sees "[REDACTED]" instead of actual keys.</p>
+
+    <h3>3. Dangerous Command Protection</h3>
+    <p><b>The problem:</b> `rm -rf /` is one mistake away. You want a safety net.</p>
+    <p><b>The solution:</b> A <code>PreToolUse</code> hook that blocks any Bash command matching dangerous patterns (rm -rf, > /dev/sda, DROP TABLE, etc.) before execution.</p>
+    <p><b>The result:</b> Catastrophic mistakes are prevented. Claude can propose anything, but the hook enforces the safety boundary.</p>
+
+    <h3>4. Automatic Testing Before Every Commit</h3>
+    <p><b>The problem:</b> Code gets committed without running tests. Broken tests reach CI/CD, wasting time.</p>
+    <p><b>The solution:</b> A <code>UserPromptSubmit</code> hook that, if your prompt mentions "commit," automatically runs your test suite before proceeding. If tests fail, block the commit.</p>
+    <p><b>The result:</b> Tests run automatically before any commit suggestion. You can't accidentally skip testing.</p>
+
+    <h3>5. Environment Setup and Cleanup</h3>
+    <p><b>The problem:</b> Each session needs to activate a Python venv, load environment variables, connect to a database. Manual setup is error-prone.</p>
+    <p><b>The solution:</b> A <code>SessionStart</code> hook that runs setup.sh (activates venv, loads .env, checks database connection). A <code>SessionEnd</code> hook that cleans up (closes DB, saves logs).</p>
+    <p><b>The result:</b> Setup and cleanup happen automatically every session. No manual steps. No forgotten cleanup.</p>
   </div>
 </section>
 
 <section id="handson">
-  <h2>Hands-on</h2>
+  <h2>Hands-on Practice: Five Examples</h2>
+
   <div class="step">
-    <div class="step-head"><span class="step-num">1</span><span class="step-title">Add a real <code>PreToolUse</code> logging hook</span></div>
+    <h3>Example 1: Create a Simple Logging Hook</h3>
     <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Ask Claude to add a PreToolUse logging hook:</p>
     <div class="prompt-box">
       <div class="prompt-label">Prompt</div>
-      <pre><code>Add a PreToolUse hook in .claude/settings.json that appends a one-line
-JSON log entry (timestamp, tool name) to W2D0/outputs/tool_log.jsonl every
-time any tool is about to be called. Show me the hook config and the small
-script it runs.</code></pre>
+      <pre><code>Add a PreToolUse hook to .claude/settings.json that logs every tool call.
+Create a simple script that appends a JSON line to W2D0/outputs/tool_calls.jsonl
+with format: {timestamp: "ISO8601", tool: "ToolName", action: "pre_use"}.
+
+Show me the hook config and the script.</code></pre>
     </div>
-    <p>Trigger a couple of tool calls (e.g. read any file), then check:</p>
-    <pre><code>cat W2D0/outputs/tool_log.jsonl</code></pre>
+
+    <p><b>Step 2:</b> Make sure the output directory exists:</p>
+    <pre><code># On Mac/Linux
+mkdir -p W2D0/outputs
+
+# On Windows (PowerShell)
+New-Item -ItemType Directory -Path W2D0\outputs -Force</code></pre>
+
+    <p><b>Step 3:</b> Trigger a tool call to activate the hook. Ask Claude to read a file:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Read the CLAUDE.md file and tell me the first three bullet points you see.</code></pre>
+    </div>
+
+    <p><b>Step 4:</b> Check the log file:</p>
+    <pre><code># On Mac/Linux
+cat W2D0/outputs/tool_calls.jsonl
+
+# On Windows (PowerShell)
+Get-Content W2D0\outputs\tool_calls.jsonl</code></pre>
+
+    <p><b>What you should see:</b> A JSON line with your Read tool call logged, including timestamp and tool name.</p>
+
     <div class="checkpoint">
       <b class="tag">Checkpoint</b>
-      Real entries, one per tool call, written without you doing anything except using Claude Code normally.
-    </div>
-
-    <div class="step-head"><span class="step-num">2</span><span class="step-title"><code>PostToolUse</code>, for contrast</span></div>
-    <div class="prompt-box">
-      <div class="prompt-label">Prompt</div>
-      <pre><code>Now add a PostToolUse hook that, specifically for Read calls, appends how
-many characters were read to the same log line. Trigger it and show me the
-difference from the Pre-only entries above.</code></pre>
-    </div>
-    <div class="callout">
-      <b class="tag">Debrief</b>
-      <code>PreToolUse</code> ran before the result existed — good for deciding <i>whether</i> a call happens. <code>PostToolUse</code> ran after, with real data — good for what you do with what came back. This is exactly what powers Week 2 Day 4's local trace analyzer.
-    </div>
-
-    <div class="step-head"><span class="step-num">3</span><span class="step-title">A blocking hook</span></div>
-    <div class="prompt-box">
-      <div class="prompt-label">Prompt</div>
-      <pre><code>Add one more PreToolUse hook that BLOCKS any Bash command containing the
-string "rm -rf" outright, before it runs. Try to trigger it with a
-deliberately scary (but never-actually-run) example command and confirm it
-gets refused.</code></pre>
+      The hook ran deterministically, without you asking for it. Every tool call is logged.
     </div>
   </div>
+
+  <div class="step">
+    <h3>Example 2: Add a PostToolUse Hook</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Ask Claude to add a complementary PostToolUse hook:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Add a PostToolUse hook to .claude/settings.json that, for Read tool results,
+appends additional data: {action: "post_use", tool: "Read", result_size_chars: 1234, success: true}.
+Show me the hook config and script.</code></pre>
+    </div>
+
+    <p><b>Step 2:</b> Trigger another Read call to activate this hook:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Read the file W2D0/03_slash_commands.html and count how many lines it has.</code></pre>
+    </div>
+
+    <p><b>Step 3:</b> Check the log again:</p>
+    <pre><code># On Mac/Linux
+tail -5 W2D0/outputs/tool_calls.jsonl
+
+# On Windows (PowerShell)
+Get-Content W2D0\outputs\tool_calls.jsonl | Select-Object -Last 5</code></pre>
+
+    <p><b>What you should see:</b> Now you have both PreToolUse and PostToolUse entries, showing the before and after of the Read call.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You've seen both pre (before execution) and post (with results) hooks working together.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 3: A Blocking Hook</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Create a safety hook that blocks dangerous commands:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Add a PreToolUse hook to .claude/settings.json that BLOCKS any Bash command
+containing "rm -rf". The hook should read the tool_input.command field from
+its JSON stdin payload and, if that pattern is found, exit with code 2 (or
+print a permissionDecision: "deny" JSON response) so the command is actually
+blocked instead of just logged.
+
+Show me the hook config and script.</code></pre>
+    </div>
+
+    <p><b>Step 2:</b> Try to trigger the blocking hook with a safe command first:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Run this bash command to list files: ls W2D0/</code></pre>
+    </div>
+
+    <p><b>What should happen:</b> The ls command runs normally. The hook checks for "rm -rf," doesn't find it, and lets the command proceed.</p>
+
+    <p><b>Step 3:</b> Now try with the dangerous command:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Run this bash command: rm -rf W2D0/ (don't worry, it won't actually run because of our hook)</code></pre>
+    </div>
+
+    <p><b>What should happen:</b> Claude generates the command, but the hook intercepts it. The command never executes. You should get a message about the hook blocking execution.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      The hook deterministically blocked a dangerous command. The safety boundary is enforced by code, not human judgment.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 4: Secret Redaction Hook</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Create a file with a fake secret:</p>
+    <pre><code># On Mac/Linux
+echo "API_KEY=sk_live_abc123def456" > W2D0/.env.test
+
+# On Windows (PowerShell)
+Add-Content W2D0\.env.test "API_KEY=sk_live_abc123def456"</code></pre>
+
+    <p><b>Step 2:</b> Add a PostToolUse hook that redacts secrets:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Add a PostToolUse hook for Read results that redacts API keys. If a result
+contains patterns like "sk_live_", "BEGIN RSA", "password=", or similar,
+replace them with "[REDACTED_API_KEY]" or "[REDACTED_PASSWORD]".
+
+Show me the hook config and script.</code></pre>
+    </div>
+
+    <p><b>Step 3:</b> Read the file with the secret:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Read the file W2D0/.env.test and tell me what's inside.</code></pre>
+    </div>
+
+    <p><b>What you should see:</b> Claude's response shows "[REDACTED]" or similar, not the actual API key. The hook caught and redacted it.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Secrets are redacted automatically. You can safely read sensitive files—the hook protects them.
+    </div>
+
+    <p><b>Step 4:</b> Clean up:</p>
+    <pre><code># On Mac/Linux
+rm W2D0/.env.test
+
+# On Windows (PowerShell)
+Remove-Item W2D0\.env.test -ErrorAction SilentlyContinue</code></pre>
+  </div>
+
+  <div class="step">
+    <h3>Example 5: SessionStart Hook</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Create a SessionStart hook that validates the environment:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Add a SessionStart hook to .claude/settings.json that:
+1. Checks that git is installed
+2. Checks that we're in a git repository
+3. Verifies the Python venv is available (if one exists)
+4. Logs the session start time to W2D0/outputs/session.log
+
+Show me the hook config and script.</code></pre>
+    </div>
+
+    <p><b>Step 2:</b> The hook has likely already run (it fires at session start). Check the session log:</p>
+    <pre><code># On Mac/Linux
+cat W2D0/outputs/session.log 2>/dev/null || echo "No session log yet"
+
+# On Windows (PowerShell)
+Test-Path W2D0\outputs\session.log; if ($?) { Get-Content W2D0\outputs\session.log } else { Write-Host "No session log yet" }</code></pre>
+
+    <p><b>What you should see:</b> A log entry with the session start time and environment checks. This ran automatically when the session started.</p>
+
+    <p><b>Key insight:</b> SessionStart hooks are useful for setup that should happen once per session, automatically, without user intervention. Logging environment setup, health checks, permission verification — all good candidates.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      SessionStart hook ran automatically when you started this session.
+    </div>
+  </div>
+
 </section>
 
 </main>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · Capstone Phase 3 · Multi-Agent &amp; MCP</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Capstone Phase 3 of 6 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="CP2_capstone_agentic_tools_and_rag.html" style="color:#cbd8ff;">← Phase 2</a> · <a href="CP4_capstone_guardrails_memory_cache.html" style="color:#cbd8ff;">Phase 4 →</a></p>
+  <h1>Capstone Phase 3 — Multi-Agent Systems &amp; MCP</h1>
+  <p>Phase 2 built one agent that does everything: read the email, call two tools, draft a reply. Phase 3 splits that into two roles — a cheap intake/classifier subagent and the underwriting subagent from Phase 2 — coordinated by an orchestrator, and moves the two grounding tools off in-process function calls onto a real network MCP server, the same upgrade path Day 2 PM takes with the insurance thread's claims lookup.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept: Splitting roles, and a real network MCP server</h2>
+  <div class="step">
+    <h3>Why split the single agent into two subagents</h3>
+    <p>Phase 2's agent did classification and grounded drafting in one loop. That's fine at 12 emails, but it conflates two different jobs with two different cost/latency profiles: classification is a single cheap structured call (which category, which <code>Loan_ID</code>), while grounded drafting is a multi-turn tool-use loop. Splitting them lets an orchestrator route work — and lets you see, concretely, where each role succeeds or fails independently.</p>
+
+    <h3>From in-process import to a real MCP server</h3>
+    <p>Phase 2 called <code>get_loan_record</code>/<code>search_policy</code> as plain Python functions in the same process. Phase 3 exposes the same two functions over <b>Streamable HTTP</b> — a standalone service on its own port, the same pattern as <code>W2D2/my_claims_network_server.py</code>. This is the actual Day 2 PM upgrade: Day 1 wires an MCP server Claude Code launches itself (stdio, in-process); Day 2 PM makes it a real network service other clients — including a second machine — could call.</p>
+
+    <h3>A second safety layer, independent of classification</h3>
+    <p>The underwriting subagent's grounding check (<code>grounding_available</code>) doesn't depend on the intake subagent getting the category right. Even if intake mislabels an email's <i>intent</i>, the underwriting subagent still looks up the actual <code>Loan_ID</code>, still checks whether a policy document exists for that product, and still escalates on <code>gold_loan</code> regardless of what category label got attached upstream. That independence is deliberate — worth confirming with real, imperfect classifier output rather than a hand-picked clean run.</p>
+  </div>
+</section>
+
+<section id="use-cases">
+  <h2>Key Learning Objectives</h2>
+  <div class="step">
+    <h3>By the end of Phase 3, you will:</h3>
+    <ul>
+      <li>Split a single agent into two subagents with distinct responsibilities and prompts</li>
+      <li>Build an orchestrator that routes between them and records both outputs</li>
+      <li>Move a tool surface from in-process calls to a real Streamable HTTP MCP server</li>
+      <li>Verify, with a genuinely imperfect classifier, that a downstream safety check doesn't depend on an upstream classification being correct</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Move the two tools onto a network MCP server</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Build W2D0/capstone/mcp_loan_server.py: a FastMCP Streamable HTTP server
+(mirror W2D2/my_claims_network_server.py's structure exactly) exposing two
+tools that wrap the functions in W2D0/capstone/tools.py:
+- get_loan_record_tool(loan_id: str)
+- search_policy_tool(query: str, product: str | None = None, k: int = 3)
+
+host 127.0.0.1, port 8770, path /mcp, json_response=True,
+stateless_http=True. Add a --self-check CLI flag that calls the
+underlying functions directly (not through the MCP transport) for one
+grounded loan and one gold_loan, plus one product-scoped search, and
+prints the result as JSON -- so I can verify the logic without needing a
+live MCP client.</code></pre>
+    </div>
+    <span class="where-tag where-vm">VM terminal</span>
+    <pre><code>"C:\Users\Asus\.venv\Scripts\python.exe" W2D0/capstone/mcp_loan_server.py --self-check</code></pre>
+    <p>Then start it for real in a separate terminal and confirm it's actually listening on the network (not just self-check):</p>
+    <pre><code>"C:\Users\Asus\.venv\Scripts\python.exe" W2D0/capstone/mcp_loan_server.py
+# separate terminal:
+curl -i http://127.0.0.1:8770/mcp</code></pre>
+    <p>A bare <code>curl</code> GET isn't a real MCP client, so expect <b>406 Not Acceptable</b> rather than a 404/connection-refused — that response code is itself the confirmation: something real is listening and enforcing the Streamable HTTP protocol's content-negotiation rules, not silently accepting anything.</p>
+    <p>To exercise it as a real client, point Claude Code's own <code>.mcp.json</code> at it (same shape as this repo's root <code>.mcp.json</code>, which already configures the insurance-thread <code>policy-search</code> server) and ask Claude Code directly to look up a loan through the tool — that live round trip through the actual MCP protocol is the equivalent of Day 2 PM's manual verification step.</p>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Build the intake/classifier subagent + orchestrator</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Build W2D0/capstone/multiagent.py: an orchestrator with two subagent roles.
+
+Intake/classifier subagent: one Claude API call per email, forced to call
+a "classify_email" tool (tool_choice forcing it) with input_schema
+{loan_id: string, category: enum[status_inquiry, rate_query,
+rejection_appeal, document_submission, fraud_escalation]}. System prompt:
+extract only, don't answer the customer's question.
+
+Underwriting subagent: reuse Phase 2's process_email exactly (import it
+from agent_loop.py) -- don't duplicate that logic.
+
+Orchestrator: for every row in inbound_emails.csv, run the classifier,
+compare its category and loan_id against the CSV's ground-truth columns,
+then call the underwriting subagent using the CLASSIFIER's extracted
+loan_id (not the CSV ground truth -- this is the real handoff). Save
+everything to outputs/multiagent_results.json and print, per email,
+classifier category vs ground truth, loan_id match, and the underwriting
+subagent's escalated flag. At the end print overall classifier category
+accuracy and loan_id extraction accuracy out of 12.</code></pre>
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Predict, then run against the real API</span></div>
+    <div class="callout predict">
+      <b class="tag">Predict first</b>
+      Two of the twelve emails don't obviously state their own category in the text — <code>LN-005</code> asks about "approval criteria" for an application that's under review (is that a status question or a rate/eligibility question?), and <code>LN-012</code> just says the case was "flagged for extra review" without ever using the word "fraud." Do you expect the classifier to get both of these right?
+    </div>
+    <span class="where-tag where-vm">VM terminal — real, billed API calls (24 total: 12 classifications + 12 underwriting runs)</span>
+    <pre><code>"C:\Users\Asus\.venv\Scripts\python.exe" W2D0/capstone/multiagent.py</code></pre>
+    <div class="callout">
+      <b class="tag">Debrief</b>
+      The verified reference run scored <b>10/12</b> on category — it missed exactly those two ambiguous cases (<code>LN-005</code> called <code>status_inquiry</code> instead of <code>rate_query</code>; <code>LN-012</code> called <code>status_inquiry</code> instead of <code>fraud_escalation</code>, since the email body genuinely never says "fraud"). Both misses are defensible given what's actually in the email text — the ground-truth label encodes internal knowledge the customer's own words don't carry. The important result is what <i>didn't</i> break: the underwriting subagent still correctly escalated all three <code>gold_loan</code>/gap cases (<code>LN-004</code>, <code>LN-005</code>, <code>LN-012</code>) regardless of the classifier's label, because its escalation check runs off <code>grounding_available</code>, not off the intake category.
+    </div>
+
+    <div class="step-head"><span class="step-num">4</span><span class="step-title">Confirm loan_id extraction independently</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <p>Ask Claude Code why <code>loan_id</code> extraction scored differently from <code>category</code> classification in this run (12/12 vs 10/12) — the answer should point at the difference between a fact literally printed in the email body (the <code>Loan_ID</code> string) versus an inferred label (the customer's underlying intent).</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Verified reference run: intake classifier scored <b>10/12</b> on category and <b>12/12</b> on <code>Loan_ID</code> extraction. All <b>3</b> <code>gold_loan</code> cases were still correctly escalated by the underwriting subagent despite two of them being classifier-mislabeled upstream. <code>mcp_loan_server.py --self-check</code> returns <code>grounding_available: true</code> for a documented product and <code>false</code> for <code>gold_loan</code>; the live server responds <code>406</code> to a bare <code>curl</code> GET, confirming it's a real Streamable HTTP endpoint.
+    </div>
+  </div>
+
+  <p>Next: Phase 4 adds guardrails (PII redaction, prompt-injection scanning) in front of this pipeline, plus durable per-<code>Loan_ID</code> session memory and a semantic cache over policy search.</p>
+
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>A tested version is at <a href="capstone_ref/mcp_loan_server.py">capstone_ref/mcp_loan_server.py</a> and <a href="capstone_ref/multiagent.py">capstone_ref/multiagent.py</a> — verified end to end against the numbers above (real API run, real live server). Use it to compare, not as the first attempt.</p>
+  </details>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — Capstone Phase 3: Multi-Agent Systems &amp; MCP</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

@@ -12,7 +12,7 @@
 <header class="hero">
   <p class="eyebrow">Week 2 · Day 3 · Applied Build Lab (16:00–20:00)</p>
   <h1>Memory, real-time data &amp; cost — durable sessions, a live webhook, and a cache that catches paraphrases</h1>
-  <p>Everything runs locally against services already live on the VM: SQLite session persistence, a real FastAPI webhook, and diskcache/Redis-backed caching. No API key anywhere today.</p>
+  <p>Everything runs locally against services already live on the VM: SQLite session persistence, a real FastAPI webhook, and diskcache/Redis-backed caching. No API (Application Programming Interface) key anywhere today.</p>
   <div class="thread-badges">
     <span class="thread-badge insurance">Insurance — primary build, all six topics</span>
     <span class="thread-badge homework">Logistics — point the webhook at delay_events.jsonl as homework</span>
@@ -65,7 +65,7 @@ python -c "import redis; r = redis.Redis(); print('redis ping:', r.ping())"</cod
 <h2 id="topic-01">Topic 01 · Layered agent memory, revisited</h2>
 <div class="step">
   <div class="step-head"><span class="step-num">1</span><span class="step-title">Session persistence, and where 2026 memory APIs fit</span><span class="step-time">~25 min</span></div>
-  <p><b>Concept.</b> Day 1 covered the four memory layers conceptually; Day 2 covered durable LangGraph checkpointing for HITL. Today's version: the same SQLite-checkpoint mechanism, applied specifically to remembering a customer's session across multiple separate interactions — episodic memory (this specific customer's history) as distinct from semantic memory (general facts, like policy terms). 2026 memory APIs (Mem0 and similar, installed in <code>ai_agent_env</code> as <code>mem0ai</code>) typically extract and manage this automatically — but they need their own LLM backend to do the extraction, which is why we're building the SQLite version ourselves this week instead of relying on Mem0 out of the box.</p>
+  <p><b>Concept.</b> Day 1 covered the four memory layers conceptually; Day 2 covered durable LangGraph checkpointing for HITL (Human-In-The-Loop). Today's version: the same SQLite-checkpoint mechanism, applied specifically to remembering a customer's session across multiple separate interactions — episodic memory (this specific customer's history) as distinct from semantic memory (general facts, like policy terms). 2026 memory APIs (Mem0 and similar, installed in <code>ai_agent_env</code> as <code>mem0ai</code>) typically extract and manage this automatically — but they need their own LLM (Large Language Model) backend to do the extraction, which is why we're building the SQLite version ourselves this week instead of relying on Mem0 out of the box.</p>
   <figure class="concept-figure">
     <img src="images/d3pm_t1_layered_memory.png" alt="Layered memory for governed sessions: temporary working memory versus bounded, retained episodic memory, semantic memory, and external artifacts, all looked up via a stable session key and passing through a governance rail (typed, attributed, retained, permissioned) before feeding a governed decision">
     <figcaption>A session key looks up the retained layers — it isn't the memory itself.</figcaption>
@@ -165,7 +165,7 @@ required_chunk_ids field our simpler eval doesn't use.</code></pre>
   </div>
   <div class="callout instructor">
     <b class="tag">Debrief</b>
-    Have Claude Code connect this webhook conceptually to Day 1's <code>delay_events.jsonl</code> fixture — the same shape of event, this time arriving live over HTTP instead of being read from a static file.
+    Have Claude Code connect this webhook conceptually to Day 1's <code>delay_events.jsonl</code> fixture — the same shape of event, this time arriving live over HTTP (Hypertext Transfer Protocol) instead of being read from a static file.
   </div>
 
   <p><b>Learners repeat.</b> Send a webhook call with a <i>different</i> <code>event_id</code> and confirm it's processed as new, not treated as a duplicate — the idempotency key has to be specific, not just "any repeated POST."</p>
@@ -251,7 +251,7 @@ loose a threshold?</code></pre>
   <p><b>Learners repeat.</b> Restore the threshold to 0.85, then test two of your own query pairs (one true paraphrase, one superficially-similar-but-different question) and confirm the cache handles both correctly.</p>
 </div>
 
-<h2 id="topic-06">Topic 06 · MDM &amp; the data value chain</h2>
+<h2 id="topic-06">Topic 06 · MDM (Master Data Management) &amp; the data value chain</h2>
 <div class="step">
   <div class="step-head"><span class="step-num">6</span><span class="step-title">Stable IDs, carried through everything built this week</span><span class="step-time">~20 min</span></div>
   <p><b>Concept.</b> Master data management is the unglamorous baseline that makes all of this trustworthy: <code>claim_id</code>, <code>policy_id</code>, <code>order_id</code> have to mean exactly one thing, consistently, across the lookup tool, the retrieval index, the graph, the cache, and the webhook — not five slightly different representations that happen to share a name.</p>
@@ -281,7 +281,7 @@ and show me the combined report.</code></pre>
 
 <section id="appbuild">
   <h2>App build (19:00–19:30) · Day 3 of the progressive insurance app</h2>
-  <p>Days 1–2 only checked <i>whether</i> a policy document exists for a claim's product. Today's increment makes the app actually answer the coverage question — RAG search over the indexed policy corpus (Topic 02), a cache in front of it (Topic 05), and a fraud-connection signal from the claims graph, all wired into the same <code>resolve_email</code> pipeline you've been extending since Day 1.</p>
+  <p>Days 1–2 only checked <i>whether</i> a policy document exists for a claim's product. Today's increment makes the app actually answer the coverage question — RAG (Retrieval-Augmented Generation) search over the indexed policy corpus (Topic 02), a cache in front of it (Topic 05), and a fraud-connection signal from the claims graph, all wired into the same <code>resolve_email</code> pipeline you've been extending since Day 1.</p>
 
   <div class="step">
     <div class="step-head"><span class="step-num">App</span><span class="step-title">Extend your Day 2 file into a Day 3 version</span><span class="step-time">~15 min</span></div>

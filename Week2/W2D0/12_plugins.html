@@ -17,43 +17,115 @@
 <main>
 
 <section id="concept">
-  <h2>Concept</h2>
+  <h2>Concept: Plugins — Packaged Extensions</h2>
   <div class="step">
-    <p>A plugin bundles skills, commands, agents, and hooks into one installable, shareable unit — instead of hand-copying config files between machines or teammates, you install (or others install) the plugin.</p>
-    <ul class="concept-list">
-      <li><b>Where they come from.</b> Marketplaces (<code>claude plugin marketplace</code>) host installable plugins; you can also scaffold your own locally.</li>
-      <li><b>Why this matters for a team.</b> Everything you built in Topics 03–06 (a custom command, a subagent, a hook) could become one shared plugin instead of four separate manual setup steps for every new teammate.</li>
+    <h3>The Big Picture</h3>
+    <p>A plugin bundles together everything you've built so far (skills, commands, agents, hooks, even MCP server definitions) into one installable unit. Instead of each teammate manually copying `.claude/` files, they run <code>claude plugin install my-awesome-plugin</code> and get everything.</p>
+
+    <h3>Why Plugins Matter</h3>
+    <ul>
+      <li><b>Shareable expertise:</b> You've built a great code-review skill. Instead of explaining how to set it up, distribute it as a plugin.</li>
+      <li><b>Team onboarding:</b> New teammate joins. Install three plugins, and they have all your team's conventions, commands, and tools. No manual setup.</li>
+      <li><b>Version control:</b> Plugin versions are tracked. When you improve a skill, bump the version. Teams can upgrade when ready.</li>
+      <li><b>Distribution:</b> Share publicly via marketplace, or privately within your org.</li>
+    </ul>
+
+    <h3>Plugin Structure</h3>
+    <p>The manifest lives inside a <code>.claude-plugin/</code> folder, but every component folder (<code>skills/</code>, <code>commands/</code>, <code>agents/</code>, <code>hooks/</code>) sits at the plugin root, not inside <code>.claude-plugin/</code>. Each skill keeps the same folder-per-skill + <code>SKILL.md</code> convention as standalone skills (Topic 04) &mdash; just nested one level deeper under <code>skills/</code>:</p>
+    <pre><code>my-plugin/
+├── .claude-plugin/
+│   └── plugin.json     # Metadata: name, version, description
+├── skills/              # Skills (from Topic 04) — one folder per skill
+│   └── code-review/
+│       └── SKILL.md
+├── commands/            # Commands (from Topic 03) — flat .md files, no per-command folder
+│   └── deploy.md
+├── agents/              # Subagent specs (from Topic 05)
+└── hooks/               # Hook scripts (from Topic 06)
+    └── hooks.json</code></pre>
+
+    <h3>Installation Sources</h3>
+    <ul>
+      <li><b>Public marketplace:</b> `claude plugin install name@marketplace-name` (e.g. `claude plugin install formatter@claude-plugins-official`) — official plugins</li>
+      <li><b>GitHub (or any git host):</b> two steps — register the marketplace, then install a plugin from it: `claude plugin marketplace add user/repo` followed by `claude plugin install plugin-name@repo`</li>
+      <li><b>Local (development/testing, no install step):</b> `claude --plugin-dir ./path/to/plugin`</li>
     </ul>
   </div>
 </section>
 
-<section id="handson">
-  <h2>Hands-on</h2>
+<section id="use-cases">
+  <h2>Real-World Use Cases</h2>
   <div class="step">
-    <div class="step-head"><span class="step-num">1</span><span class="step-title">See what's installed</span></div>
-    <span class="where-tag where-vm">VM · terminal</span>
-    <pre><code>claude plugin list
-claude plugin marketplace --help</code></pre>
+    <h3>1. Team Onboarding at Scale</h3>
+    <p><b>The problem:</b> Your team has 10 engineers. Each needs to install 3 tools, learn 5 custom commands, understand 2 subagents. Manual setup takes 4 hours per person.</p>
+    <p><b>The solution:</b> One plugin bundles it all. Onboarding is `claude plugin install my-team-toolkit`.</p>
+    <p><b>The result:</b> 30 minutes of setup instead of 4 hours per person. Scaling works.</p>
 
-    <div class="step-head"><span class="step-num">2</span><span class="step-title">Scaffold your own</span></div>
-    <span class="where-tag where-claude">Claude Code chat panel or terminal</span>
-    <pre><code>claude plugin init w2d0-demo-plugin</code></pre>
-    <p>This scaffolds a new plugin at <code>~/.claude/skills/w2d0-demo-plugin/</code>. Ask Claude Code to explain the scaffolded structure:</p>
-    <div class="prompt-box">
-      <div class="prompt-label">Prompt</div>
-      <pre><code>Look at what claude plugin init just scaffolded. Explain each file's
-purpose, and tell me how you'd add the /summarize-changes command from
-Topic 03 into this plugin instead of leaving it as a standalone project
-command.</code></pre>
-    </div>
+    <h3>2. Publish Expertise Publicly</h3>
+    <p><b>The problem:</b> You've built an amazing test-generation skill. Other teams would love it but don't know about it.</p>
+    <p><b>The solution:</b> Publish it as a plugin on the Claude Code marketplace.</p>
+    <p><b>The result:</b> Your tool helps the broader community. You gain recognition for the contribution.</p>
+
+    <h3>3. Compliance and Standards</h3>
+    <p><b>The problem:</b> Your company has security standards (linting rules, audit hooks, policy checks) that must apply everywhere.</p>
+    <p><b>The solution:</b> Corporate plugin with hooks that enforce these standards automatically.</p>
+    <p><b>The result:</b> Every Claude Code session, everywhere in your org, enforces compliance.</p>
+
+    <h3>4. Industry-Specific Tools</h3>
+    <p><b>The problem:</b> You work in fintech. You've built tools for PII redaction, regulatory checks, audit trails.</p>
+    <p><b>The solution:</b> Package as a fintech plugin. Other fintech companies can install and use.</p>
+    <p><b>The result:</b> Your tools become a distributed best practice in your industry.</p>
+
+    <h3>5. Local Development Environment Consistency</h3>
+    <p><b>The problem:</b> Different developers have different setups. One uses Haiku, one uses Opus. One has hooks, one doesn't.</p>
+    <p><b>The solution:</b> Dev environment plugin that sets up standard config for everyone.</p>
+    <p><b>The result:</b> Consistent behavior across the team. No surprises when code changes hands.</p>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on Practice: Two Examples</h2>
+
+  <div class="step">
+    <h3>Example 1: List Installed Plugins</h3>
+    <span class="where-tag where-vm">Terminal/PowerShell</span>
+
+    <p><b>Step 1:</b> Check what's currently installed:</p>
+    <pre><code>claude plugin list</code></pre>
+
+    <p><b>What you'll see:</b> List of installed plugins (if any). Initially likely empty.</p>
+
     <div class="checkpoint">
       <b class="tag">Checkpoint</b>
-      You should be able to name which of Topics 03–06's artifacts (command, subagent, hook) could move into this plugin, and why bundling them helps a teammate who's never seen this repo before.
+      You know the command to view plugins.
     </div>
-
-    <div class="step-head"><span class="step-num">3</span><span class="step-title">Validate it</span></div>
-    <pre><code>claude plugin validate ~/.claude/skills/w2d0-demo-plugin</code></pre>
   </div>
+
+  <div class="step">
+    <h3>Example 2: Scaffold Your Own Plugin</h3>
+    <span class="where-tag where-vm">Terminal/PowerShell</span>
+
+    <p><b>Step 1:</b> Create a plugin scaffold:</p>
+    <pre><code>claude plugin init w2d0-test-plugin</code></pre>
+
+    <p><b>Step 2:</b> Explore the structure Claude created. Note: <code>claude plugin init</code> scaffolds into your skills directory, not a <code>plugins/</code> folder:</p>
+    <pre><code># On Mac/Linux
+find ~/.claude/skills/w2d0-test-plugin -type f
+
+# On Windows (PowerShell)
+Get-ChildItem $env:USERPROFILE\.claude\skills\w2d0-test-plugin -Recurse</code></pre>
+
+    <p><b>Step 3:</b> Validate the plugin:</p>
+    <pre><code>claude plugin validate ~/.claude/skills/w2d0-test-plugin</code></pre>
+
+    <p><b>What you should see:</b> "Valid" status indicating the plugin is correctly structured.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You've created and validated a plugin. You could add skills, commands, and agents to it.
+    </div>
+  </div>
+
 </section>
 
 </main>

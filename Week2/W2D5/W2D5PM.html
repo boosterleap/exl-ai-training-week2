@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D5 PM · Delivery Excellence, Governance &amp; Capstone</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">Week 2 · Day 5 · Applied Build Lab (16:00–20:00)</p>
+  <h1>Delivery excellence, governance &amp; capstone — the week closes with a real audit chain, a real autonomy check, and your own brief</h1>
+  <p>A tamper-evident audit log you can actually break and catch, a governance matrix checked against real risk-tier data, and a capstone brief that reuses this week's real build — not a hypothetical one.</p>
+  <div class="thread-badges">
+    <span class="thread-badge insurance">Insurance — primary, feeds the capstone brief</span>
+    <span class="thread-badge homework">Logistics — optional second capstone angle</span>
+  </div>
+  <div class="timing-strip">
+    <span class="timing-chip">16:00–16:05 bridge</span>
+    <span class="timing-chip">16:05–17:45 topics 01–03</span>
+    <span class="timing-chip">17:45–17:55 break</span>
+    <span class="timing-chip">17:55–19:00 topics 04–06</span>
+    <span class="timing-chip">19:00–19:30 app build</span>
+    <span class="timing-chip">19:30–20:00 MCQ (Multiple-Choice Questions) assessment (demo + written)</span>
+  </div>
+</header>
+
+<nav class="page-nav" aria-label="Session sections">
+  <a href="#bridge">Bridge</a>
+  <a href="#topics-01-03">01 PoC pitfalls</a>
+  <a href="#topic-02">02 Governance</a>
+  <a href="#topic-03">03 Regulatory</a>
+  <a href="#topics-04-06">04 Consulting</a>
+  <a href="#topic-05">05 Capstone</a>
+  <a href="#topic-06">06 Specialisation</a>
+  <a href="#appbuild">App build</a>
+</nav>
+
+<main>
+
+<section id="bridge">
+  <h2>Bridge (16:00–16:05)</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">0</span><span class="step-title">Governance fixture check</span><span class="step-time">5 min</span></div>
+    <span class="where-tag where-vm">VM · VS Code terminal</span>
+    <pre><code>conda activate ai_agent_env
+python -c "import json; print(len(json.load(open('data/governance/use_case_risk_tiers.json'))['use_cases']), 'use cases loaded')"</code></pre>
+  </div>
+</section>
+
+<section id="topics-01-03">
+<h2 id="topic-01">Topic 01 · From PoC (Proof of Concept) to production</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">1</span><span class="step-title">Readiness gates and a real tamper-evident audit chain</span><span class="step-time">~30 min</span></div>
+  <p><b>Concept.</b> Common pitfalls that keep a PoC from becoming production: over-automation (no human in the loop for consequential actions), weak evals (Day 4's whole session existed to close this gap), no guardrails, and cost blow-ups. What separates the roughly 57% of organizations now running agents in production that actually work is usually not a smarter model — it's these unglamorous controls, all things you've built this week.</p>
+  <figure class="concept-figure">
+    <img src="images/d5pm_t1_poc_production_pitfalls.png" alt="Six sequential readiness gates between a working PoC and an operated service -- named ownership, evaluation plus failure budget, observability plus security, cost and capacity controls, and rollback plus audit evidence -- any 'no' stops and remediates, while passing all six appends to an append-only, hash-chained audit trail">
+    <figcaption>Readiness is six gates, not one demo.</figcaption>
+  </figure>
+
+  <p><b>Run it together, variation A — the chain as shipped.</b> <span class="where-tag where-vm">VS Code terminal</span>:</p>
+  <pre><code>uv run python W2D5/snippets/audit_chain.py</code></pre>
+  <p>You should see <code>chain valid before tamper: True</code> then <code>chain valid after tamper: False</code>.</p>
+
+  <p><b>Run it together, variation B — readiness gates, for contrast.</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Score our week's insurance assistant against 5 production-readiness
+gates: (1) guardrails in place? (2) evals with a quality floor? (3)
+approval-gated writes? (4) durable HITL checkpoints? (5) an audit trail?
+For each, cite the SPECIFIC thing we built this week as evidence, or say
+honestly "not built" if it isn't there.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    This should come back mostly "built," with specific evidence for each — a satisfying, honest capstone-week moment, not a marketing claim.
+  </div>
+
+  <p><b>Learners repeat.</b> Try tampering with a different (later) entry in the chain and confirm verification still correctly catches it.</p>
+</div>
+
+<h2 id="topic-02">Topic 02 · Responsible-AI governance for agents</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">2</span><span class="step-title">Autonomy that decreases as consequence rises</span><span class="step-time">~25 min</span></div>
+  <p><b>Concept.</b> Meaningful human oversight scales inversely with risk: low-tier use cases can act with light oversight, high-tier ones (regulated, safety, employment, credit, or otherwise consequential) stay at "recommend" or "human_decides," never full autonomy — a dial you turn down as consequence goes up, not a fixed setting.</p>
+  <figure class="concept-figure">
+    <img src="images/d5pm_t2_responsible_ai_governance.png" alt="Governance loop: define the use case, assess its consequence, set an autonomy limit that ranges from assist-and-log for lower consequence to no-autonomous-decision for higher consequence, assign human oversight with an appeal path, capture audit evidence, then monitor and feed new evidence back into reassessing consequence">
+    <figcaption>Autonomy is a dial, tied to consequence.</figcaption>
+  </figure>
+
+  <p><b>Run it together, variation A — the matrix as shipped.</b> <span class="where-tag where-vm">VS Code terminal</span>:</p>
+  <pre><code>uv run python W2D5/snippets/autonomy_matrix.py</code></pre>
+  <p>All 5 real use cases should show <code>OK</code> — the fixture is deliberately well-designed.</p>
+
+  <p><b>Run it together, variation B — inject a violation, for contrast.</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Add a 6th use case to a scratch copy of use_case_risk_tiers.json:
+{"id": "auto-payout", "name": "Automatic high-value payout", "tier":
+"high", "autonomy": "act"}. Re-run autonomy_matrix.py against the scratch
+copy. Confirm it correctly FLAGs this one, and explain in one sentence
+why "act" is wrong for a high-tier use case.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    This is deliberately the kind of use case a well-meaning team might actually propose ("payouts are slow, let's automate them") — the matrix exists to catch exactly this instinct before it ships.
+  </div>
+
+  <p><b>Learners repeat.</b> Have Claude Code produce a short "governed model/agent card" for our insurance assistant: name, tier, autonomy level, and the controls in place.</p>
+</div>
+
+<h2 id="topic-03">Topic 03 · Regulatory fit in 2026</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">3</span><span class="step-title">EU (European Union) AI Act, India's DPDP (Digital Personal Data Protection) Act, NIST (National Institute of Standards and Technology) AI RMF (Risk Management Framework), ISO (International Organization for Standardization)/IEC (International Electrotechnical Commission) 42001 — as engineering questions</span><span class="step-time">~25 min</span></div>
+  <p><b>Concept.</b> The EU AI Act's Annex III high-risk categories (with Digital Omnibus deferral to December 2027) and Article 50 transparency duties, India's DPDP Act, NIST's AI RMF, and ISO/IEC 42001 all converge on the same engineering asks this week already answers: can you explain a decision, can you audit it, can a human override it, is personal data handled lawfully. Extraterritorial reach matters directly for India-based delivery to EU clients.</p>
+  <figure class="concept-figure">
+    <img src="images/d5pm_t3_regulatory_fit.png" alt="Regulatory-fit discovery worksheet: four question columns -- people and sector, jurisdiction and impact, data and explanation, retention and appeal -- feed into documenting open questions and proposing controls, which then require qualified legal review; the worksheet supports that review, it is not legal advice itself">
+    <figcaption>A worksheet for the lawyer, not a verdict from the agent.</figcaption>
+  </figure>
+
+  <p><b>Instructor drives live.</b> <span class="where-tag where-claude">Claude Code chat panel</span> — turn regulation into engineering questions, not legal advice:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>For our insurance claims-triage use case (tier: high, per the governance
+matrix), list the concrete engineering questions a legal/compliance
+reviewer would ask under (a) EU AI Act high-risk obligations and (b)
+India's DPDP Act, IF this system were serving EU or Indian customers.
+For each question, name which of this week's actual controls would
+answer it (or admit if none does yet).</code></pre>
+  </div>
+  <div class="callout danger">
+    <b class="tag">Scope note</b>
+    This is engineering discovery, not legal advice — the output is a worksheet for a real legal/compliance reviewer, not a compliance determination Claude Code (or you) can make.
+  </div>
+
+  <p><b>Learners repeat.</b> Name the one control gap from this exercise you'd prioritize closing first if this were a real EU-facing deployment.</p>
+</div>
+</section>
+
+<section id="topics-04-06">
+<h2 id="topic-04">Topic 04 · Solution consulting</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">4</span><span class="step-title">A scope contract with testable acceptance criteria</span><span class="step-time">~20 min</span></div>
+  <p><b>Concept.</b> Discovery, scoping, stakeholder alignment, and build-vs-buy all converge on one deliverable: a scope contract that excludes unsafe autonomy up front and makes acceptance testable — not "the client will know it when they see it."</p>
+  <figure class="concept-figure">
+    <img src="images/d5pm_t4_solution_consulting.png" alt="Solution-consulting flow: a broad request runs through a discovery canvas covering users and owners, outcome and acceptance, sources and data boundary, exclusions, delivery stages, and risks and assumptions, producing an agreed bounded scope and staged delivery -- unmet acceptance criteria trigger a re-scope with the owner rather than silent scope creep">
+    <figcaption>Every broad request earns a bounded, testable scope first.</figcaption>
+  </figure>
+
+  <p><b>Instructor drives live.</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Write a one-page scope contract for extending our insurance assistant to
+a new client. Include: in-scope capabilities, explicitly EXCLUDED
+autonomy (name what it may never do without a human), and 3 testable
+acceptance criteria (each one something we could actually run and check,
+like today's autonomy_matrix.py did).</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    Each acceptance criterion should be checkable the way this week's evals were — a pass/fail test, not a vague quality bar.
+  </div>
+
+  <p><b>Learners repeat.</b> Add one more explicitly-excluded capability to the contract.</p>
+</div>
+
+<h2 id="topic-05">Topic 05 · Capstone framing</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">5</span><span class="step-title">Frame a real use case, validated against this week's own controls</span><span class="step-time">~35 min</span></div>
+  <p><b>Concept.</b> A capstone brief needs a real industry problem, defined success metrics, and an eval plan — and it should be rejected if it's missing any of: a truth source, an eval, write controls, or a rollback plan. That's not a bureaucratic checklist — it's exactly the shape of what you built this week.</p>
+  <figure class="concept-figure">
+    <img src="images/d5pm_t5_capstone_framing.png" alt="Capstone framing: a measurable operator outcome must clear a required proof panel -- offline demo, typed boundary, evaluation set, governance controls, and rollback plan -- before the complete evidence becomes a capstone brief; an incomplete or invalid brief sends you back to fix gaps early rather than building the demo first">
+    <figcaption>Validate the outcome before you build the demo.</figcaption>
+  </figure>
+
+  <p><b>Build it together, variation A — draft the brief.</b> <span class="where-tag where-claude">Claude Code chat panel</span> — this is the week's culminating artifact:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Write a one-page capstone brief for our insurance ticket-resolution
+assistant: the problem, the truth source (data/insurance/policies/ +
+claims.db), the eval plan (reference Day 4's trajectory/injection evals
+and their quality floors), the write controls (Day 2's HITL checkpoint),
+the rollback plan, and this morning's ROI numbers. Pull real specifics
+from this week's actual work throughout, not generic placeholders.</code></pre>
+  </div>
+
+  <p><b>Validate it, variation B — the rejection check, for contrast.</b></p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Now audit your own brief: does it name a truth source, an eval with a
+number, a write control, AND a rollback plan? If any is missing or vague,
+say so honestly and fix it before calling the brief done.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    A brief that cites real artifacts (a specific file, a specific eval score, a specific checkpoint mechanism) is fundamentally different from one that describes intentions — the whole week's discipline shows up here or it doesn't.
+  </div>
+
+  <p><b>Learners repeat.</b> Save the finished brief — you'll reference it in the closing assessment.</p>
+</div>
+
+<h2 id="topic-06">Topic 06 · Specialisation preview</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">6</span><span class="step-title">Four lanes, one handoff card that preserves this week's controls</span><span class="step-time">~15 min</span></div>
+  <p><b>Concept.</b> Week 3 branches into the DM (Data Management) track and three DE (Digital Engineering) tracks — AI Engineering/GenAI, Agentic CX (Customer Experience), and Low-Code/No-Code. Whichever lane you head into, the controls from this week (grounding, guardrails, approval gates, evals) need to travel with you, not get left behind as "Week 2 stuff."</p>
+  <figure class="concept-figure">
+    <img src="images/d5pm_t6_specialisation_preview.png" alt="Specialisation preview: whichever domain lane (insurance, banking, logistics) and role you choose, a common safety contract -- grounded facts, typed outputs, permissioned writes, audit evidence, human escalation -- must underpin the data boundary and skills backlog before reaching a first evidence milestone">
+    <figcaption>Whichever lane, this week's controls travel with you.</figcaption>
+  </figure>
+
+  <p><b>Instructor drives live.</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>For each of the four Week 3 lanes (DM, AI Engineering/GenAI, Agentic CX,
+Low-Code/No-Code), name ONE thing from this week that would matter most
+in that lane specifically. Then produce a short "handoff card": what
+must NOT be lost regardless of which lane a learner picks (name the
+specific controls, not a generic "keep doing guardrails").</code></pre>
+  </div>
+
+  <p><b>Learners repeat.</b> Pick the lane you're most drawn to and name the one skill from this week you'd want to go deeper on there.</p>
+</div>
+</section>
+
+<section id="appbuild">
+  <h2>App build — capstone (19:00–19:30) · Day 5 of the progressive insurance app</h2>
+  <p>This is the last increment of the pipeline you've built one PM slot at a time across all five days — Day 1's grounded lookup, Day 2's triage/authorization handoff, Day 3's RAG (Retrieval-Augmented Generation) grounding and fraud signal, Day 4's injection scan and PII (Personally Identifiable Information) redaction. Today adds governance on top: every call gated against a real risk tier before it's allowed to run, every decision written to a tamper-evident audit chain — then, for the first time, you run the complete pipeline against the whole inbox in one shot.</p>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">App</span><span class="step-title">Extend your Day 4 file: a real governance gate, a real audit chain</span><span class="step-time">~18 min</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <p>Direct Claude Code to build a new file that imports and extends your own Day 4 file — do not overwrite anything under <code>app/</code>:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Create app/my_day5_resolve.py that imports resolve_email from my
+Day 4 file (app/my_day4_resolve.py) and wraps it with two things:
+
+1. A governance gate. Before any lookup runs, read
+   data/governance/use_case_risk_tiers.json, find the "claims-triage"
+   use case, and check its declared autonomy against its risk tier
+   (tier "high" should never exceed "recommend" autonomy). If the check
+   ever fails, refuse to run at all rather than proceeding anyway.
+2. A persisted, tamper-evident audit chain. For every resolve_email
+   call, append an event (email_id, claim_id, escalate, injection_blocked,
+   fraud flag, autonomy level) to a hash chain where each entry's hash
+   incorporates the previous entry's hash, so mutating any past entry
+   breaks verification. Persist it to a JSONL file so it survives across
+   runs, and add a verify() method. Attach audit_record_hash and
+   audit_chain_valid to each result.
+
+Also add resolve_all() that runs every row in data/insurance/fnol_emails.csv
+through my_day5_resolve.resolve_email and returns a summary: total,
+grounded_replies, escalated, injection_blocked, audit_chain_valid,
+audit_entries.</code></pre>
+    </div>
+    <p>Then check the governance entry and a single-claim run directly:</p>
+    <span class="where-tag where-vm">VM terminal</span>
+    <pre><code>uv run python -m app.my_day5_resolve CLN-001</code></pre>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">App</span><span class="step-title">The capstone moment: run the whole 12-email inbox end to end</span><span class="step-time">~10 min</span></div>
+    <p>This is the payoff of the whole week, not just today's slot: every email in the real inbox, through the complete Day 1–5 pipeline, in one call.</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Run resolve_all() from app/my_day5_resolve.py and print the summary as
+JSON. Then tell me honestly whether it matches this reference summary,
+field by field, and explain any difference:
+{"total": 12, "grounded_replies": 8, "escalated": 4,
+"injection_blocked": 0, "audit_chain_valid": true, "audit_entries": 12}</code></pre>
+    </div>
+  </div>
+
+  <div class="checkpoint">
+    <b class="tag">Checkpoint</b>
+    <code>uv run python -m app.autonomy_check</code> shows the real <code>claims-triage</code> entry as tier <code>high</code>, autonomy <code>recommend</code> (never <code>act</code>), correctly within bounds — <code>day5_resolve.py</code> gates every call against this exact entry and refuses to run at all if a declared autonomy ever exceeded what its tier allows. A single-claim run (<code>uv run python -m app.day5_resolve CLN-001</code>) adds a real sha256 <code>audit_record_hash</code> and <code>audit_chain_valid: true</code> to the result. The chain's own tamper demo (<code>uv run python -m app.audit_chain</code>) shows <code>chain valid before tamper: True</code>, then, after directly mutating a past entry's event data, <code>chain valid after tamper: False</code> — append-only by construction, not convention, because each entry's hash incorporates the previous entry's hash. The full-inbox run (<code>uv run python -m app.day5_resolve --resolve-all</code>) reports <code>{"total": 12, "grounded_replies": 8, "escalated": 4, "injection_blocked": 0, "audit_chain_valid": true, "audit_entries": 12}</code>. One honest closing bug: the claims knowledge graph fixture (<code>data/insurance/claims_kg.json</code>) only covers a demo subset of claims, not every claim in <code>claims.db</code> — running the fraud-signal check against a claim outside that subset originally crashed with a <code>NetworkXError</code>. The fix made <code>graph_signals.py</code> treat "claim not in the graph" as "no signal available" (return <code>None</code>/<code>[]</code>), not a crash — the same "escalate/no-answer beats a fabricated or crashed answer" instinct this whole course teaches, just applied to code robustness instead of a policy answer.
+    <p>That's the end of the progressive app: the pipeline built incrementally across Days 1–5 — grounded lookup, triage handoff, RAG grounding, guardrails, and now governance and audit — is complete, tested, guarded, and audited.</p>
+  </div>
+
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>A complete, tested version is at <a href="../app/day5_resolve.py"><code>app/day5_resolve.py</code></a>, <a href="../app/audit_chain.py"><code>app/audit_chain.py</code></a>, and <a href="../app/autonomy_check.py"><code>app/autonomy_check.py</code></a> — verified against all the numbers above, including the full <code>resolve_all()</code> summary. Use it to compare after you've built your own, not as the first attempt.</p>
+  </details>
+</section>
+
+</main>
+
+<footer class="page-footer">Week 2 · Day 5 PM · Claude Code edition — delivery excellence, governance &amp; capstone, insurance thread primary</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

@@ -12,7 +12,7 @@
 <header class="hero">
   <p class="eyebrow">Week 2 · Day 2 · Concept Exploration (11:00–15:00)</p>
   <h1>Frameworks, scaffolding &amp; orchestration patterns — Claude Code's own primitives, exercised directly</h1>
-  <p>Isolation (subagents), lifecycle hooks, and human-in-the-loop checkpoints are all real, runnable features of what's already open in front of you. Reliability patterns run against deliberately-flaky local mocks — no API key needed anywhere today.</p>
+  <p>Isolation (subagents), lifecycle hooks, and human-in-the-loop checkpoints are all real, runnable features of what's already open in front of you. Reliability patterns run against deliberately-flaky local mocks — no API (Application Programming Interface) key needed anywhere today.</p>
   <div class="thread-badges">
     <span class="thread-badge insurance">Insurance — primary, all six topics</span>
     <span class="thread-badge logistics">Logistics — quick transfer check at the end</span>
@@ -56,7 +56,7 @@ python -c "from langgraph.checkpoint.sqlite import SqliteSaver; print('sqlite ch
         <pre><code>conda activate ai_agent_env
 uv pip install langgraph-checkpoint-sqlite
 python -c "from langgraph.checkpoint.sqlite import SqliteSaver; print('ok now')"</code></pre>
-        <p>This only needs to happen once per VM — if it already imported cleanly above, skip this.</p>
+        <p>This only needs to happen once per VM (Virtual Machine) — if it already imported cleanly above, skip this.</p>
       </div>
     </details>
     <div class="callout">
@@ -69,11 +69,11 @@ python -c "from langgraph.checkpoint.sqlite import SqliteSaver; print('ok now')"
 <section id="topics-01-03">
 <h2 id="topic-01">Topic 01 · The 2026 framework landscape</h2>
 <div class="step">
-  <div class="step-head"><span class="step-num">1</span><span class="step-title">LangGraph, Claude Agent SDK, CrewAI, OpenAI Agents SDK, Google ADK, Microsoft Agent Framework</span><span class="step-time">~35 min</span></div>
+  <div class="step-head"><span class="step-num">1</span><span class="step-title">LangGraph, Claude Agent SDK (Software Development Kit), CrewAI, OpenAI Agents SDK, Google ADK (Agent Development Kit), Microsoft Agent Framework</span><span class="step-time">~35 min</span></div>
   <p><b>Concept.</b> LangGraph models an agent as an explicit graph of states and transitions with durable checkpointing — it's in production at Klarna, Uber, LinkedIn, BlackRock, and JPMorgan. Claude Agent SDK (what Claude Code itself runs on) gives skills/subagents/hooks/permissions as first-class primitives. CrewAI organizes work as role-based crews of agents with defined tasks. OpenAI Agents SDK, Google ADK, and Microsoft Agent Framework are the other major 2026 options, each with their own take on the same core loop.</p>
   <ul class="concept-list">
     <li><b>What "framework" actually buys you.</b> Every one of these still runs perceive/reason/act/observe underneath. The difference is how much of the state management, tool orchestration, and multi-agent coordination is handled for you vs. left for you to write — that's the real axis to evaluate on, not "which one is smartest."</li>
-    <li><b>Why this matters for a hiring/build decision.</b> LangGraph's explicit graph state is valuable when you need durable, resumable, auditable workflows (this week's HITL topic depends on exactly that). CrewAI's role-based framing is valuable when the task naturally decomposes into named specialist roles. Claude Agent SDK is valuable when the coding-agent-style isolation spectrum (skills → subagents → teams) fits your task shape.</li>
+    <li><b>Why this matters for a hiring/build decision.</b> LangGraph's explicit graph state is valuable when you need durable, resumable, auditable workflows (this week's HITL (Human-In-The-Loop) topic depends on exactly that). CrewAI's role-based framing is valuable when the task naturally decomposes into named specialist roles. Claude Agent SDK is valuable when the coding-agent-style isolation spectrum (skills → subagents → teams) fits your task shape.</li>
     <li><b>Ecosystem maturity is also a real input.</b> Production references, community size, and documentation depth (LangGraph's named production users, for instance) reduce real delivery risk beyond the raw feature list.</li>
   </ul>
   <figure class="concept-figure">
@@ -82,9 +82,9 @@ python -c "from langgraph.checkpoint.sqlite import SqliteSaver; print('ok now')"
   </figure>
 
   <details class="setup-guide">
-    <summary><span class="setup-tag gcp">GCP setup</span> Google ADK + Vertex AI (learner hands-on this cohort)</summary>
+    <summary><span class="setup-tag gcp">GCP (Google Cloud Platform) setup</span> Google ADK + Vertex AI (learner hands-on this cohort)</summary>
     <div class="setup-body">
-      <p class="freshness">Current as of July 2026 — Google rebranded the Vertex AI console area to the <b>Gemini Enterprise Agent Platform</b> in April 2026 (Cloud Next '26); the underlying APIs (<code>aiplatform.googleapis.com</code>), ADC auth model, and <code>google-adk</code> package are unchanged, only the console navigation label moved. Claude models are now also available directly in Vertex/Gemini Enterprise Model Garden alongside Gemini — interesting context; AWS Bedrock (this afternoon's Topic 4) remains the one Claude-model call, so you can compare a Claude-native path against Vertex's Gemini path with hands-on experience on both.</p>
+      <p class="freshness">Current as of July 2026 — Google rebranded the Vertex AI console area to the <b>Gemini Enterprise Agent Platform</b> in April 2026 (Cloud Next '26); the underlying APIs (<code>aiplatform.googleapis.com</code>), ADC (Application Default Credentials) auth model, and <code>google-adk</code> package are unchanged, only the console navigation label moved. Claude models are now also available directly in Vertex/Gemini Enterprise Model Garden alongside Gemini — interesting context; AWS (Amazon Web Services) Bedrock (this afternoon's Topic 4) remains the one Claude-model call, so you can compare a Claude-native path against Vertex's Gemini path with hands-on experience on both.</p>
         <figure class="concept-figure">
           <img src="images/d2am_primer_google_adk.png" alt="Google ADK primer: a user's request flows through a Runner that orchestrates the session, to an Agent that reasons and picks tools/model, backed by Session State and Memory side stores, with an Evaluation/Tracing layer capturing metrics, traces, and quality across the whole flow">
           <figcaption>ADK's Runner sits between the user and the Agent, managing session state and callbacks either side.</figcaption>
@@ -110,8 +110,8 @@ python -c "from langgraph.checkpoint.sqlite import SqliteSaver; print('ok now')"
         <h4>What you do (every learner, in your own Azure sandbox)</h4>
         <ol>
           <li>In the Azure portal, create your own standalone Azure OpenAI S0 resource (Basics: your assigned subscription/resource group, an allowed region, S0 tier; Network: All networks; Tags: none). <b>Verified live: this does not auto-deploy a model</b> — you still need the next step.</li>
-          <li>Deploy a model via Azure CLI (<code>az cognitiveservices account list-models</code>, then <code>account deployment create</code> with <code>--sku-name GlobalStandard</code> — the classic portal's Deployments blade is unreliable/missing on some resources, so CLI is the documented path now). Pick a <code>GenerallyAvailable</code>, not <code>Deprecating</code>, model.</li>
-          <li>Read your resource's endpoint and API key off its <b>Keys and Endpoint</b> blade, and export them plus the deployment name (the one you chose in <code>--deployment-name</code>, not anything from a Resource Group "Deployments" list — that's an unrelated ARM history entry) directly in the shell (never a file).</li>
+          <li>Deploy a model via Azure CLI (Command-Line Interface) (<code>az cognitiveservices account list-models</code>, then <code>account deployment create</code> with <code>--sku-name GlobalStandard</code> — the classic portal's Deployments blade is unreliable/missing on some resources, so CLI is the documented path now). Pick a <code>GenerallyAvailable</code>, not <code>Deprecating</code>, model.</li>
+          <li>Read your resource's endpoint and API key off its <b>Keys and Endpoint</b> blade, and export them plus the deployment name (the one you chose in <code>--deployment-name</code>, not anything from a Resource Group "Deployments" list — that's an unrelated ARM (Azure Resource Manager) history entry) directly in the shell (never a file).</li>
           <li>Ask Claude Code to run <code>W2D2/snippets/azure_openai_verify.py</code> — the script reads your three environment variables and makes one bounded chat-completions call; no Entra/CLI auth needed for this call itself (CLI was only needed to create the deployment).</li>
         </ol>
         <p>Full step-by-step, including the verification code, expected result, and what it confirms: <a href="../VM-Clouds/_AZURE_SANDBOX_SETUP.html">VM-Clouds/_AZURE_SANDBOX_SETUP.html</a>.</p>
@@ -157,7 +157,7 @@ and show me the output.</code></pre>
 <h2 id="topic-02">Topic 02 · Scaffold effect on reliability</h2>
 <div class="step">
   <div class="step-head"><span class="step-num">2</span><span class="step-title">Same model, wildly different results depending on the scaffold around it</span><span class="step-time">~35 min</span></div>
-  <p><b>Concept.</b> The same underlying model can swing by a huge margin on a benchmark like GAIA purely based on the scaffold wrapped around it — planning discipline, evidence checks, retry logic. Architecture, not just the model, drives reliability.</p>
+  <p><b>Concept.</b> The same underlying model can swing by a huge margin on a benchmark like GAIA (General AI Assistants) purely based on the scaffold wrapped around it — planning discipline, evidence checks, retry logic. Architecture, not just the model, drives reliability.</p>
   <ul class="concept-list">
     <li><b>What "scaffold" concretely means here.</b> The explicit rules you put around the model: does it have to cite evidence before answering? Does it retry once if uncertain? Is there a hard stop on tool-call count? Each of those is a scaffold decision, independent of which model you're using.</li>
     <li><b>Where this bites in practice.</b> A weak scaffold on a genuinely hard case doesn't usually fail loudly — it fails by confidently giving a plausible-but-wrong answer, exactly like Day 1's ungrounded-claim failure mode.</li>

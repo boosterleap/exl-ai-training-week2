@@ -18,46 +18,215 @@
 <main>
 
 <section id="concept">
-  <h2>Concept</h2>
+  <h2>Concept: GitHub Operations Through <code>gh</code> CLI</h2>
   <div class="step">
-    <p>Claude Code doesn't need a special GitHub integration — <code>gh</code>, the official GitHub CLI, is just another command it can run. If <code>gh auth status</code> shows you're logged in, Claude Code can read issues/PRs, open new ones, comment, and run reviews, all through normal Bash calls it already knows how to make.</p>
-    <ul class="concept-list">
-      <li><b>Read operations are always safe to explore freely</b> — listing issues/PRs, viewing a diff, checking CI status. <b>Write operations (creating an issue/PR, commenting, merging) are real and visible to your team</b> — treat them the way Week 2 treats any irreversible action: confirm the exact content before it goes out.</li>
-      <li><b>This is exactly the "actions visible to others" category</b> from how you should generally work with any agent — an opened issue or a pushed PR is not private scratch work.</li>
+    <h3>The Big Picture</h3>
+    <p>GitHub automation in Claude Code is straightforward: <code>gh</code> (the official GitHub CLI) is just another command Claude can run. If you're logged in with <code>gh auth login</code>, Claude Code can read PRs, list issues, create issues, comment, run reviews — all through Bash calls.</p>
+
+    <p><b>No special integration needed for this workflow.</b> It's the same Bash tool you use for anything else — as long as you're logged in via <code>gh auth login</code>, Claude just runs <code>gh</code> commands like any other shell command.</p>
+
+    <p><b>Note — a separate, dedicated integration also exists.</b> Anthropic ships an official GitHub App/Action (<code>anthropics/claude-code-action</code>, installed with <code>/install-github-app</code> from the Claude Code terminal) that lets Claude respond to <code>@claude</code> mentions directly on GitHub issues/PRs and run as a CI job. That's a different mode from what this page covers — it's for triggering Claude *from* GitHub events, not for driving <code>gh</code> interactively from your terminal session. For the read/write patterns below (an active Claude Code session calling <code>gh</code> via Bash), the "no special integration" framing holds.</p>
+
+    <h3>Read vs. Write Operations</h3>
+    <p><b>Read operations</b> (safe to explore):</p>
+    <ul>
+      <li>List issues/PRs with filters</li>
+      <li>View a PR diff and code review</li>
+      <li>Check CI status and test results</li>
+      <li>Read issue comments and discussions</li>
     </ul>
+
+    <p><b>Write operations</b> (visible to your team, require approval):</p>
+    <ul>
+      <li>Create an issue or PR</li>
+      <li>Add a comment to an existing issue/PR</li>
+      <li>Approve a PR or request changes</li>
+      <li>Merge a PR</li>
+      <li>Close/open issues</li>
+    </ul>
+
+    <p><b>Key point:</b> Write operations are public and permanent. Before Claude runs <code>gh issue create</code> or <code>gh pr create</code>, always:
+    1. Have it draft the content (title, body, description)</li>
+    2. Review it carefully</li>
+    3. Explicitly approve before it posts</li>
+    </p>
+
+    <h3>Common <code>gh</code> Commands</h3>
+    <table>
+      <tr>
+        <th>Command</th>
+        <th>What It Does</th>
+      </tr>
+      <tr>
+        <td><code>gh auth status</code></td>
+        <td>Check if you're logged in</td>
+      </tr>
+      <tr>
+        <td><code>gh issue list</code></td>
+        <td>List all open issues</td>
+      </tr>
+      <tr>
+        <td><code>gh issue list --search "label:bug"</code></td>
+        <td>List issues with a specific label</td>
+      </tr>
+      <tr>
+        <td><code>gh issue create --title "T" --body "B"</code></td>
+        <td>Create a new issue</td>
+      </tr>
+      <tr>
+        <td><code>gh pr list</code></td>
+        <td>List all open pull requests</td>
+      </tr>
+      <tr>
+        <td><code>gh pr view 42</code></td>
+        <td>View PR #42 details</td>
+      </tr>
+      <tr>
+        <td><code>gh pr diff 42</code></td>
+        <td>View the code changes in PR #42</td>
+      </tr>
+      <tr>
+        <td><code>gh pr review 42 --comment -b "feedback"</code></td>
+        <td>Comment on PR #42</td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<section id="use-cases">
+  <h2>Real-World Use Cases</h2>
+  <div class="step">
+    <h3>1. Automated Issue Triage</h3>
+    <p><b>The problem:</b> Your repo gets 50 new issues per week. Many are duplicates, outdated, or missing details. Manual triage takes hours.</p>
+    <p><b>The solution:</b> Claude Code reads all open issues, identifies duplicates, checks if they're stale (no updates in 6 months), and adds labels/comments suggesting closure or requesting more info.</p>
+    <p><b>The result:</b> Issues are pre-triaged. Your team spends time on real work, not administrative sorting.</p>
+
+    <h3>2. Automated Code Review</h3>
+    <p><b>The problem:</b> Every PR needs a review before merging. Review checklists are long and tedious (style, security, tests, documentation).</p>
+    <p><b>The solution:</b> Claude Code reads the PR diff and automatically checks against your review checklist. It leaves detailed comments on the PR with findings.</p>
+    <p><b>The result:</b> First-pass code review is automated. Maintainers focus on logic and architecture, not style.</p>
+
+    <h3>3. Release Notes Generation</h3>
+    <p><b>The problem:</b> Time to cut a release. You manually grep through commit messages and PRs to write release notes.</p>
+    <p><b>The solution:</b> Claude Code lists all PRs merged since the last tag, extracts titles/descriptions, and generates organized release notes grouped by feature/bugfix/breaking change.</p>
+    <p><b>The result:</b> Release notes are ready in minutes, not hours. Consistent format across releases.</p>
+
+    <h3>4. Bug Report Follow-Up</h3>
+    <p><b>The problem:</b> Some bug reports lack critical info (stack traces, reproduction steps, environment). Without it, debugging is a guessing game.</p>
+    <p><b>The solution:</b> Claude Code identifies incomplete bug reports and leaves a template comment requesting missing information.</p>
+    <p><b>The result:</b> Reporters get helpful guidance. Your team gets the info it needs to fix bugs faster.</p>
+
+    <h3>5. Dependency Update Notifications</h3>
+    <p><b>The problem:</b> A critical security patch for a dependency is released. You need to update it and notify the team.</p>
+    <p><b>The solution:</b> Claude Code creates an issue automatically, summarizing the vulnerability and update steps. Your CI runs the upgrade, tests it, and opens a PR.</p>
+    <p><b>The result:</b> Security updates are tracked and visible. No more forgotten patches.</p>
   </div>
 </section>
 
 <section id="handson">
-  <h2>Hands-on</h2>
+  <h2>Hands-on Practice: Four Examples</h2>
+
   <div class="step">
-    <div class="step-head"><span class="step-num">1</span><span class="step-title">Confirm access, read-only</span></div>
-    <span class="where-tag where-vm">VM · terminal</span>
-    <pre><code>gh auth status
-gh repo view --json name,description,defaultBranchRef</code></pre>
+    <h3>Example 1: Verify GitHub Access</h3>
+    <span class="where-tag where-vm">Terminal/PowerShell</span>
 
-    <div class="step-head"><span class="step-num">2</span><span class="step-title">Have Claude Code triage, read-only</span></div>
+    <p><b>Step 1:</b> Check if you're logged in:</p>
+    <pre><code>gh auth status</code></pre>
+
+    <p><b>If not logged in:</b> Run <code>gh auth login</code> and follow the prompts to authenticate.</p>
+
+    <p><b>Step 2:</b> View the current repo:</p>
+    <pre><code>gh repo view</code></pre>
+
+    <p><b>What you should see:</b> Repository details (name, description, URL).</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      GitHub CLI is authenticated and working.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 2: Read Issues and PRs (Read-Only)</h3>
     <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Ask Claude to list recent activity:</p>
     <div class="prompt-box">
       <div class="prompt-label">Prompt</div>
-      <pre><code>Using gh, list the 5 most recently updated open issues (or pull requests,
-if there are no issues) in this repo, and give me a one-line triage note
-for each: what it's about and roughly how urgent it looks.</code></pre>
-    </div>
-    <div class="callout">
-      <b class="tag">If the repo has no issues/PRs yet</b>
-      That's fine — ask Claude Code to run <code>gh issue list</code>/<code>gh pr list</code> and confirm it correctly reports zero, rather than guessing.
+      <pre><code>Using the gh CLI, list the 5 most recent pull requests in this repo
+(sorted by updated date, most recent first). For each, give me:
+1. PR number and title
+2. Author
+3. Status (open/merged/closed)
+4. When it was last updated</code></pre>
     </div>
 
-    <div class="step-head"><span class="step-num">3</span><span class="step-title">A real write — only on a repo you control</span></div>
-    <p>If you have write access to a repo you're comfortable creating a test issue on (not a shared production repo), try:</p>
+    <p><b>What you'll see:</b> A real list of PRs from GitHub. Claude reads live data.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Claude successfully queried GitHub and presented structured results.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 3: Draft a GitHub Issue (No Write Yet)</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Ask Claude to draft, not create, an issue:</p>
     <div class="prompt-box">
       <div class="prompt-label">Prompt</div>
-      <pre><code>Draft (don't create yet) a GitHub issue titled "W2D0 test issue — safe to
-close" with a one-paragraph body explaining it's a training exercise. Show
-me the exact title and body before you run gh issue create.</code></pre>
+      <pre><code>Draft a GitHub issue (don't create it yet) with the following:
+- Title: "W2D0 GitHub Automation Test"
+- Body: A short paragraph explaining this is a training exercise and safe to delete
+- Labels: ["documentation", "test"]
+
+Show me the exact content you would create. I'll review it and approve before posting.</code></pre>
     </div>
-    <p>Review what it drafted, then explicitly approve before it actually runs <code>gh issue create</code>. Close/delete the test issue afterward.</p>
+
+    <p><b>What you should see:</b> Claude shows you the exact issue content, without creating it on GitHub yet.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You've reviewed the draft and confirmed the content before it's public.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 4: Create an Issue (With Approval)</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Only proceed if you have write access to the repo and are comfortable creating a test issue.</b></p>
+
+    <p><b>Step 1:</b> Based on your review in Example 3, explicitly approve:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>I've reviewed the draft and it looks good. Go ahead and create the GitHub
+issue with those exact details using `gh issue create`.</code></pre>
+    </div>
+
+    <p><b>Step 2:</b> Claude runs <code>gh issue create</code> and the issue appears on GitHub.</p>
+
+    <p><b>Step 3:</b> Verify it was created:</p>
+    <pre><code>gh issue list --limit 1</code></pre>
+
+    <p><b>What you should see:</b> Your new test issue listed.</p>
+
+    <p><b>Step 4:</b> Now close it to clean up:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Close the "W2D0 GitHub Automation Test" issue using `gh issue close`.</code></pre>
+    </div>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You've created and closed a GitHub issue through Claude Code. Workflow complete.
+    </div>
+
+    <p><b>Key learning:</b> Always draft first, review, approve explicitly. Don't let Claude post without confirmation.</p>
+  </div>
+
+</section>
     <div class="checkpoint">
       <b class="tag">Checkpoint</b>
       The draft-then-approve pattern here is the same approval-gate discipline from Week 2 Day 1 Topic 03 — a write action gets a look before it fires, every time.

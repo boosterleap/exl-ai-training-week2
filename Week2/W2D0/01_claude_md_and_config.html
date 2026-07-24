@@ -25,52 +25,256 @@
 <main>
 
 <section id="concept">
-  <h2>Concept</h2>
+  <h2>Concept: Why CLAUDE.md Matters</h2>
   <div class="step">
-    <p><b>What it is.</b> <code>CLAUDE.md</code> is project memory — plain markdown, read at the start of every session. It's not the only scope: a <b>user-scoped</b> <code>~/.claude/CLAUDE.md</code> applies to every project you open, and nested project subdirectories can carry their own, more specific <code>CLAUDE.md</code> too.</p>
-    <ul class="concept-list">
-      <li><b>They combine, they don't override.</b> User-level, project-root, and subdirectory <code>CLAUDE.md</code> files all load together when relevant — think of it as layered context that gets more specific as you go deeper, not a single winner-takes-all file.</li>
-      <li><b>The <code>.claude</code> folder is the sibling for everything else.</b> Settings, custom commands, subagent definitions, and hooks configuration all live under a project's <code>.claude/</code> directory (or the user-level <code>~/.claude/</code>) — <code>CLAUDE.md</code> is just the plain-text memory piece.</li>
-      <li><b>Why this matters practically.</b> A user-level <code>CLAUDE.md</code> is the right place for "always write commit messages this way" (true across every project you touch). A project-level one is for "this specific repo's conventions" — which is what you've been extending all week.</li>
+    <h3>The Big Picture</h3>
+    <p><b>What it is.</b> <code>CLAUDE.md</code> is your project's persistent instruction manual for Claude Code. It's a plain markdown file that Claude reads at the start of every session to understand:</p>
+    <ul>
+      <li>How you work (your coding style, testing requirements, deployment process)</li>
+      <li>What constraints matter (security policies, performance thresholds, compliance rules)</li>
+      <li>Where to find things (how your data is organized, which tools do what)</li>
+      <li>What you've already learned and built (ongoing context that survives across sessions)</li>
     </ul>
+
+    <h3>Why This Matters</h3>
+    <p>Without <code>CLAUDE.md</code>, every session starts with Claude knowing only what's in your git history and file tree. With it, Claude knows your team's unwritten conventions — the "why" behind your architecture choices, the gotchas you've learned, what you're building toward. This turns Claude Code from a generic tool into something that understands YOUR project.</p>
+
+    <div class="callout info">
+      <b>Real example:</b> If your CLAUDE.md says "always use async/await patterns, never callbacks," Claude won't suggest callback-style code. If it says "we use a 5-minute deploy SLA, so changes must be backward compatible," Claude will check for that before suggesting schema changes. These aren't hints — they're guardrails that actually stick.
+    </div>
+
+    <h3>Three Levels of CLAUDE.md (Hierarchical Context)</h3>
+    <p>CLAUDE.md comes in three flavors that all combine into context — but they don't all load at the same moment:</p>
+    <ul class="concept-list">
+      <li><b>User-level (<code>~/.claude/CLAUDE.md</code>)</b> — Personal instructions that apply to EVERY project you open. Example: "always write test cases before implementation," "commit messages must follow Conventional Commits," "only use Poetry for package management, never pip." Loaded in full at session launch.</li>
+      <li><b>Project-level (<code>PROJECT_ROOT/CLAUDE.md</code>, or equivalently <code>PROJECT_ROOT/.claude/CLAUDE.md</code>)</b> — This project's specific rules. Example: "we use FastAPI for backends, Redux for state management, SQLAlchemy for ORM." This is what you've been extending all week. Also loaded in full at session launch.</li>
+      <li><b>Subdirectory-level (<code>src/backends/CLAUDE.md</code>)</b> — Sub-team rules. Example: "the billing module uses a special auditing pattern; always pair changes with audit log entries." This is real and supported for monorepos, but it does <b>not</b> load at launch alongside the other two — Claude Code discovers it lazily and pulls it into context only when Claude actually reads a file inside that subdirectory.</li>
+    </ul>
+
+    <p><b>Key point: They combine, they don't override.</b> If your user-level CLAUDE.md says "always write tests" AND your project CLAUDE.md says "unit tests must use pytest," both apply — Claude sees both constraints simultaneously (the project one loads after the user one, so more specific context is read last). Subdirectory rules join the mix once Claude touches that part of the tree. More specific rules don't replace general ones; they layer on top. (There's also an org-wide "managed policy" CLAUDE.md that IT/DevOps can deploy outside the project entirely — out of scope for this lesson, but good to know it exists.)</p>
+
+    <figure class="concept-figure">
+      <img src="images/claude-md-hierarchy.svg" alt="CLAUDE.md hierarchy: user-scoped and project-root files load at launch; subdirectory files load lazily as Claude reads into that part of the tree">
+      <figcaption>Layering in action: user rules (global) and project rules (team) load at session start; subdirectory rules (module) join in once Claude reads a file there — all combine into one set of active instructions, getting more specific as you descend.</figcaption>
+    </figure>
+
+    <h3>The .claude Folder Structure</h3>
+    <p><code>CLAUDE.md</code> is just one part of a larger ecosystem. The <code>.claude/</code> folder holds everything else:</p>
+    <pre><code>.claude/
+├── CLAUDE.md          ← This file: plain text instructions, no structure
+├── settings.json      ← Committed, shared config (hooks, permissions, tools)
+├── settings.local.json ← Your personal overrides (in .gitignore)
+├── commands/          ← Custom slash commands (e.g., /deploy, /test)
+├── agents/            ← Custom subagent definitions
+└── (hooks live inside settings.json's "hooks" key, not their own folder —
+     the scripts they call can be stored anywhere, e.g. .claude/hooks/*.sh)</code></pre>
+
+    <p><code>CLAUDE.md</code> is freeform markdown — no schema, no parsing rules. Everything else is JSON-structured and processed by Claude Code. Think of <code>CLAUDE.md</code> as "tell me in words," and the rest as "configure these mechanisms."</p>
   </div>
-  <figure class="concept-figure">
-    <img src="images/claude-md-hierarchy.svg" alt="CLAUDE.md hierarchy: user-scoped, project root, and subdirectory files all load together">
-    <figcaption>Every applicable level loads together — more specific context, not an override.</figcaption>
-  </figure>
+</section>
+
+<section id="use-cases">
+  <h2>Real-World Use Cases</h2>
+  <div class="step">
+    <h3>1. Enforcing Code Style Across a Distributed Team</h3>
+    <p><b>The problem:</b> Your team has 5 engineers. Without documentation, one writes camelCase, another writes snake_case. Code reviews become style debates instead of logic reviews.</p>
+    <p><b>The solution:</b> Your project's <code>CLAUDE.md</code> contains:</p>
+    <pre><code>## Code Style
+- All Python functions use snake_case. All variables use snake_case.
+- All TypeScript uses PascalCase for classes, camelCase for variables and methods.
+- Every function needs a one-line docstring explaining the "why" (not the "what").
+- Imports are always at the top: stdlib, then third-party, then local, each group sorted alphabetically.</code></pre>
+    <p><b>The result:</b> When Claude writes code, it automatically follows these rules. When it reviews your code, it checks against them. No more "but the style guide says..." arguments — Claude enforces it.</p>
+
+    <h3>2. Capturing Lessons From Outages</h3>
+    <p><b>The problem:</b> Your team deployed a change that didn't handle concurrent updates correctly. You spent 4 hours tracking it down. Next month, a new engineer makes a similar mistake.</p>
+    <p><b>The solution:</b> Your CLAUDE.md includes:</p>
+    <pre><code>## Known Footguns
+- When updating user permissions, ALWAYS use a database transaction with row-level locking.
+  We learned this the hard way on 2025-03-14 when two concurrent API calls left a user without
+  any role. The fix: always fetch, lock, update in a transaction.
+- Never cache user roles in memory without a 5-minute TTL. Stale role data has caused false
+  permission denials in production.</code></pre>
+    <p><b>The result:</b> Claude remembers these lessons and warns you when similar patterns appear in your code.</p>
+
+    <h3>3. Keeping Architectural Decisions Alive Across Seasons</h3>
+    <p><b>The problem:</b> Your project chose PostgreSQL, not MongoDB. This was decided in 2023, documented in a dead GitHub issue, and forgotten. In 2025, a new feature request arrives, and someone asks "why don't we just use MongoDB?"</p>
+    <p><b>The solution:</b> Your CLAUDE.md has a section:</p>
+    <pre><code>## Architectural Decisions
+- **Database**: PostgreSQL, not MongoDB. Why: we need ACID transactions, complex joins, and
+  relational integrity for billing. We avoid NoSQL for this domain.
+- **Frontend framework**: React (not Vue), because the team has deep expertise and most
+  third-party integrations target React.</code></pre>
+    <p><b>The result:</b> Every proposal Claude makes fits this architecture. Suggestions stay coherent across years and team rotations.</p>
+
+    <h3>4. Documenting Data Schemas and Lookup Paths</h3>
+    <p><b>The problem:</b> Your project has several databases and a custom data format. Claude keeps guessing where data lives and what fields exist.</p>
+    <p><b>The solution:</b> Your CLAUDE.md documents the schema once:</p>
+    <pre><code>## Data Locations and Access Patterns
+- **Insurance claims** live in `data/insurance/claims.db` (SQLite, schema in `data/_DATA_README.md`)
+- **Policy documents** live in `data/insurance/policies/` as plaintext, keyed by policy_id
+- **Customer emails** live in `data/insurance/fnol_emails.csv` with columns: [email_id, policy_id, subject, body, timestamp]
+- Use the `ClaimLookup` tool to query claims; use the `PolicyReader` tool to fetch policy text.
+  Don't try to parse policies with regex — they have complex structure.</code></pre>
+    <p><b>The result:</b> Claude doesn't guess. It knows exactly where to look and how to fetch it.</p>
+
+    <h3>5. Defining Approval Gates for Sensitive Actions</h3>
+    <p><b>The problem:</b> You want Claude to help with database migrations, but not to auto-deploy them. You want it to suggest payment refunds, but not to send them without your sign-off.</p>
+    <p><b>The solution:</b> Your CLAUDE.md includes:</p>
+    <pre><code>## Approval Requirements
+- Database schema changes require human review before execution. Claude must propose,
+  not execute.
+- Refunds over $100 require explicit user approval. Never auto-approve.
+- Deleting user data requires confirmation—no batch deletes without human sign-off.
+- Pushing to main requires at least one team member to review the PR first.</code></pre>
+    <p><b>The result:</b> Claude is helpful but bounded. It knows when to stop and ask for permission.</p>
+  </div>
 </section>
 
 <section id="handson">
-  <h2>Hands-on</h2>
+  <h2>Hands-on Practice: Five Examples</h2>
+
   <div class="step">
-    <div class="step-head"><span class="step-num">1</span><span class="step-title">Confirm what's already loading for this repo</span></div>
+    <h3>Example 1: Read the Project's CLAUDE.md</h3>
     <span class="where-tag where-claude">Claude Code chat panel, in this repo</span>
     <div class="prompt-box">
       <div class="prompt-label">Prompt</div>
-      <pre><code>Read the project's CLAUDE.md. Summarize, in 2-3 bullets, what you now know
-about this project that you wouldn't know from the file tree alone.</code></pre>
+      <pre><code>Read the project's CLAUDE.md file. Summarize in 3-4 bullets what you now know
+about this project that you wouldn't know from just browsing the file tree and
+git history. Focus on the constraints, patterns, and design decisions that
+matter for building here.</code></pre>
     </div>
-
-    <div class="step-head"><span class="step-num">2</span><span class="step-title">Check whether a user-level CLAUDE.md exists for you</span></div>
-    <span class="where-tag where-vm">VM · terminal</span>
-    <pre><code>ls -la ~/.claude/CLAUDE.md 2>&1 || echo "no user-level CLAUDE.md yet"</code></pre>
-    <div class="callout">
-      <b class="tag">If it doesn't exist yet</b>
-      That's normal — it's opt-in. Ask Claude Code to create one with one durable personal preference (e.g. "always explain your plan before editing more than one file") and confirm it now applies in a brand-new session in a completely different directory, not just this repo.
-    </div>
-
-    <div class="step-head"><span class="step-num">3</span><span class="step-title">Observe layering directly</span></div>
-    <div class="prompt-box">
-      <div class="prompt-label">Prompt</div>
-      <pre><code>Without me telling you, list every CLAUDE.md-shaped source of context you
-currently have loaded for this session — project-level, user-level, or
-otherwise — and where each one physically lives on disk.</code></pre>
-    </div>
+    <p><b>What's happening:</b> Claude loads CLAUDE.md automatically and reads it on your command. You get back a summary of the project's unique context — the stuff that's too important to leave to chance.</p>
     <div class="checkpoint">
       <b class="tag">Checkpoint</b>
-      You should get back at least the project's own <code>CLAUDE.md</code>, plus your user-level one if you created it in step 2 — both, not just one.
+      Claude should return 3-4 bullets about this project's specific rules and patterns. This proves CLAUDE.md is loaded and readable.
     </div>
   </div>
+
+  <div class="step">
+    <h3>Example 2: Create a User-Level CLAUDE.md (If You Don't Have One)</h3>
+    <span class="where-tag where-vm">Terminal/PowerShell</span>
+
+    <p><b>Step 1:</b> Check whether a user-level CLAUDE.md already exists on your machine:</p>
+    <pre><code># On Mac/Linux
+ls -la ~/.claude/CLAUDE.md 2>&1 || echo "no user-level CLAUDE.md yet"
+
+# On Windows (PowerShell)
+Test-Path $env:USERPROFILE\.claude\CLAUDE.md -PathType Leaf; if ($?) { cat $env:USERPROFILE\.claude\CLAUDE.md } else { Write-Host "no user-level CLAUDE.md yet" }</code></pre>
+
+    <p><b>Step 2:</b> If it doesn't exist, create one with your personal rules. In Claude Code, run:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt in Claude Code</div>
+      <pre><code>Create a user-level CLAUDE.md for me at ~/.claude/CLAUDE.md with these sections:
+
+## My Coding Preferences
+- Always write a plan before editing multiple files
+- Prefer explicit code over clever one-liners
+- Use descriptive variable names (no single letters except loop indices)
+
+## My Testing Standards
+- Every public function needs at least one test case
+- Never commit without running the test suite
+
+## My Documentation Habits
+- Commit messages should explain the "why", not the "what"
+- Code comments are only for non-obvious logic</code></pre>
+    </div>
+
+    <p><b>Step 3:</b> After Claude creates it, verify it exists:</p>
+    <pre><code># On Mac/Linux
+cat ~/.claude/CLAUDE.md
+
+# On Windows (PowerShell)
+Get-Content $env:USERPROFILE\.claude\CLAUDE.md</code></pre>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Your user-level CLAUDE.md now exists. It will load automatically in every project you open next.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 3: Observe Layering in Action</h3>
+    <span class="where-tag where-claude">Claude Code chat panel, in this repo</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>List every source of CLAUDE.md context you currently have loaded for this session.
+For each one, tell me:
+1. Its file path on disk (e.g., ~/.claude/CLAUDE.md or ./CLAUDE.md)
+2. Whether it's user-level, project-level, or subdirectory-level
+3. One key instruction from it
+
+Don't ask me which ones exist—just tell me what you've actually loaded.</code></pre>
+    </div>
+    <p><b>What's happening:</b> Claude scans multiple directories and reports exactly which CLAUDE.md files are active. This reveals the layering in real time.</p>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You should see at least the project's own CLAUDE.md. If you created a user-level one in Example 2, you should see that too — both listed separately, proving they load together.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 4: Add a Project-Specific Rule</h3>
+    <span class="where-tag where-vm">Terminal/PowerShell, in this repo root</span>
+
+    <p><b>Step 1:</b> Open the project's CLAUDE.md:</p>
+    <pre><code># On Mac/Linux
+open CLAUDE.md
+
+# On Windows
+notepad .\CLAUDE.md</code></pre>
+
+    <p><b>Step 2:</b> Scroll to the end and add a new section. For example, if you're working on an API project, add:</p>
+    <pre><code>## API Response Standards
+- All API endpoints must return consistent error responses with {error: string, status: number}
+- All date/time fields use ISO 8601 format (e.g., 2025-03-15T14:30:00Z)
+- Endpoints that modify data must return a 202 (Accepted) while processing, or 201 (Created) on success
+- Always document query parameters in comments: ?page=1&limit=100 (defaults: page=1, limit=20)</code></pre>
+
+    <p><b>Step 3:</b> Save and close the file. Now, in Claude Code, write some API code:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt in Claude Code</div>
+      <pre><code>Create a Python FastAPI endpoint POST /claims that accepts a claim object,
+saves it, and returns the response. Follow the API Response Standards in CLAUDE.md.</code></pre>
+    </div>
+
+    <p><b>What's happening:</b> Claude reads your new CLAUDE.md section and applies those rules to the generated code. You get a response that respects your team's API conventions automatically.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      The generated endpoint should include proper error responses, date formatting, and status codes as you specified. If it doesn't, you can refine your CLAUDE.md and ask again.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 5: Use CLAUDE.md to Override a Claude Code Assumption</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Setup:</b> Suppose your project uses an unusual pattern — maybe you prefer environment-based configuration over dotenv files, or you use a custom logger instead of print().</p>
+
+    <p><b>Step 1:</b> Add this to your project CLAUDE.md:</p>
+    <pre><code>## Configuration Management
+- Never use python-dotenv (.env files). Configuration comes from environment variables
+  only, read via os.environ['KEY'] with fallback to /etc/config/app.json.
+- Never use print() for logging. Always use the project's Logger class:
+  from logging_config import Logger; logger = Logger(__name__)</code></pre>
+
+    <p><b>Step 2:</b> Now ask Claude to write initialization code:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt in Claude Code</div>
+      <pre><code>Create a Python script that initializes the application: load configuration,
+set up logging, and print "App started successfully" when done.</code></pre>
+    </div>
+
+    <p><b>What's happening:</b> Without CLAUDE.md, Claude might suggest dotenv. With your rules, it reads from environment variables and uses your Logger class instead — even though you never mentioned your Logger class in this prompt. CLAUDE.md is doing the heavy lifting.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      The generated code should use os.environ and your Logger class, not dotenv or print(). If it doesn't, your CLAUDE.md rule wasn't specific enough — refine it and try again.
+    </div>
+  </div>
+
 </section>
 
 </main>

@@ -18,55 +18,157 @@
 <main>
 
 <section id="concept">
-  <h2>Concept</h2>
+  <h2>Concept: Automated Git Sync</h2>
   <div class="step">
-    <p>"Git sync automation" means using a hook (Topic 06) to commit — and optionally push — automatically at a natural checkpoint, like the end of a Claude Code task, instead of remembering to run <code>git add/commit/push</code> yourself every time.</p>
-    <ul class="concept-list">
-      <li><b>Commit and push are different risk levels.</b> An auto-commit is local and reversible — safe to automate freely. An auto-push changes what your team sees — treat it as an explicit opt-in, never a silent default.</li>
-      <li><b>The <code>Stop</code> hook is the natural trigger.</b> It fires when Claude Code finishes responding — a clean checkpoint to check <code>git status</code> and commit anything meaningful, before the next task starts and the diff gets harder to describe well.</li>
-      <li><b>Commit message quality still matters even when it's automatic.</b> A hook-generated commit that just says "auto-commit" is worse than no automation — have Claude Code write a real, scoped message describing what actually changed.</li>
+    <h3>The Big Picture</h3>
+    <p>Git automation through hooks (Topic 06) handles commits for you. When Claude Code finishes a task (the <code>Stop</code> event), a hook checks for uncommitted changes and commits them with a real message describing what changed. No more manual <code>git add/commit</code>.</p>
+
+    <p><b>Commit vs. Push:</b> Safe to auto-commit (it's local, reversible). Push is different — it's visible to your team. Push only on explicit approval.</p>
+
+    <h3>Why Automate Commits</h3>
+    <ul>
+      <li>Never forget to commit. Changes are captured immediately after each task.</li>
+      <li>Clean, scoped commits. Each Claude Code response gets its own commit with a message describing that specific work.</li>
+      <li>Reversible. If a commit is wrong, `git reset --soft HEAD~1` takes it back.</li>
+      <li>Team history stays accurate. Every change is documented with a real message, not "WIP" or "fixup."</li>
     </ul>
+
+    <h3>The Stop Hook</h3>
+    <p>The <code>Stop</code> hook fires when Claude Code finishes responding. It's the natural checkpoint:</p>
+    <pre><code>Stop hook runs when:
+- Claude finishes its response
+- Tool calls are complete
+- Before the next user prompt
+
+This is the ideal moment to commit: the diff is fresh and scoped to one task.</code></pre>
+
+    <h3>Commit Message Strategy</h3>
+    <p>Automate the commit but not the message. Best approach:</p>
+    <ul>
+      <li>Claude Code reads `git diff` in the Stop hook</li>
+      <li>It writes a real message: "Add user authentication to settings" not "auto-commit"</li>
+      <li>Commit goes in with a meaningful message</li>
+    </ul>
+
+    <figure class="concept-figure">
+      <img src="images/git-sync-flow.svg" alt="Stop hook checks status, writes message, commits—push stays manual">
+      <figcaption>Commit is safe to automate with a real message. Push requires explicit approval.</figcaption>
+    </figure>
   </div>
-  <figure class="concept-figure">
-    <img src="images/git-sync-flow.svg" alt="A Stop hook checks git status and auto-commits with a clear message; push stays an explicit opt-in step">
-    <figcaption>Commit is safe to automate. Push is a team-visible action — opt in explicitly.</figcaption>
-  </figure>
+</section>
+
+<section id="use-cases">
+  <h2>Real-World Use Cases</h2>
+  <div class="step">
+    <h3>1. Always-Committed Working Directory</h3>
+    <p><b>The problem:</b> You use Claude Code to make changes, but forget to commit. After an hour, you have a large, scoped-unclear diff. You forget what you changed earlier.</p>
+    <p><b>The solution:</b> Stop hook auto-commits each task. Every response gets its own commit with a message.</p>
+    <p><b>The result:</b> Clean git history. Each task is isolated. You can always see what changed when.</p>
+
+    <h3>2. Safe Rollback</h3>
+    <p><b>The problem:</b> Claude Code made a change that turned out wrong. You want to revert just that change, but it's mixed with other work in your working directory.</p>
+    <p><b>The solution:</b> With auto-commit, you can `git reset --soft HEAD~N` to take back only the bad commits.</p>
+    <p><b>The result:</b> Easy, surgical rollbacks. No need to cherry-pick or manually revert.</p>
+
+    <h3>3. Code Review Clarity</h3>
+    <p><b>The problem:</b> You push a PR with 10 commits. Reviewers can't tell which commit is which task. The diff is hard to understand.</p>
+    <p><b>The solution:</b> Each Claude Code task → one commit with a clear message. PR reviewers see clean, scoped diffs.</p>
+    <p><b>The result:</b> Code reviews are faster. Reviewers understand the reasoning behind each change.</p>
+
+    <h3>4. Debugging via Git Bisect</h3>
+    <p><b>The problem:</b> A bug was introduced. You want to find which commit broke it using `git bisect`.</p>
+    <p><b>The solution:</b> With clean, scoped commits, bisect works perfectly. Each commit is a single change.</p>
+    <p><b>The result:</b> Bugs are traced to their exact commit. No guessing.</p>
+
+    <h3>5. Compliance and Audit Trail</h3>
+    <p><b>The problem:</b> Your company requires proof that all code changes are documented. Manual commits are easy to forget.</p>
+    <p><b>The solution:</b> Auto-commit ensures nothing is missed. Every change has a commit message explaining it.</p>
+    <p><b>The result:</b> Audit trail is complete and automatic.</p>
+  </div>
 </section>
 
 <section id="handson">
-  <h2>Hands-on</h2>
+  <h2>Hands-on Practice: Three Examples</h2>
+
   <div class="step">
-    <div class="step-head"><span class="step-num">1</span><span class="step-title">Build an auto-commit <code>Stop</code> hook</span></div>
+    <h3>Example 1: Set Up Auto-Commit Hook</h3>
     <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Ask Claude to add a Stop hook for auto-commits:</p>
     <div class="prompt-box">
       <div class="prompt-label">Prompt</div>
-      <pre><code>Add a Stop hook that runs when I finish a turn: if `git status --short`
-shows uncommitted changes under W2D0/, stage them and commit with a message
-you write summarizing the actual diff. Do NOT push. Show me the hook
-config.</code></pre>
+      <pre><code>Add a Stop hook to .claude/settings.json that:
+1. Runs when I finish a turn (Stop event)
+2. Checks `git status --short` for uncommitted changes
+3. If there are changes, stages them with `git add`
+4. Writes a commit message by reading `git diff --cached` and summarizing
+5. Commits with `git commit -m "<message>"`
+6. Does NOT push
+
+Show me the hook config and script.</code></pre>
     </div>
 
-    <div class="step-head"><span class="step-num">2</span><span class="step-title">Trigger it for real</span></div>
-    <p>Make a small, real change (e.g. ask Claude Code to add one bullet point to this file's concept section), and watch what happens once it finishes:</p>
-    <pre><code>git log --oneline -3</code></pre>
     <div class="checkpoint">
       <b class="tag">Checkpoint</b>
-      A new commit should exist with a real, specific message — not "auto-commit" — and <code>git status</code> should be clean.
+      Hook is configured and ready to run.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 2: Trigger Auto-Commit</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Make a change and watch the hook fire:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Add one bullet point to the top of W2D0/discussion-Qs.html explaining
+the purpose of auto-commit hooks in workflow automation. Keep it brief.</code></pre>
     </div>
 
-    <div class="step-head"><span class="step-num">3</span><span class="step-title">Confirm push stayed manual</span></div>
-    <pre><code>git status
-git log origin/main..HEAD --oneline 2>&1 || echo "check your actual branch name"</code></pre>
-    <p>Your new commit should exist locally but not yet be pushed — confirming the hook respected the commit/push risk boundary.</p>
+    <p><b>Step 2:</b> After Claude finishes, check git history:</p>
+    <pre><code>git log --oneline -5</code></pre>
 
-    <div class="step-head"><span class="step-num">4</span><span class="step-title">Decide when you'd add auto-push</span></div>
+    <p><b>What you should see:</b> Your new auto-commit appears at the top with a message summarizing the change.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Auto-commit hook worked. Changes are committed automatically.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 3: Verify Commits Stay Local (No Auto-Push)</h3>
+    <span class="where-tag where-vm">Terminal/PowerShell</span>
+
+    <p><b>Step 1:</b> Check commits are local only:</p>
+    <pre><code>git log --oneline HEAD...origin/main 2>/dev/null | head -5 || echo "No commits ahead of origin"</code></pre>
+
+    <p><b>What you should see:</b> Your auto-commits are ahead of the remote (not pushed). They're local and safe.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Auto-commit is working, but push is still manual. Safety maintained.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 4: Decide When You'd Add Auto-Push</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Auto-commit is safe by default because it's local and reversible. Auto-push is a different risk level — it's visible to your team the moment it happens. Ask Claude to help you reason about where the line should be:</p>
     <div class="prompt-box">
       <div class="prompt-label">Prompt</div>
       <pre><code>Under what specific conditions would auto-pushing (not just auto-committing)
 be safe to enable here — a personal scratch branch? Never on main? Give me
 a one-sentence policy.</code></pre>
     </div>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You have a concrete, written policy for when (if ever) auto-push would be acceptable — not just "commit yes, push no" as a blanket rule.
+    </div>
   </div>
+
 </section>
 
 </main>

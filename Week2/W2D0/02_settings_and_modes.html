@@ -18,46 +18,345 @@
 <main>
 
 <section id="concept">
-  <h2>Concept</h2>
+  <h2>Concept: Settings and Permission Modes</h2>
   <div class="step">
-    <p><b>Settings scope, same layering idea as Topic 01.</b> <code>~/.claude/settings.json</code> is user-scoped (applies everywhere). A project's <code>.claude/settings.json</code> is meant to be shared/committed; <code>.claude/settings.local.json</code> is your personal, gitignored overrides for that same project — you've had one of these in this very repo all week.</p>
+    <h3>The Big Picture</h3>
+    <p><b>What it is.</b> Settings are how you configure Claude Code's behavior: which tools are allowed, which get extra prompts, how hooks run, what custom commands exist. They're structured JSON files, unlike CLAUDE.md which is freeform markdown.</p>
+
+    <p>Settings come at two scopes, just like CLAUDE.md:</p>
     <ul class="concept-list">
-      <li><b>The six real permission modes</b> (from <code>claude --help</code>'s <code>--permission-mode</code> flag): <code>plan</code> (read/analyze/propose, no edits), <code>manual</code> (asks before every sensitive action), <code>acceptEdits</code> (file edits auto-approved, other tools still ask), <code>auto</code> and <code>dontAsk</code> (fewer prompts, policy still applies), and <code>bypassPermissions</code> (no prompts at all — sandboxes with no internet access only).</li>
-      <li><b>This is the exact mechanism behind Week 2's <code>allow</code>/<code>ask</code>/<code>deny</code> rules.</b> A permission mode is the default posture; <code>allow</code>/<code>ask</code>/<code>deny</code> rules in settings refine it per tool.</li>
-      <li><b><code>claude doctor</code> and <code>--safe-mode</code> exist for exactly this layering's failure mode.</b> When settings from multiple scopes combine unexpectedly, <code>--safe-mode</code> disables all customizations (CLAUDE.md, skills, hooks, MCP, commands, agents) so you can tell whether a problem is your config or something else.</li>
+      <li><b>User-level (<code>~/.claude/settings.json</code>)</b> — Your personal defaults for every project</li>
+      <li><b>Project-level (<code>.claude/settings.json</code>)</b> — This project's shared rules, committed to git</li>
+      <li><b>Project-local (<code>.claude/settings.local.json</code>)</b> — Your personal overrides for this project, gitignored, never shared</li>
     </ul>
+
+    <h3>Permission Modes: Six Levels From Safe to Fast</h3>
+    <p>A <b>permission mode</b> is your baseline safety/speed tradeoff. Claude Code has exactly six (verified from <code>claude --help</code>):</p>
+
+    <div class="permission-modes-table">
+      <table>
+        <tr>
+          <th>Mode</th>
+          <th>Safety Level</th>
+          <th>What Happens</th>
+          <th>When to Use</th>
+        </tr>
+        <tr>
+          <td><code>plan</code></td>
+          <td>🔒 Highest</td>
+          <td>Claude proposes changes, explains them, but <b>never executes</b>. You click to approve.</td>
+          <td>First time touching unknown code, risky refactors, learning new domains</td>
+        </tr>
+        <tr>
+          <td><code>manual</code></td>
+          <td>🔒🔒</td>
+          <td>Claude asks for permission before <b>any</b> action: editing files, running commands, calling tools. Default for most users.</td>
+          <td>Day-to-day work, balanced safety/speed</td>
+        </tr>
+        <tr>
+          <td><code>acceptEdits</code></td>
+          <td>🔒</td>
+          <td>File edits auto-approve. Other tools (Bash, git, etc.) still ask. Useful for rapid iteration on safe changes.</td>
+          <td>Refactoring your own code, formatting, local debugging</td>
+        </tr>
+        <tr>
+          <td><code>auto</code></td>
+          <td>⚠️</td>
+          <td>Similar to <code>acceptEdits</code> but even more permissive. Fewer prompts overall, but safety policies still apply.</td>
+          <td>High-trust workflows, trusted codebases</td>
+        </tr>
+        <tr>
+          <td><code>dontAsk</code></td>
+          <td>⚠️ Stricter, not looser</td>
+          <td>The opposite of permissive: Claude auto-<b>denies</b> anything that isn't already covered by a <code>permissions.allow</code> rule or a built-in read-only command, instead of prompting you. Nothing waits for input — it just gets refused.</td>
+          <td>Locked-down CI pipelines and scripts where you've pre-declared exactly what's allowed</td>
+        </tr>
+        <tr>
+          <td><code>bypassPermissions</code></td>
+          <td>🟡 Low</td>
+          <td>No prompts, no checks — everything runs immediately. This is a recommendation, not an enforced sandbox: Claude Code itself doesn't cut off internet or tool access in this mode, so only use it somewhere isolated (a container/VM with no network) where a mistake can't reach anything you care about.</td>
+          <td>CI/CD, testing, demos — in isolated containers/VMs only</td>
+        </tr>
+      </table>
+    </div>
+    <p><b>Naming note:</b> the mode most people start in is labeled <b>Manual</b> in the CLI, in <code>claude --help</code>, and in the VS Code/JetBrains/desktop UIs, but its underlying config value is <code>default</code> — Claude Code also accepts <code>manual</code> as a typed alias for it, so both spellings work in <code>--permission-mode</code> and in <code>defaultMode</code>.</p>
+
+    <h3>How Permissions Refine the Mode</h3>
+    <p>A permission mode is just the baseline. Within that mode, you can set specific <b>rules</b> for individual tools. Three rule types:</p>
+    <ul>
+      <li><b><code>allow</code></b> — This tool doesn't prompt. Auto-approved within the current mode.</li>
+      <li><b><code>ask</code></b> — Always ask before using this tool, even in looser modes.</li>
+      <li><b><code>deny</code></b> — Never allow this tool, period.</li>
+    </ul>
+
+    <p><b>Example:</b> If you're in <code>manual</code> mode but add <code>"allow": ["Edit"]</code>, then file edits auto-approve while everything else still asks.</p>
+
+    <h3>Settings File Structure</h3>
+    <p>A minimal settings.json looks like:</p>
+    <pre><code>{
+  "permissions": {
+    "defaultMode": "manual",
+    "allow": ["Read", "Glob", "Edit"],
+    "ask": ["Bash"],
+    "deny": ["PowerShell"]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [{ "type": "command", "command": "npm run lint" }]
+      }
+    ]
+  }
+}
+</code></pre>
+    <p><b>Note:</b> the permission mode lives <i>nested</i> under <code>permissions.defaultMode</code>, not as a top-level <code>permissionMode</code> key. Hooks are keyed by lifecycle event name (<code>PreToolUse</code>, <code>PostToolUse</code>, <code>SessionStart</code>, <code>Stop</code>, and others) rather than by names like <code>beforeWrite</code>/<code>beforePush</code>. And there's no <code>customCommands</code> key at all — custom slash commands are separate files, one per command, under <code>.claude/commands/&lt;name&gt;.md</code> (or, in current Claude Code, a folder-based skill at <code>.claude/skills/&lt;name&gt;/SKILL.md</code> — see the skills topic for that distinction).</p>
+
+    <h3>Debugging: <code>claude doctor</code> and <code>--safe-mode</code></h3>
+    <p>When something behaves unexpectedly:</p>
+    <ul>
+      <li><b><code>claude doctor</code></b> — Checks your setup: are custom commands registered? Are hooks syntactically valid? Are MCP servers running? Reports any issues.</li>
+      <li><b><code>--safe-mode</code></b> — Temporarily disables all customizations (CLAUDE.md, hooks, skills, commands, agents) so you can test whether the issue is your config or something else.</li>
+    </ul>
+
+    <figure class="concept-figure">
+      <img src="images/permission-modes.svg" alt="Six permission modes from plan (safest, no edits) through manual, acceptEdits, auto/dontAsk, to bypassPermissions (no prompts, sandbox only)">
+      <figcaption>Left: safest, most prompts. Right: fastest, most autonomous — choose deliberately based on your trust level and task type.</figcaption>
+    </figure>
   </div>
-  <figure class="concept-figure">
-    <img src="images/permission-modes.svg" alt="Six permission modes from plan (safest, no edits) through manual, acceptEdits, auto/dontAsk, to bypassPermissions (no prompts, sandbox only)">
-    <figcaption>Less friction on the right, less safety net — choose deliberately.</figcaption>
-  </figure>
+</section>
+
+<section id="use-cases">
+  <h2>Real-World Use Cases</h2>
+  <div class="step">
+    <h3>1. Protecting Sensitive Files From Accidental Edits</h3>
+    <p><b>The problem:</b> You have secrets, config files, and database schemas that should never be edited in Claude Code sessions.</p>
+    <p><b>The solution:</b> In <code>.claude/settings.json</code> (committed to git):</p>
+    <pre><code>{
+  "permissions": {
+    "deny": ["Edit"],
+    "denyPatterns": ["**/.env*", "**/secrets/**", "database/schema.sql"]
+  }
+}</code></pre>
+    <p><b>The result:</b> Claude can read these files but cannot edit them. If it tries to edit <code>.env</code>, Claude Code refuses and warns you.</p>
+
+    <h3>2. Fast Iteration for Trusted Refactors</h3>
+    <p><b>The problem:</b> You're refactoring your own code in a small module. You know the changes are safe. Asking for permission on every edit slows you down.</p>
+    <p><b>The solution:</b> Temporarily switch to <code>acceptEdits</code> mode:</p>
+    <pre><code>claude --permission-mode acceptEdits</code></pre>
+    <p>Or, in settings.local.json (just for this project, this session):</p>
+    <pre><code>{
+  "permissions": {
+    "defaultMode": "acceptEdits"
+  }
+}</code></pre>
+    <p><b>The result:</b> File edits auto-approve. Bash commands still ask. You get speed for safe operations, safety for dangerous ones.</p>
+
+    <h3>3. Requiring Approval For Risky Tools</h3>
+    <p><b>The problem:</b> You're in <code>auto</code> mode (fast, few prompts). But you want git push and Bash to always ask before running.</p>
+    <p><b>The solution:</b> In <code>.claude/settings.json</code>:</p>
+    <pre><code>{
+  "permissions": {
+    "defaultMode": "auto",
+    "ask": ["Bash", "RemoteTrigger"]
+  }
+}</code></pre>
+    <p><b>The result:</b> Fast mode for file edits, but any Bash or remote operations still require your approval.</p>
+
+    <h3>4. Enforcing Code Quality Gates</h3>
+    <p><b>The problem:</b> You want Claude to suggest changes, but also to run your linter and tests before finalizing them.</p>
+    <p><b>The solution:</b> In <code>.claude/settings.json</code>:</p>
+    <pre><code>{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [{ "type": "command", "command": "npm run lint -- --fix" }]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git push*)",
+        "hooks": [{ "type": "command", "command": "npm test" }]
+      }
+    ]
+  }
+}</code></pre>
+    <p>(Hooks are keyed by lifecycle event — <code>PreToolUse</code> runs before a matching tool call and can block it by exiting non-zero; <code>PostToolUse</code> runs after. There's no <code>beforeWrite</code>/<code>beforePush</code>/<code>onFailure</code> shorthand in the real schema — matching and blocking both happen through the <code>matcher</code> pattern and the hook script's exit code.)</p>
+    <p><b>The result:</b> Before saving a file, linting runs automatically. Before pushing, tests must pass or the push blocks. Quality gates happen without you asking.</p>
+
+    <h3>5. Learning Mode: Maximum Safety While Exploring Unknown Code</h3>
+    <p><b>The problem:</b> You're exploring a large, unfamiliar codebase. You want to ask questions and have Claude propose solutions, but absolutely no edits until you review carefully.</p>
+    <p><b>The solution:</b> Start the session in <code>plan</code> mode:</p>
+    <pre><code>claude --permission-mode plan</code></pre>
+    <p><b>The result:</b> Claude analyzes, proposes, explains — but never edits. You review everything before clicking "approve" in plan proposals.</p>
+  </div>
 </section>
 
 <section id="handson">
-  <h2>Hands-on</h2>
-  <div class="step">
-    <div class="step-head"><span class="step-num">1</span><span class="step-title">Look at your own settings, at both scopes</span></div>
-    <span class="where-tag where-vm">VM · terminal</span>
-    <pre><code>cat ~/.claude/settings.json 2>&1 || echo "none yet"
-cat .claude/settings.local.json 2>&1 || echo "none yet"</code></pre>
-    <p>If either is missing, that's fine — they're both opt-in and get created the first time something needs them.</p>
+  <h2>Hands-on Practice: Five Examples</h2>
 
-    <div class="step-head"><span class="step-num">2</span><span class="step-title">Try <code>plan</code> mode for real</span></div>
-    <span class="where-tag where-claude">Claude Code chat panel</span>
-    <p>Switch to plan mode (check <code>/help</code> or your model/mode picker for the current shortcut) and ask it to make a small, real edit:</p>
-    <div class="prompt-box">
-      <div class="prompt-label">Prompt</div>
-      <pre><code>Add a one-line comment to the top of CLAUDE.md noting today's date.</code></pre>
-    </div>
+  <div class="step">
+    <h3>Example 1: Examine Your Current Settings</h3>
+    <span class="where-tag where-vm">Terminal/PowerShell</span>
+
+    <p><b>Step 1:</b> Check your user-level settings:</p>
+    <pre><code># On Mac/Linux
+cat ~/.claude/settings.json 2>&1 || echo "no user-level settings yet"
+
+# On Windows (PowerShell)
+Test-Path $env:USERPROFILE\.claude\settings.json; if ($?) { Get-Content $env:USERPROFILE\.claude\settings.json } else { Write-Host "no user-level settings yet" }</code></pre>
+
+    <p><b>Step 2:</b> Check this project's settings:</p>
+    <pre><code># On Mac/Linux
+cat ./.claude/settings.json 2>&1 || echo "none yet"
+cat ./.claude/settings.local.json 2>&1 || echo "none yet"
+
+# On Windows (PowerShell)
+Test-Path .\.claude\settings.json; if ($?) { Get-Content .\.claude\settings.json } else { Write-Host "none yet" }
+Test-Path .\.claude\settings.local.json; if ($?) { Get-Content .\.claude\settings.local.json } else { Write-Host "none yet" }</code></pre>
+
+    <p><b>What's happening:</b> Settings files are optional. Many projects start without them. If they don't exist, that's fine — Claude Code uses built-in defaults.</p>
+
     <div class="checkpoint">
       <b class="tag">Checkpoint</b>
-      In <code>plan</code> mode it should propose the change and explain it, but not actually write the file. Switch back to your normal mode and re-run the same prompt — now it should actually edit.
+      You've identified which settings files (if any) exist at each scope.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 2: Try Plan Mode</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Switch to plan mode. Use the mode picker in your Claude Code UI, or run:</p>
+    <pre><code>claude --permission-mode plan</code></pre>
+
+    <p><b>Step 2:</b> Ask Claude to edit something:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Add a one-line comment to the top of the CLAUDE.md file: "# Updated on [today's date]"</code></pre>
     </div>
 
-    <div class="step-head"><span class="step-num">3</span><span class="step-title">Run <code>claude doctor</code></span></div>
-    <pre><code>claude doctor</code></pre>
-    <p>Read what it checks. This is your first stop any time a hook, MCP server, or custom command you configure later in this track doesn't behave as expected.</p>
+    <p><b>What's happening:</b> Claude proposes the change in detail, showing you exactly what it will add. But it doesn't actually write the file. You get to review before approving.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Claude should show you a plan with the proposed change, but the file should NOT be modified yet.
+    </div>
+
+    <p><b>Step 3:</b> Now switch back to your normal mode (usually <code>manual</code>) and ask again:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Add the same comment to CLAUDE.md: "# Updated on [today's date]"</code></pre>
+    </div>
+
+    <p><b>What's happening:</b> This time, Claude either edits immediately (if you're in a fast mode like <code>acceptEdits</code>) or asks for your approval. Either way, the file gets modified.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      The CLAUDE.md file now has the comment added. You've seen the difference between <code>plan</code> mode (proposes only) and your normal mode (proposes and executes).
+    </div>
   </div>
+
+  <div class="step">
+    <h3>Example 3: Create a Project-Local Settings File</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p>Create a <code>.claude/settings.local.json</code> file with safe defaults for your personal experiments:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Create a file at .claude/settings.local.json with this content:
+
+{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "ask": ["Bash", "RemoteTrigger"]
+  }
+}
+
+This means: auto-approve file edits, but ask before running any bash commands or remote triggers.</code></pre>
+    </div>
+
+    <p><b>What's happening:</b> You've created a personal settings override for this project. It's in .gitignore, so it won't be committed. Your team members can have different settings without conflicts.</p>
+
+    <p><b>Step 2:</b> Verify the file was created:</p>
+    <pre><code># On Mac/Linux
+cat ./.claude/settings.local.json
+
+# On Windows (PowerShell)
+Get-Content .\.claude\settings.local.json</code></pre>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      The file exists and has the JSON structure you specified.
+    </div>
+
+    <p><b>Step 3:</b> Now try editing a file (should auto-approve) and running a bash command (should ask):</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>1. Create a new file called test.txt with the content "Hello World"
+2. Run the command: ls -la test.txt</code></pre>
+    </div>
+
+    <p><b>What's happening:</b> The file edit should happen without asking. The bash command should prompt you for permission. This proves your settings are being applied.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      File edit auto-approved, bash command asked for permission. Your settings.local.json is working.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 4: Run claude doctor</h3>
+    <span class="where-tag where-vm">Terminal/PowerShell</span>
+
+    <p><b>Step 1:</b> Run the diagnostic tool:</p>
+    <pre><code>claude doctor</code></pre>
+
+    <p><b>What it checks:</b></p>
+    <ul>
+      <li>Is Claude Code installed and on your PATH?</li>
+      <li>Are your CLAUDE.md files readable?</li>
+      <li>Are your settings.json files valid JSON?</li>
+      <li>Are custom commands registered and executable?</li>
+      <li>Are hooks syntactically correct?</li>
+      <li>Are MCP servers running (if configured)?</li>
+    </ul>
+
+    <p><b>What's happening:</b> This tool validates your entire setup. If something is misconfigured, it tells you exactly what and where.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      <code>claude doctor</code> completes. If it reports any issues, you now know where to look to fix them.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 5: Safe Mode for Troubleshooting</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Start a session in safe mode:</p>
+    <pre><code>claude --safe-mode</code></pre>
+
+    <p><b>Step 2:</b> Try a command that uses your customizations:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>List any files named test.* in the current directory.</code></pre>
+    </div>
+
+    <p><b>What's happening:</b> Safe mode disables CLAUDE.md, hooks, custom commands, and agents. If your command works in safe mode but fails normally, the issue is your config, not Claude Code itself.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You've confirmed your setup works in safe mode. If a feature doesn't work outside safe mode, you know to check your CLAUDE.md or settings files.
+    </div>
+
+    <p><b>Step 3:</b> Exit safe mode and return to normal operation:</p>
+    <pre><code>claude</code></pre>
+
+    <p><b>Tip:</b> Safe mode is your diagnostic tool. When something seems broken, always try safe mode first to isolate whether the issue is your customization or Claude Code itself.</p>
+  </div>
+
 </section>
 
 </main>

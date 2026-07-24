@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D5 AM · Agentic AI Across the Enterprise</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">Week 2 · Day 5 · Concept Exploration (11:00–15:00)</p>
+  <h1>Agentic AI across the enterprise — applying the week's build to CX (Customer Experience), ops, analytics, and ROI (Return on Investment)</h1>
+  <p>No new infrastructure today — everything you built Days 1-4 gets applied to a new lens each topic. The last topic logs real ROI numbers to a real local MLflow instance.</p>
+  <div class="thread-badges">
+    <span class="thread-badge insurance">Insurance — primary, all six topics</span>
+    <span class="thread-badge logistics">Logistics — industry-comparison topic uses both threads directly</span>
+  </div>
+  <div class="timing-strip">
+    <span class="timing-chip">11:00–11:10 setup</span>
+    <span class="timing-chip">11:10–13:00 topics 01–03</span>
+    <span class="timing-chip">13:00–13:10 break</span>
+    <span class="timing-chip">13:10–14:30 topics 04–06</span>
+    <span class="timing-chip">14:30–15:00 showcase</span>
+  </div>
+</header>
+
+<nav class="page-nav" aria-label="Session sections">
+  <a href="#setup">Setup</a>
+  <a href="#topics-01-03">01 CX agents</a>
+  <a href="#topic-02">02 Ops automation</a>
+  <a href="#topic-03">03 Analytics</a>
+  <a href="#topics-04-06">04 Coding agents</a>
+  <a href="#topic-05">05 Industry</a>
+  <a href="#topic-06">06 ROI</a>
+  <a href="#showcase">Showcase</a>
+</nav>
+
+<main>
+
+<section id="setup">
+  <h2>Setup (11:00–11:10)</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">0</span><span class="step-title">Environment check</span><span class="step-time">10 min</span></div>
+    <span class="where-tag where-vm">VM · VS Code terminal</span>
+    <pre><code>conda activate ai_agent_env
+python -c "import mlflow; print('mlflow', mlflow.__version__)"</code></pre>
+    <details class="setup-guide">
+      <summary><span class="setup-tag lib">Library setup</span> MLflow's tracking backend changed — use sqlite, not plain file storage</summary>
+      <div class="setup-body">
+        <p class="freshness">Verified directly on MLflow 3.14 (July 2026): the old plain-filesystem tracking URI (Uniform Resource Identifier) style (<code>file:./mlruns</code>) now raises <code>MlflowException: ... filesystem tracking backend ... is in maintenance mode</code>. Use a <code>sqlite:///path/to/mlflow.db</code> tracking URI instead — this is what <code>snippets/roi_model.py</code> does.</p>
+        <pre><code>python -c "
+import mlflow
+mlflow.set_tracking_uri('sqlite:///scratch_mlflow.db')
+print('ok')
+"</code></pre>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section id="topics-01-03">
+<h2 id="topic-01">Topic 01 · Customer-experience agents</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">1</span><span class="step-title">Journey-centric routing: resolve directly, or escalate with evidence</span><span class="step-time">~35 min</span></div>
+  <p><b>Concept.</b> CX agents work across voice, digital, and back-office touchpoints, but the core design decision is the same one you've been building all week: known + grounded → resolve directly (deflection); unknown or ungrounded → escalate to a human, carrying whatever evidence was already gathered rather than starting the human over from zero.</p>
+  <figure class="concept-figure">
+    <img src="images/d5am_t1_cx_agents.png" alt="CX agent pipeline: customer request, classify intent, retrieve facts from authoritative tools only, then branch on whether evidence is sufficient -- draft a grounded response for operator delivery if yes, escalate to a human if no or uncertain">
+    <figcaption>The split between these two paths is the entire CX design.</figcaption>
+  </figure>
+
+  <p><b>Instructor drives live, variation A — deflection case.</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Handle row CLN-007 (glass coverage mid-term question, no active claim) as
+a CX agent: resolve it directly with a grounded answer, no escalation.
+Then state explicitly why this case qualifies for direct resolution.</code></pre>
+  </div>
+  <p><b>Instructor drives live, variation B — escalation case, for contrast.</b></p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Now handle claim CLM-255335 (commercial_package, no policy grounding, the
+fraud-flagged one) as a CX agent. Produce an escalation package for a
+human: what you found, what you couldn't determine, and what the human
+needs to decide -- not a customer-facing answer.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    The escalation package should read like a handoff brief (Day 2 Topic 05's discipline), not a customer email — different audience, different content.
+  </div>
+
+  <p><b>Learners repeat.</b> Classify two more CSV (Comma-Separated Values) rows as deflection or escalation and justify one.</p>
+</div>
+
+<h2 id="topic-02">Topic 02 · Operations &amp; process automation</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">2</span><span class="step-title">Plan first, execute only behind approval and idempotency</span><span class="step-time">~35 min</span></div>
+  <p><b>Concept.</b> Claims/KYC (Know Your Customer)/order-to-cash/returns/reconciliation are all "exception-handling agent" shapes: most cases are routine, a minority need judgment — and any actual write (a status change, a payout) plans first, then requires the same approval + idempotency discipline from Day 1-2, not a direct action.</p>
+  <figure class="concept-figure">
+    <img src="images/d5am_t2_operations_automation.png" alt="Operations automation flow: read current state, prepare a dry run, gate on explicit approval, then only if approved attach an idempotency key and execute the write once, followed by rollback-if-possible on failure or audit evidence on success; no approval means no state change">
+    <figcaption>No approval, no state change — ever.</figcaption>
+  </figure>
+
+  <p><b>Instructor drives live, variation A — plan.</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Plan (don't execute) updating claim CLM-424063's route_queue to
+"adjuster_assigned". State the plan, the tool call it would require, and
+what approval gate it should sit behind before Day 2's HITL mechanism
+would let it actually run.</code></pre>
+  </div>
+  <p><b>Instructor drives live, variation B — the controlled write, for contrast.</b> Reuse Day 2's checkpoint pattern for real:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Using the same LangGraph + SqliteSaver pattern from Day 2 Topic 06,
+actually execute the plan behind a pause-for-approval checkpoint. Approve
+it, confirm the write happened exactly once.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    This is Day 2's HITL (Human-In-The-Loop) infrastructure, now explicitly framed as "process automation," not a new mechanism — the point is recognizing the same pattern under a business label.
+  </div>
+
+  <p><b>Learners repeat.</b> Plan one more operational write (your choice) and name its approval gate before running anything.</p>
+</div>
+
+<h2 id="topic-03">Topic 03 · Analytics &amp; decision-support agents</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">3</span><span class="step-title">Real aggregate evidence, a named accountable human</span><span class="step-time">~40 min</span></div>
+  <p><b>Concept.</b> Decision-support means natural-language access to real aggregate data, producing a recommendation with evidence — while the decision itself stays owned by a named human, exactly like Day 3 PM's MDM (Master Data Management) topic insisted on stable, traceable IDs.</p>
+  <figure class="concept-figure">
+    <img src="images/d5am_t3_analytics_decision_support.png" alt="Decision-support pipeline: governed source data through reproducible analysis to metrics with lineage and a recommendation with confidence, gated on whether the choice is consequential -- an accountable human decides if yes, routine policy-bound use if no">
+    <figcaption>The agent recommends; a named human decides.</figcaption>
+  </figure>
+
+  <p><b>Instructor drives live, variation A — a real aggregate query.</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Query data/insurance/claims.db: group claims by route_queue, showing
+count and average/total reserve_usd per queue. Which queue carries the
+most total financial exposure? Recommend one operational change based on
+that finding, and name who (what role) should own approving it.</code></pre>
+  </div>
+  <p><b>Instructor drives live, variation B — the logistics equivalent, for contrast.</b></p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Do the same aggregate analysis against data/logistics/shipments.db and
+shipment_events.jsonl: which mode (ocean/rail/air) has the most delay/
+exception events? Recommend one change and name its owner.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    Compare the two recommendations' evidence quality — did either one overreach beyond what the aggregate actually supports? That overreach check is itself part of the skill.
+  </div>
+
+  <p><b>Learners repeat.</b> Ask one more aggregate question of your own against either database and produce one recommendation + owner.</p>
+</div>
+</section>
+
+<section id="topics-04-06">
+<h2 id="topic-04">Topic 04 · Software-engineering agents</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">4</span><span class="step-title">Claude Code, doing real software engineering on our real codebase — under a strict patch contract</span><span class="step-time">~35 min</span></div>
+  <p><b>Concept.</b> This topic is Claude Code itself — the tool you've directed all week is a software-engineering agent, and every guardrail principle from Day 1/4 (bounded scope, evidence before action, approval for anything consequential) applies to coding changes too. A "patch contract" bounds scope explicitly: exactly what may change, what tests must still pass, and what's out of bounds.</p>
+  <figure class="concept-figure">
+    <img src="images/d5am_t4_software_engineering_agents.png" alt="Coding-agent pipeline: an issue within scope becomes a bounded plan, a typed patch proposal, and automated tests; only a human-reviewed, approved change is applied, while failing tests trigger a bounded revise loop and a rejected review stops the change unchanged -- the repository itself is treated as untrusted input">
+    <figcaption>The repo is untrusted input; every change earns its way through a gate.</figcaption>
+  </figure>
+
+  <p><b>Instructor drives live, variation A — a bounded patch.</b> <span class="where-tag where-claude">Claude Code chat panel</span> — state the contract before any code changes:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Patch contract: add input validation to get_claim_and_policy in Day 1's
+insurance_lookup_server.py so a claim_id containing anything other than
+letters, digits, and hyphens raises a clear ValueError before hitting the
+database. Scope: ONLY that function. Do not refactor anything else, do
+not change the return schema, and confirm the existing --self-check still
+passes after your change.</code></pre>
+  </div>
+  <p><b>Instructor drives live, variation B — a scope violation, for contrast.</b></p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Now ask, in the same conversation: "while you're in there, can you also
+rename PRODUCT_TO_POLICY_PREFIX and reorganize the imports?" Watch
+whether Claude Code flags this as outside the original patch contract, or
+just does it. Discuss which behavior you'd actually want from a coding
+agent in a real codebase.</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    Scope creep in a coding agent is the same failure category as Day 1's agent-vs-pipeline over-reach — "while I'm here" changes are exactly what a patch contract exists to prevent, reviewable diffs stay reviewable only if they stay small and scoped.
+  </div>
+
+  <p><b>Learners repeat.</b> Verify the self-check still passes after variation A's real change:</p>
+  <pre><code>uv run python W2D1/snippets/insurance_lookup_server.py --self-check</code></pre>
+</div>
+
+<h2 id="topic-05">Topic 05 · Industry deep dives</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">5</span><span class="step-title">Insurance vs. logistics: same patterns, different truth sources</span><span class="step-time">~35 min</span></div>
+  <p><b>Concept.</b> You've built the same six days of concepts twice this week, in two domains. The patterns transferred cleanly; what didn't transfer is domain-specific: what counts as "truth" (a policy document vs. an SLA (Service-Level Agreement) doc), what an unknown record means (no policy grounding vs. no SLA for air freight), and what "stop and escalate" looks like in each.</p>
+  <figure class="concept-figure">
+    <img src="images/d5am_t5_industry_deep_dives.png" alt="Cross-industry comparison: the same four-step control pattern (ground facts, limit authority, record evidence, escalate uncertainty) applied identically to insurance, banking, and logistics lanes, each retrieving, validating, gating, and handing off -- domain truth comes from tools, but the controls themselves are reused across industries">
+    <figcaption>Same controls, three industries — only the truth source changes.</figcaption>
+  </figure>
+
+  <p><b>Instructor drives live.</b> <span class="where-tag where-claude">Claude Code chat panel</span>:</p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Compare the insurance and logistics threads side by side: (1) what's the
+"truth source" in each (policy docs vs. SLA docs)? (2) what's the
+deliberate ungrounded case in each (commercial_package vs. air mode)?
+(3) what's the stop/escalate behavior in each when evidence is missing?
+Where did the SAME code pattern (e.g. grounding_available field) transfer
+directly, and where did the domain force a real difference?</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    A strong answer names at least one place the pattern transferred with zero changes (proving the abstraction was sound) and at least one place domain specifics genuinely mattered (proving it wasn't a fake abstraction either).
+  </div>
+
+  <p><b>Learners repeat.</b> Pick one more concept from earlier this week (e.g. Day 3's GraphRAG signal) and describe how it would look if applied to a third domain of your choosing.</p>
+</div>
+
+<h2 id="topic-06">Topic 06 · ROI &amp; value measurement</h2>
+<div class="step">
+  <div class="step-head"><span class="step-num">6</span><span class="step-title">A real ROI model, logged to a real local MLflow instance</span><span class="step-time">~35 min</span></div>
+  <p><b>Concept.</b> A credible ROI model separates assumptions (hourly rate, baseline time), quality (this week's real eval floors, not "it seems fine"), adoption (% of cases actually automated), gross value, cost, and net value — as distinct, auditable line items, not one hand-waved number.</p>
+  <figure class="concept-figure">
+    <img src="images/d5am_t6_roi_value.png" alt="ROI measurement chain: baseline, controlled experiment, adoption and use, quality and cycle time, and business-outcome evidence feed a net-value decision after subtracting operating cost -- activity alone does not equal value">
+    <figcaption>Skip a term and the number becomes fiction.</figcaption>
+  </figure>
+
+  <p><b>Run it together, variation A — the model as shipped.</b> <span class="where-tag where-vm">VS Code terminal</span>:</p>
+  <pre><code>uv run python W2D5/snippets/roi_model.py</code></pre>
+  <p>Then view it:</p>
+  <pre><code>uv run mlflow ui --backend-store-uri sqlite:///W2D5/outputs/mlflow.db</code></pre>
+
+  <p><b>Run it together, variation B — a worse baseline, for contrast.</b></p>
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt</div>
+    <pre><code>Re-run the ROI model with human_baseline_minutes lowered to 3.0 (a much
+faster human baseline than the current 12-20). Does net_value_usd stay
+positive? What does this tell you about how sensitive an ROI claim is to
+the baseline assumption you picked?</code></pre>
+  </div>
+  <div class="callout instructor">
+    <b class="tag">Debrief</b>
+    A believable ROI case states its baseline assumption explicitly and shows it's not doing all the work — if the number flips from strongly positive to marginal on a plausible baseline change, that's worth disclosing, not hiding.
+  </div>
+
+  <p><b>Learners repeat.</b> Log one more run with your own assumption for <code>hourly_rate_usd</code> and note how much the net value shifts.</p>
+</div>
+</section>
+
+<section id="showcase">
+  <h2>Showcase (14:30–15:00)</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-title">1–2 learners share, no formal grading</span><span class="step-time">30 min</span></div>
+    <p>Share one moment: a CX escalation package, a real aggregate finding, a scope-creep catch on the coding agent, or an ROI number that surprised you.</p>
+    <div class="homework-block">
+      <h3>Before W2D5 PM</h3>
+      <p>Bring one number from today's ROI run — it feeds directly into this afternoon's capstone brief.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="page-footer">Week 2 · Day 5 AM · Claude Code edition — agentic AI across the enterprise, insurance thread primary</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

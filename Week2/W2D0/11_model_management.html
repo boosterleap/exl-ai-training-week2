@@ -17,27 +17,126 @@
 <main>
 
 <section id="concept">
-  <h2>Concept</h2>
+  <h2>Concept: Model Selection and Cost Management</h2>
   <div class="step">
-    <p>Model choice is a per-session (or per-task) dial, not a one-time setup decision. Claude Code exposes it as a setting (<code>~/.claude/settings.json</code>'s <code>"model"</code> key), a CLI flag, and an in-session switch.</p>
-    <ul class="concept-list">
-      <li><b>Depth vs. speed, the same tradeoff from Week 2 Day 1.</b> A deeper-reasoning model costs more and is slower per turn; a faster one is cheaper but may need more explicit guidance on hard judgment calls.</li>
-      <li><b>Fallback exists for reliability, not just preference.</b> <code>--fallback-model</code> lets a session automatically retry on a different model if the primary is overloaded or unavailable — a real production concern, not a hypothetical.</li>
-      <li><b>Cost is visible, not hidden.</b> The same <code>/cost</code>-style reporting you used all through Week 2 works here too — check it before assuming a workflow is cheap.</li>
+    <h3>The Big Picture</h3>
+    <p>Claude Code lets you choose which Claude model runs your session. Different models have different speed/cost tradeoffs:
+    <ul>
+      <li><b>Claude Haiku (fastest, cheapest):</b> Best for quick tasks, straightforward coding, simple analysis. Lower cost, faster response.</li>
+      <li><b>Claude Sonnet (balanced):</b> Default for most work. Good reasoning, fast enough.</li>
+      <li><b>Claude Opus (most capable, slower, most expensive):</b> For hard problems, complex reasoning, design decisions. Slower, costs more.</li>
+    </ul>
+
+    <h3>Where to Set the Model</h3>
+    <ul>
+      <li><code>~/.claude/settings.json</code>: Default model for all sessions (the <code>"model"</code> field)</li>
+      <li><code>claude --model opus</code>: Override for one session</li>
+      <li><code>/model</code>: Switch mid-session — run it with a name/alias to switch immediately, or with no argument to open an interactive picker. This is a built-in Claude Code command, not something that depends on your IDE.</li>
+    </ul>
+
+    <h3>Fallback and Reliability</h3>
+    <p><code>--fallback-model</code> specifies one or more alternate models to try if your primary model is overloaded, unavailable, or returns another non-retryable server error (it does <i>not</i> kick in for auth, billing, rate-limit, or request-size errors):</p>
+    <pre><code>claude --model opus --fallback-model sonnet</code></pre>
+    <p>If Opus is overloaded or unavailable, the session automatically retries with Sonnet. The fallback only applies for the current turn — your next message tries Opus again. (You can also chain multiple fallbacks, comma-separated, e.g. <code>--fallback-model sonnet,haiku</code>, and persist a chain across sessions with the <code>fallbackModel</code> array in settings.json.)</p>
+
+    <h3>Cost Visibility</h3>
+    <p>Always check token usage:
+    <ul>
+      <li>At the end of a session, Claude reports tokens used and estimated cost</li>
+      <li>Long sessions with complex tasks can add up</li>
+      <li>Cheaper models (Haiku) are fine for routine coding; splurge on Opus for design questions</li>
     </ul>
   </div>
 </section>
 
-<section id="handson">
-  <h2>Hands-on</h2>
+<section id="use-cases">
+  <h2>Real-World Use Cases</h2>
   <div class="step">
-    <div class="step-head"><span class="step-num">1</span><span class="step-title">Check your current default</span></div>
-    <span class="where-tag where-vm">VM · terminal</span>
-    <pre><code>cat ~/.claude/settings.json | grep -i model || echo "no explicit model set — using the account default"</code></pre>
+    <h3>1. Cost Optimization for Routine Tasks</h3>
+    <p><b>The problem:</b> You use Opus for everything. Your bill is high, but most tasks are simple code changes that don't need Opus's depth.</p>
+    <p><b>The solution:</b> Switch to Haiku for routine edits. Use Opus only for architecture and design decisions.</p>
+    <p><b>The result:</b> 50-70% cost reduction while maintaining quality for complex tasks.</p>
 
-    <div class="step-head"><span class="step-num">2</span><span class="step-title">Compare two models on the same task</span></div>
+    <h3>2. Hard Design Problems</h3>
+    <p><b>The problem:</b> A tough architectural question. Cheaper models give surface-level answers. You need deep reasoning.</p>
+    <p><b>The solution:</b> `claude --model opus` for that specific session. Spend more where it matters.</p>
+    <p><b>The result:</b> Better architectural decisions, faster consensus.</p>
+
+    <h3>3. Reliability in Production Systems</h3>
+    <p><b>The problem:</b> A critical agent must stay responsive, even if the primary API is slow.</p>
+    <p><b>The solution:</b> `--fallback-model` ensures automatic retry on a backup model if needed.</p>
+    <p><b>The result:</b> More reliable service. No manual intervention needed for model unavailability.</p>
+
+    <h3>4. Learning and Experimentation</h3>
+    <p><b>The problem:</b> You're exploring an unfamiliar domain. Cheaper models help you learn without big costs.</p>
+    <p><b>The solution:</b> Start with Haiku for learning. Graduate to better models when you have more context.</p>
+    <p><b>The result:</b> Cheaper exploration. Less waste on "what's the right direction?" questions.</p>
+
+    <h3>5. Batch Processing</h3>
+    <p><b>The problem:</b> You need to process 1000 small, similar tasks (e.g., analyze logs, summarize customer feedback).</p>
+    <p><b>The solution:</b> Haiku or Sonnet for batch work. Save Opus for exceptions needing deeper reasoning.</p>
+    <p><b>The result:</b> Massive cost savings on repetitive work.</p>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on Practice: Three Examples</h2>
+
+  <div class="step">
+    <h3>Example 1: Check Current Model Default</h3>
+    <span class="where-tag where-vm">Terminal/PowerShell</span>
+
+    <p><b>Step 1:</b> Check your settings:</p>
+    <pre><code># On Mac/Linux
+cat ~/.claude/settings.json | grep -i model || echo "no explicit model set"
+
+# On Windows (PowerShell)
+Select-String -Path $env:USERPROFILE\.claude\settings.json -Pattern "model" -ErrorAction SilentlyContinue || Write-Host "no model set"</code></pre>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You know what your current default model is (or that no explicit default is set).
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 2: Override Model for a Session</h3>
     <span class="where-tag where-claude">Claude Code chat panel</span>
-    <p>If your setup lets you switch models mid-session (check your model picker or <code>/model</code>), give both the same genuinely ambiguous task:</p>
+
+    <p><b>Step 1:</b> Ask Claude what model it's using:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>What Claude model are you running right now? (This is metadata, not a task.)</code></pre>
+    </div>
+
+    <p><b>Step 2:</b> Try a model override via your UI's model picker or settings (specific method depends on your IDE integration).</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You've switched models and confirmed the change.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 3: Monitor Token/Cost Usage</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Ask Claude about token usage in this session:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Roughly how many tokens have been used in this W2D0 session so far?
+Estimate the cost at current model rates.</code></pre>
+    </div>
+
+    <p><b>What you'll see:</b> Estimate of tokens and cost. This helps you understand the budget impact of long sessions or expensive models.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You're aware of cost. Use this knowledge to choose Haiku for cheap routine work and Opus for hard problems.
+    </div>
+  </div>
+
+</section></p>
     <div class="prompt-box">
       <div class="prompt-label">Prompt</div>
       <pre><code>Here's a deliberately underspecified request: "make the config better."
@@ -51,6 +150,7 @@ and why. (Run this once per model you're comparing.)</code></pre>
 
     <div class="step-head"><span class="step-num">3</span><span class="step-title">Read your own cost</span></div>
     <pre><code>/cost</code></pre>
+    <p><code>/cost</code> is now an alias for the more complete <code>/usage</code> command, which also shows plan-limit usage, rate limits, and a breakdown by model/skill/subagent — either command works.</p>
   </div>
 </section>
 

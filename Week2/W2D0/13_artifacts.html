@@ -10,7 +10,7 @@
 <p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
 
 <header class="hero">
-  <p class="eyebrow">W2D0 · Topic 13 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="12_plugins.html" style="color:#cbd8ff;">← 12</a> · <a href="14_capstone_setup_and_eda.html" style="color:#cbd8ff;">Capstone →</a></p>
+  <p class="eyebrow">W2D0 · Topic 13 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="12_plugins.html" style="color:#cbd8ff;">← 12</a> · <a href="CP1_capstone_setup_and_grounding_data.html" style="color:#cbd8ff;">Capstone →</a></p>
   <h1>Artifacts — publishing a shareable page directly from Claude Code</h1>
   <p>The last foundational topic before the capstone — and you'll use this exact capability for the Streamlit demo's write-up.</p>
 </header>
@@ -18,26 +18,106 @@
 <main>
 
 <section id="concept">
-  <h2>Concept</h2>
+  <h2>Concept: Artifacts — Shareable Web Pages</h2>
   <div class="step">
-    <p>An Artifact is a rendered, hosted web page (or document) Claude Code can publish directly — useful for a dashboard, a report, or a demo page you want to share without setting up your own hosting. It starts private; you choose whether to share it further.</p>
-    <ul class="concept-list">
-      <li><b>Different from a file in your repo.</b> A file is code/content you and your team read in an editor. An artifact is something you'd hand a stakeholder a link to — rendered, presentable, no setup required on their end.</li>
-      <li><b>Updatable in place.</b> Republishing to the same artifact updates it at the same URL — you don't get a new link every time you fix something.</li>
+    <h3>The Big Picture</h3>
+    <p>An artifact is a hosted, rendered web page Claude Code publishes for you. No server setup, no deployment, no hosting costs. Just ask Claude to create a dashboard, report, or demo page, and it publishes automatically with a shareable link.</p>
+
+    <h3>Artifact vs. File</h3>
+    <p><b>File (in your repo):</b> Code, text, data. You and your team read it in an editor. It's source, not presentation.</p>
+    <p><b>Artifact (hosted page):</b> Rendered, styled, interactive. You share a link with stakeholders. They open a browser, see a polished page. No editor, no setup, no technical knowledge needed.</p>
+
+    <h3>Types of Artifacts</h3>
+    <ul>
+      <li><b>HTML dashboards:</b> Real-time data display, charts, interactive controls</li>
+      <li><b>Documentation:</b> Guides, reports, tutorials—nicely formatted and shareable</li>
+      <li><b>Demo pages:</b> Show off a feature or idea to non-technical stakeholders</li>
+      <li><b>Markdown documents:</b> Formatted text, much nicer than raw markdown files</li>
+      <li><b>Data visualizations:</b> Charts, graphs, heatmaps—all interactive</li>
     </ul>
+
+    <h3>Sharing and Privacy</h3>
+    <p><b>Artifacts start private.</b> Only you can see the link. You control whether to share it further.</p>
+    <p><b>Update in place:</b> Republish to the same artifact URL to push updates. No new links, just new content.</p>
+    <p><b>Self-contained:</b> All CSS, JS, and content are embedded. No external CDN dependencies or broken links.</p>
+  </div>
+</section>
+
+<section id="use-cases">
+  <h2>Real-World Use Cases</h2>
+  <div class="step">
+    <h3>1. Project Status Dashboards</h3>
+    <p><b>The problem:</b> You want to show your team a real-time status dashboard: build status, test coverage, deployment history. Setting up a real server is overkill.</p>
+    <p><b>The solution:</b> Claude Code creates a simple HTML page with charts and current metrics. Publish as an artifact.</p>
+    <p><b>The result:</b> Dashboard is live in seconds. Shareable link to your team. Update it anytime by republishing.</p>
+
+    <h3>2. Customer-Facing Reports</h3>
+    <p><b>The problem:</b> Monthly report to a client. Needs to be pretty, professional, no technical jargon. Can't send a Python script.</p>
+    <p><b>The solution:</b> Claude Code generates a polished HTML report with charts, summary, key metrics. Publish as an artifact and share the link.</p>
+    <p><b>The result:</b> Professional, self-contained report. Client sees it in their browser, no setup needed.</p>
+
+    <h3>3. Feature Demo to Stakeholders</h3>
+    <p><b>The problem:</b> You've built a cool feature. Non-technical stakeholders need to see it working, but your dev environment isn't public.</p>
+    <p><b>The solution:</b> Create a demo page in an artifact showing the feature in action.</p>
+    <p><b>The result:</b> Stakeholders see a working demo. Their buy-in is faster.</p>
+
+    <h3>4. Documentation and Guides</h3>
+    <p><b>The problem:</b> Onboarding docs in markdown. They're hard to navigate, ugly, not indexed.</p>
+    <p><b>The solution:</b> Generate as an artifact. It's styled, searchable, shareable.</p>
+    <p><b>The result:</b> Better documentation experience. Less friction for new team members.</p>
+
+    <h3>5. Data Visualization</h3>
+    <p><b>The problem:</b> You have data (CSV, JSON). You want an interactive visualization without writing D3 or learning Matplotlib.</p>
+    <p><b>The solution:</b> Claude Code creates a chart artifact with interactivity built-in.</p>
+    <p><b>The result:</b> Beautiful, interactive visualization in minutes.</p>
   </div>
 </section>
 
 <section id="handson">
-  <h2>Hands-on</h2>
+  <h2>Hands-on Practice: Two Examples</h2>
+
   <div class="step">
-    <div class="step-head"><span class="step-num">1</span><span class="step-title">Publish something real</span></div>
+    <h3>Example 1: Publish a Summary Artifact</h3>
     <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Ask Claude to create and publish a summary artifact:</p>
     <div class="prompt-box">
       <div class="prompt-label">Prompt</div>
-      <pre><code>Build a short one-page summary of everything we've covered in W2D0 Topics
-00-12 (a title per topic, one line each), styled cleanly, and publish it as
-an artifact.</code></pre>
+      <pre><code>Create a clean, one-page HTML artifact that summarizes everything we've
+learned in W2D0 (Topics 01-13). Include a title, a short intro, and a list
+of all 13 topics with one-line descriptions. Style it professionally with
+a nice color scheme. Then publish it as an artifact and give me the link.</code></pre>
+    </div>
+
+    <p><b>What you'll see:</b> Claude creates HTML and publishes it. You get a link to the artifact.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You have a live artifact link. Visit it in a browser to see your published page.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 2: Update Your Artifact</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Ask Claude to update the existing artifact (add the capstone section):</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Update the W2D0 summary artifact: add a new section at the top titled
+"Capstone" with a brief description of what we'll build in the capstone.
+Re-publish to the same artifact URL so the link doesn't change.</code></pre>
+    </div>
+
+    <p><b>What's happening:</b> Claude republishes to the same artifact. The page updates, but the URL stays the same. Shareable link remains valid.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      The artifact updated in place. You didn't get a new link, just new content at the same URL.
+    </div>
+  </div>
+
+</section>
     </div>
     <div class="checkpoint">
       <b class="tag">Checkpoint</b>
@@ -57,7 +137,7 @@ republish it to the SAME url, not a new one.</code></pre>
 <section id="next">
   <h2>Next: the capstone</h2>
   <div class="step">
-    <p>You now have the full toolkit — memory, config, commands, skills, subagents, hooks, context management, MCP, GitHub/git automation, model choice, plugins, and artifacts. The capstone (14–18) uses essentially all of it, building one real project end to end: <a href="14_capstone_setup_and_eda.html">start with Stage 1 — setup &amp; EDA →</a></p>
+    <p>You now have the full toolkit — memory, config, commands, skills, subagents, hooks, context management, MCP, GitHub/git automation, model choice, plugins, and artifacts. The capstone (CP1–CP6) uses essentially all of it, building one real project end to end: <a href="CP1_capstone_setup_and_grounding_data.html">start with Phase 1 — setup &amp; grounding data →</a></p>
   </div>
 </section>
 

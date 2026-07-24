@@ -11,8 +11,8 @@
 
 <header class="hero">
   <p class="eyebrow">Week 2 · Day 1 · Applied Build Lab (16:00–20:00)</p>
-  <h1>Claude Agent SDK primitives — configured directly on your own Claude Code</h1>
-  <p>Claude Code is a real application built on the Claude Agent SDK. Today's six topics are properties of the exact tool open in front of you — no simulation, no separate demo notebook. You'll build a real MCP tool, configure real permissions, and read your own session's real cost — each with at least one contrasting run so you can see the difference, not just hear about it.</p>
+  <h1>Claude Agent SDK (Software Development Kit) primitives — configured directly on your own Claude Code</h1>
+  <p>Claude Code is a real application built on the Claude Agent SDK. Today's six topics are properties of the exact tool open in front of you — no simulation, no separate demo notebook. You'll build a real MCP (Model Context Protocol) tool, configure real permissions, and read your own session's real cost — each with at least one contrasting run so you can see the difference, not just hear about it.</p>
   <div class="thread-badges">
     <span class="thread-badge insurance">Insurance — primary build, all six topics</span>
     <span class="thread-badge homework">Logistics — start in-session, finish as homework</span>
@@ -23,7 +23,7 @@
     <span class="timing-chip">17:45–17:55 break</span>
     <span class="timing-chip">17:55–19:00 topics 04–06</span>
     <span class="timing-chip">19:00–19:30 app build</span>
-    <span class="timing-chip">19:30–20:00 MCQ assessment</span>
+    <span class="timing-chip">19:30–20:00 MCQ (Multiple-Choice Questions) assessment</span>
   </div>
 </header>
 
@@ -52,7 +52,7 @@ claude auth status
 python -c "import mcp; print(mcp.__version__ if hasattr(mcp,'__version__') else 'mcp ok')"</code></pre>
     <div class="callout">
       <b class="tag">Note on <code>claude-agent-sdk</code></b>
-      The Python package <code>claude-agent-sdk</code> is <b>not</b> installed in <code>ai_agent_env</code>, and you won't need it today. Claude Code (the CLI/VS Code extension you already have open) <i>is</i> the reference application built on that SDK — everything below maps 1:1 onto that library's concepts. You're studying the real thing, not a stand-in for it.
+      The Python package <code>claude-agent-sdk</code> is <b>not</b> installed in <code>ai_agent_env</code>, and you won't need it today. Claude Code (the CLI (Command-Line Interface)/VS Code extension you already have open) <i>is</i> the reference application built on that SDK — everything below maps 1:1 onto that library's concepts. You're studying the real thing, not a stand-in for it.
     </div>
   </div>
 </section>
@@ -343,7 +343,7 @@ covered or not, and why.</code></pre>
   <p>Everything above was topic-scoped practice. This slot is different: it's the first increment of one continuous pipeline you'll keep extending every PM this week — <code>resolve_email(email_id)</code>, an insurance capstone thread distinct from the logistics transfer exercise below. Today it does the smallest useful thing: read one inbound email, look up its claim and policy through Topic 02's stdio MCP tool, and either draft a grounded reply or escalate rather than guess.</p>
 
   <div class="step">
-    <div class="step-head"><span class="step-num">App</span><span class="step-title">Build <code>resolve_email(email_id)</code> for one FNOL email</span><span class="step-time">~20 min</span></div>
+    <div class="step-head"><span class="step-num">App</span><span class="step-title">Build <code>resolve_email(email_id)</code> for one FNOL (First Notice of Loss) email</span><span class="step-time">~20 min</span></div>
     <span class="where-tag where-claude">Claude Code chat panel</span>
     <p>Direct Claude Code to build your <b>own</b> file — do not overwrite anything under <code>app/</code>:</p>
     <div class="prompt-box">
@@ -399,7 +399,7 @@ me each JSON result.</code></pre>
   <h2>Logistics thread — start now, finish as homework</h2>
   <div class="homework-block">
     <h3>Build the parallel tool for the logistics thread</h3>
-    <p>Repeat Topic 02's exercise for the logistics data: have Claude Code build a second MCP server, <code>logistics-lookup</code>, exposing <code>get_order_and_shipment(order_id: str)</code> against <code>data/logistics/shipments.db</code> and <code>shipment_events.jsonl</code>/<code>delay_events.jsonl</code>, using the <code>mode</code> → SLA-doc-prefix mapping in <code>data/_DATA_README.md</code>. Remember: <code>air</code> mode has no matching SLA doc on purpose — your tool's <code>grounding_available</code> field should reflect that honestly, the same way the insurance tool does for <code>commercial_package</code>.</p>
+    <p>Repeat Topic 02's exercise for the logistics data: have Claude Code build a second MCP server, <code>logistics-lookup</code>, exposing <code>get_order_and_shipment(order_id: str)</code> against <code>data/logistics/shipments.db</code> and <code>shipment_events.jsonl</code>/<code>delay_events.jsonl</code>, using the <code>mode</code> → SLA (Service-Level Agreement)-doc-prefix mapping in <code>data/_DATA_README.md</code>. Remember: <code>air</code> mode has no matching SLA doc on purpose — your tool's <code>grounding_available</code> field should reflect that honestly, the same way the insurance tool does for <code>commercial_package</code>.</p>
     <p>Then, mirroring this afternoon's Topic 02 second-tool exercise, add a second tool to the same server: <code>list_delayed_shipments(min_severity: str)</code> against <code>delay_events.jsonl</code>.</p>
     <p>Register both in <code>.mcp.json</code> alongside <code>insurance-lookup</code>, and by the start of W2D2 AM be ready to show one real call for <code>ORD-3007</code> (the air-freight order with no SLA doc) and one call to <code>list_delayed_shipments</code>, and explain what each tool returned.</p>
   </div>

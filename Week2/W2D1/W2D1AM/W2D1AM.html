@@ -12,7 +12,7 @@
 <header class="hero">
   <p class="eyebrow">Week 2 · Day 1 · Concept Exploration (11:00–15:00)</p>
   <h1>The agentic loop, reasoning, tools, memory &amp; guardrails — watched live in Claude Code</h1>
-  <p>No slides, no raw API key. Every concept today is demonstrated by directing and inspecting your own Claude Code session against real customer emails — and for each concept you'll see at least two contrasting runs, not just one, so the difference is visible, not just described.</p>
+  <p>No slides, no raw API (Application Programming Interface) key. Every concept today is demonstrated by directing and inspecting your own Claude Code session against real customer emails — and for each concept you'll see at least two contrasting runs, not just one, so the difference is visible, not just described.</p>
   <div class="thread-badges">
     <span class="thread-badge insurance">Insurance — primary, all six topics</span>
     <span class="thread-badge logistics">Logistics — quick transfer check at the end</span>
@@ -65,7 +65,7 @@ git -C . rev-parse --show-toplevel</code></pre>
 <h2 id="topic-01">Topic 01 · The agentic loop, in depth</h2>
 <div class="step">
   <div class="step-head"><span class="step-num">1</span><span class="step-title">Perceive → reason → act → observe</span><span class="step-time">~40 min</span></div>
-  <p><b>Concept.</b> An agent isn't "a prompt that's a bit smarter" — it's a small distributed system where the LLM itself is the planner <i>and</i> the executor: it decides what to look up, does the looking-up (via tools), reads what came back, and decides what's next. That loop — perceive, reason, act, observe — repeats until the model decides it's done.</p>
+  <p><b>Concept.</b> An agent isn't "a prompt that's a bit smarter" — it's a small distributed system where the LLM (Large Language Model) itself is the planner <i>and</i> the executor: it decides what to look up, does the looking-up (via tools), reads what came back, and decides what's next. That loop — perceive, reason, act, observe — repeats until the model decides it's done.</p>
   <ul class="concept-list">
     <li><b>Why "distributed system," specifically.</b> Each act/observe pair is a network or filesystem round-trip with its own latency and its own chance of partial failure (a tool can time out, return an error, or return something the model misreads) — reasoning has to account for that, the same way a distributed backend has to handle a flaky downstream service.</li>
     <li><b>What a one-shot completion loses.</b> A single "perceive → reason → output text" call (no act/observe) can only answer from what's already in the prompt. The moment it needs a fact it doesn't have, a one-shot call either admits it can't help or — worse — guesses. The loop exists specifically to let the model go get the fact instead of guessing it.</li>
@@ -91,7 +91,7 @@ policies). Tell me, step by step, what you looked up and in what order,
 before you tell me your answer. Don't draft a reply yet — just narrate your
 process.</code></pre>
   </div>
-  <p>Watch the transcript together. Point at the exact moment Claude Code reads the CSV (perceive), decides it needs the database (reason), runs a query (act), and reads the result back (observe) — then does another reason/act/observe pass before answering.</p>
+  <p>Watch the transcript together. Point at the exact moment Claude Code reads the CSV (Comma-Separated Values) (perceive), decides it needs the database (reason), runs a query (act), and reads the result back (observe) — then does another reason/act/observe pass before answering.</p>
 
   <p><b>Instructor drives live, variation B — the loop disabled, for contrast.</b> Same row, but this time forbid tool use entirely:</p>
   <div class="prompt-box">
@@ -108,7 +108,7 @@ covered and what happens next. Do not look anything up.</code></pre>
 
   <details class="instructor-reveal">
     <summary>Instructor: what to point out (reveal after running both)</summary>
-    <p>Claude Code will typically: read the CSV row, notice <code>claim_number_ground_truth</code>/<code>policy_id_ground_truth</code>, then either grep/read <code>claims.db</code> directly or write a tiny script to query it. Emphasize: it chose <i>how</i> to look the data up — you didn't tell it "run a SQL query." That's the reasoning step making an executor decision, not you scripting it. In variation B, watch for the model correctly refusing to invent a policy status — that's a preview of Topic 06's guardrail theme.</p>
+    <p>Claude Code will typically: read the CSV row, notice <code>claim_number_ground_truth</code>/<code>policy_id_ground_truth</code>, then either grep/read <code>claims.db</code> directly or write a tiny script to query it. Emphasize: it chose <i>how</i> to look the data up — you didn't tell it "run a SQL (Structured Query Language) query." That's the reasoning step making an executor decision, not you scripting it. In variation B, watch for the model correctly refusing to invent a policy status — that's a preview of Topic 06's guardrail theme.</p>
   </details>
 
   <p><b>Learners repeat, two rows.</b> <span class="where-tag where-vm">Your own VM, your own terminal + Claude Code panel</span> — pick <i>two</i> different rows (e.g. <code>CLN-004</code> and <code>CLN-008</code>) and run the full-loop prompt (variation A) on each. Fill in an observation note for each:</p>
@@ -175,7 +175,7 @@ ahead at a time.</code></pre>
 
 <h2 id="topic-03">Topic 03 · Tools as contracts</h2>
 <div class="step">
-  <div class="step-head"><span class="step-num">3</span><span class="step-title">JSON-schema, validation, idempotency, budgets</span><span class="step-time">~40 min</span></div>
+  <div class="step-head"><span class="step-num">3</span><span class="step-title">JSON (JavaScript Object Notation)-schema, validation, idempotency, budgets</span><span class="step-time">~40 min</span></div>
   <p><b>Concept.</b> A tool call is a contract, not a suggestion: the model must supply arguments matching a schema, the tool validates them, and the tool's output is itself validated before the model trusts it. A well-designed tool is also <i>idempotent</i> — calling it twice with the same input causes no extra side effect — and carries an explicit time/cost budget so one runaway call can't blow the whole session.</p>
   <ul class="concept-list">
     <li><b>Read tools vs. write tools need different contracts.</b> A read-only lookup only needs input validation and a "not found" path. A write tool (approve a payment, send an email) additionally needs idempotency — typically an idempotency key so a retried call doesn't double-charge or double-send — and usually a human approval gate before it fires.</li>
@@ -214,7 +214,7 @@ this tool ever run without a human approval step — why or why not?</code></pre
   </div>
   <div class="callout instructor">
     <b class="tag">Debrief</b>
-    The point isn't to build this tool today — it's to hear Claude Code (correctly) insist on an idempotency key and a human approval gate for anything that moves money, in a way it didn't need to for the read-only lookup. That distinction is exactly what Day 1 PM's permissions topic and Day 2's HITL topic build on.
+    The point isn't to build this tool today — it's to hear Claude Code (correctly) insist on an idempotency key and a human approval gate for anything that moves money, in a way it didn't need to for the read-only lookup. That distinction is exactly what Day 1 PM's permissions topic and Day 2's HITL (Human-In-The-Loop) topic build on.
   </div>
 
   <p><b>Learners repeat — design both directions for logistics.</b> Ask Claude Code to do the same two design passes for the logistics domain: a read tool <code>get_order_and_shipment_status(order_id)</code> against <code>data/logistics/shipments.db</code> + <code>shipment_events.jsonl</code>, <i>and</i> a write tool <code>issue_delay_compensation_credit(order_id, credit_pct, idempotency_key)</code>. Note where the "no grounding" case shows up in the read tool (hint: the <code>air</code> mode) and what the write tool's approval requirement should be.</p>
@@ -356,7 +356,7 @@ coverage status.</code></pre>
     Variation A is "the record exists, but nothing grounds a coverage answer" (escalate/flag). Variation B is "the record itself doesn't exist" (a plain not-found error). A well-built assistant should distinguish these two out loud, not collapse them into one vague "can't help" response — they call for different next actions.
   </div>
 
-  <p><b>Learners repeat.</b> Try both variations again, but on the logistics thread: <code>ORD-3007</code> (air freight, no matching SLA doc — the ungrounded case) and an order ID that doesn't exist at all (the not-found case). Confirm Claude Code treats them differently, the same way it did for insurance.</p>
+  <p><b>Learners repeat.</b> Try both variations again, but on the logistics thread: <code>ORD-3007</code> (air freight, no matching SLA (Service-Level Agreement) doc — the ungrounded case) and an order ID that doesn't exist at all (the not-found case). Confirm Claude Code treats them differently, the same way it did for insurance.</p>
 </div>
 </section>
 
@@ -367,7 +367,7 @@ coverage status.</code></pre>
     <p>Pick one moment from today where Claude Code did something you didn't expect — a different lookup order, a caught mistake during reflection, a refusal on the ungrounded claim, a surprising pipeline-vs-agent classification. Share the prompt and the surprising part of the transcript.</p>
     <div class="homework-block">
       <h3>Before W2D1 PM</h3>
-      <p>Skim <code>data/logistics/customer_emails.csv</code> and <code>data/_DATA_README.md</code>'s logistics section. You'll build a real MCP tool against this data as homework this afternoon, using the same shape as the insurance tool you designed in Topic 03.</p>
+      <p>Skim <code>data/logistics/customer_emails.csv</code> and <code>data/_DATA_README.md</code>'s logistics section. You'll build a real MCP (Model Context Protocol) tool against this data as homework this afternoon, using the same shape as the insurance tool you designed in Topic 03.</p>
     </div>
   </div>
 </section>

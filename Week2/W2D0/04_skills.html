@@ -18,48 +18,290 @@
 <main>
 
 <section id="concept">
-  <h2>Concept</h2>
+  <h2>Concept: Skills — Packaged Expertise</h2>
   <div class="step">
-    <p>A skill is a packaged set of instructions for a particular kind of task — a checklist, a repo-specific workflow, a review procedure — that Claude Code can load and follow, invoked either automatically (when the task matches) or explicitly by name. Unlike a subagent, a skill runs <b>in your current context</b> — no isolation, no separate session.</p>
-    <ul class="concept-list">
-      <li><b>Skill vs. custom slash command.</b> A slash command is a fixed prompt template you trigger by name. A skill is closer to a reusable procedure Claude Code can recognize it should apply, with its own instructions loaded in — more like handing it a runbook than a canned message.</li>
-      <li><b>Skill vs. subagent (the real decision point).</b> Use a skill when the task should stay in your current conversation's context — you want the result woven into what you're already doing. Reach for a subagent (Topic 05) specifically when you want isolation — a big, noisy sub-task that shouldn't pollute your main context.</li>
+    <h3>The Big Picture</h3>
+    <p>A <b>skill</b> is a set of specialized instructions that Claude Code loads when a task matches. Think of it as a recipe card: "when you see a review task, here's how to do it" or "when generating a visualization, follow these design principles."</p>
+
+    <p><b>Key point:</b> Skills run <b>in your current conversation context</b>. Claude loads the skill's instructions, applies them to your task, and the results stay in your chat. No isolation, no separate session.</p>
+
+    <h3>Skills vs. Slash Commands vs. Subagents — Choose Wisely</h3>
+    <p>These three are related but different:</p>
+    <ul>
+      <li><b>Slash command (Topic 03)</b> — A fixed prompt template. You type <code>/foo</code>, you get a preset prompt run. Good for: templated workflows you type out frequently.</li>
+      <li><b>Skill</b> — Instructions for how to do a particular kind of task, loaded automatically or on request. Claude recognizes when the task matches and applies the skill. Good for: quality standards (code review, visualization design), procedural checks (testing, linting), and recurring patterns that don't need to be user-triggered.</li>
+      <li><b>Subagent (Topic 05)</b> — A completely isolated session, separate from your current chat. Good for: big, noisy tasks (running a test suite, searching a large codebase, training a model) that would clutter your main conversation.</li>
     </ul>
+
+    <h3>Real-World Skill Examples</h3>
+    <p>Claude Code comes with built-in skills already available to you:</p>
+    <ul>
+      <li><b>dataviz</b> — When you ask for a chart or visualization, this skill loads design principles (colors, accessibility, responsive layout) and ensures consistency across all your visualizations.</li>
+      <li><b>artifact-design</b> — When you're about to create a web artifact, this skill gives guidance on structure, styling, interactivity.</li>
+      <li><b>security-review</b> — When you run <code>/code-review --security</code>, this skill loads a security checklist: OWASP top 10, injection risks, auth patterns, etc.</li>
+      <li><b>simplify</b> — When you ask Claude to clean up code, this skill checks for reuse, efficiency, and clarity — more thorough than a casual review.</li>
+      <li><b>update-config</b> — When you're changing Claude Code settings, this skill understands the schema and helps you navigate permission modes, hooks, and environment variables.</li>
+    </ul>
+
+    <h3>When to Build a Custom Skill</h3>
+    <p>You'd create your own skill when:</p>
+    <ul>
+      <li><b>You have a repeating checklist or procedure</b> that you want Claude to always follow. Example: "every time you review a PR, check for N+1 queries, missing error handling, and untested edge cases."</li>
+      <li><b>You want to enforce quality standards across your team</b> without asking repeatedly. Example: "all visualizations use our brand color palette and are accessible to color-blind viewers."</li>
+      <li><b>You have a domain-specific task</b> that benefits from specialized knowledge. Example: "when analyzing database performance, always check execution plans, index usage, and locking behavior."</li>
+    </ul>
+
+    <h3>Skill File Structure</h3>
+    <p>Skills live under <code>.claude/skills/</code> (project-scoped) or <code>~/.claude/skills/</code> (user-scoped). Each skill gets its own <b>folder</b>, and the folder name becomes the skill's identity on disk. Inside that folder, <code>SKILL.md</code> (exact filename, uppercase) is the one file that must exist:</p>
+    <pre><code>.claude/skills/
+├── my-code-review/
+│   └── SKILL.md
+├── my-visualization-standards/
+│   └── SKILL.md
+└── my-testing-checklist/
+    ├── SKILL.md
+    └── references/        # optional: extra docs, templates, scripts
+        └── checklist-details.md</code></pre>
+
+    <p>A <code>SKILL.md</code> file looks like:</p>
+    <pre><code">---
+name: my-code-review
+description: Team's standard code review checklist
+triggers: ["code review", "review the code", "examine changes"]
+---
+
+When reviewing code, check these in order:
+1. **Correctness** - Does the logic work for all inputs?
+2. **Safety** - Are there security issues?
+3. **Performance** - Any N+1 queries, memory leaks?
+4. **Testing** - Are edge cases covered?
+5. **Style** - Does it match our CLAUDE.md conventions?</code></pre>
+
+    <p>The frontmatter (<code>name</code>, <code>description</code>, <code>triggers</code>) is read for <i>every</i> skill up front, cheaply, so Claude Code knows what's available. The body below the frontmatter — and anything in an optional <code>references/</code>, <code>scripts/</code>, <code>templates/</code>, or <code>assets/</code> subfolder — only loads once the skill is actually selected for use.</p>
+
+    <h3>Built-in Skills Available to You</h3>
+    <p>Run this in Claude Code to see all available skills:</p>
+    <pre><code>/help</code></pre>
+    <p>Look for the skills section. Built-in skills include dataviz, artifact-design, security-review, simplify, and more. You can load any of them explicitly or let them auto-load when appropriate.</p>
+  </div>
+</section>
+
+<section id="use-cases">
+  <h2>Real-World Use Cases</h2>
+  <div class="step">
+    <h3>1. Enforcing Code Style Across Reviews</h3>
+    <p><b>The problem:</b> Your team's code reviews are inconsistent. One reviewer checks for performance, another checks for security, another checks for style. Reviews take longer and catch different issues.</p>
+    <p><b>The solution:</b> Create a skill <code>team-code-review</code> that loads a standardized checklist. When Claude reviews code, the skill ensures every review checks the same things.</p>
+    <p><b>The result:</b> Consistent, thorough reviews. No more "wait, we should have caught that" in hindsight.</p>
+
+    <h3>2. Visual Design Consistency</h3>
+    <p><b>The problem:</b> You're building charts and dashboards for a product. Without guidance, each one has different colors, fonts, and layouts. Inconsistent UX confuses users.</p>
+    <p><b>The solution:</b> Create a skill <code>visual-design-guide</code> that loads your brand colors, accessible palettes, responsive layout principles. When you ask for a chart, the skill automatically applies.</p>
+    <p><b>The result:</b> Every visualization looks like it belongs to the same product. No manual style enforcement needed.</p>
+
+    <h3>3. Security Checklist Automation</h3>
+    <p><b>The problem:</b> Security vulnerabilities slip into production because security reviews are manual and error-prone. OWASP top 10 items like SQL injection, XSS, broken auth get missed.</p>
+    <p><b>The solution:</b> Create a skill <code>security-scan</code> that checks for common vulnerabilities: injection risks, auth flaws, insecure defaults, etc. Run it before every code review.</p>
+    <p><b>The result:</b> Vulnerabilities get caught earlier, in code review, not production.</p>
+
+    <h3>4. Testing Coverage Verification</h3>
+    <p><b>The problem:</b> Features ship without proper test coverage. Later, a regression breaks production and catches you off guard. Coverage metrics exist but aren't enforced.</p>
+    <p><b>The solution:</b> Create a skill <code>test-coverage-check</code> that asks about test cases for every code change, suggests missing tests, verifies edge cases.</p>
+    <p><b>The result:</b> Testing becomes part of the code-writing process, not an afterthought.</p>
+
+    <h3>5. Documentation Quality</h3>
+    <p><b>The problem:</b> APIs are shipped without documentation. New team members don't understand the interfaces. Support tickets ask "how do I use this?"</p>
+    <p><b>The solution:</b> Create a skill <code>api-documentation</code> that ensures every function has a docstring with examples, parameters, return types, and error cases documented.</p>
+    <p><b>The result:</b> APIs are self-documenting. Onboarding is faster.</p>
   </div>
 </section>
 
 <section id="handson">
-  <h2>Hands-on</h2>
+  <h2>Hands-on Practice: Five Examples</h2>
+
   <div class="step">
-    <div class="step-head"><span class="step-num">1</span><span class="step-title">See what's already available</span></div>
+    <h3>Example 1: List Available Skills</h3>
     <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Ask Claude to list all available skills:</p>
     <div class="prompt-box">
       <div class="prompt-label">Prompt</div>
-      <pre><code>What skills do you currently have available in this session? List them and
-one line on what each is for.</code></pre>
+      <pre><code>List all the skills you currently have available in this session. For each one,
+tell me its name and a one-line description of what it's for.</code></pre>
     </div>
 
-    <div class="step-head"><span class="step-num">2</span><span class="step-title">Watch one get used, in-context</span></div>
-    <p>Ask for something that plausibly matches one of the skills you just saw listed (or a general one like reviewing a diff, writing commit messages, or building a visualization, depending on what's available) and watch whether Claude Code explicitly invokes it:</p>
-    <div class="prompt-box">
-      <div class="prompt-label">Prompt</div>
-      <pre><code>Review the changes I made to CLAUDE.md in Topic 02 as if preparing a short
-code-review comment. If a skill applies here, use it and tell me which one.</code></pre>
-    </div>
+    <p><b>What you'll see:</b> A list of built-in skills (like dataviz, security-review, simplify) and any custom skills you've created. Each skill has a clear purpose.</p>
+
+    <p><b>Example output might include:</b></p>
+    <ul>
+      <li><code>dataviz</code> — Design guidance for charts, graphs, and visualizations</li>
+      <li><code>security-review</code> — Security checklist for code review</li>
+      <li><code>simplify</code> — Code simplification and refactoring guidance</li>
+      <li><code>artifact-design</code> — Design principles for web artifacts</li>
+    </ul>
+
     <div class="checkpoint">
       <b class="tag">Checkpoint</b>
-      Whether or not a skill fires, you should be able to tell from the transcript — this is exactly the kind of thing to look for when deciding later whether your own repeated task belongs as a skill, a custom command (Topic 03), or a subagent (Topic 05).
-    </div>
-
-    <div class="step-head"><span class="step-num">3</span><span class="step-title">Decide: skill, command, or subagent?</span></div>
-    <div class="prompt-box">
-      <div class="prompt-label">Prompt</div>
-      <pre><code>I want something that always double-checks any Python file I edit for
-missing type hints before considering the edit done. Would you implement
-that as a skill, a custom slash command, or a subagent? Justify the choice
-against the other two.</code></pre>
+      You know what skills are available. This is useful when you're about to ask for something that might benefit from a skill.
     </div>
   </div>
+
+  <div class="step">
+    <h3>Example 2: Watch a Skill Be Used Automatically</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Step 1:</b> Ask Claude to create a visualization, which should trigger the dataviz skill automatically:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Create a simple bar chart showing the top 5 countries by population.
+Use appropriate colors and make it accessible. Tell me if a skill is being
+applied and which one.</code></pre>
+    </div>
+
+    <p><b>What's happening:</b> Claude recognizes this is a visualization request. The <code>dataviz</code> skill loads automatically, bringing color palettes, accessibility guidelines, and responsive design principles into the response.</p>
+
+    <p><b>What you should see:</b> The chart code should follow accessibility best practices (color contrast, labels, alt text). Claude should mention that it's using the dataviz skill.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You've seen a skill activate automatically. This is how skills save time—Claude recognizes the task type and applies the right expertise without you asking.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 3: Explicitly Invoke a Skill</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Setup:</b> Sometimes you want to explicitly tell Claude to use a particular skill, even if it wouldn't auto-trigger.</p>
+
+    <p><b>Step 1:</b> Ask Claude to use a specific skill:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Use the /simplify skill to review this Python function and suggest
+improvements for clarity and efficiency:
+
+def get_user(user_id):
+    u = db.query("SELECT * FROM users WHERE id = ?", user_id)
+    if u:
+        return u[0]
+    else:
+        return None</code></pre>
+    </div>
+
+    <p><b>What's happening:</b> You're explicitly invoking the simplify skill. Claude applies its refactoring principles and returns cleaner, more Pythonic code.</p>
+
+    <p><b>Expected improvements:</b></p>
+    <ul>
+      <li>Use proper variable names (not <code>u</code>, use <code>user</code>)</li>
+      <li>Use an ORM method instead of raw SQL</li>
+      <li>Simplify the conditional (use <code>return u[0] if u else None</code>)</li>
+      <li>Add type hints</li>
+    </ul>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      The refactored code is clearer and more concise. You've explicitly triggered a skill.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 4: Create a Custom Skill</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Setup:</b> Create your own project-scoped skill for something you do repeatedly.</p>
+
+    <p><b>Step 1:</b> Ask Claude to create a skill:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Create a project-scoped skill folder at .claude/skills/code-review-checklist/
+with a SKILL.md file that provides a detailed code review checklist. Include
+checks for:
+- Correctness (does the logic work?)
+- Performance (any inefficiencies?)
+- Security (injection risks, auth issues?)
+- Testing (edge cases covered?)
+- Documentation (is it clear?)
+
+Show me the exact folder and file you created and explain how it would be triggered.</code></pre>
+    </div>
+
+    <p><b>What's happening:</b> Claude creates a folder <code>.claude/skills/code-review-checklist/</code> containing a <code>SKILL.md</code> file with frontmatter (name, description, triggers) and the full checklist.</p>
+
+    <p><b>Step 2:</b> Verify the folder and file exist:</p>
+    <pre><code># On Mac/Linux
+ls -la .claude/skills/code-review-checklist/
+
+# On Windows (PowerShell)
+Get-ChildItem .\.claude\skills\code-review-checklist\</code></pre>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      The skill folder exists with <code>SKILL.md</code> inside it — not a flat <code>.md</code> file directly under <code>skills/</code>.
+    </div>
+
+    <p><b>Step 3:</b> Now use it. Ask Claude to review some code and request the skill explicitly:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Review this Python code and use the code-review-checklist skill:
+
+def process_payment(user_id, amount):
+    user = db.query(f"SELECT * FROM users WHERE id = {user_id}")
+    if user:
+        balance = user[0]['balance']
+        if balance >= amount:
+            balance -= amount
+            db.execute(f"UPDATE users SET balance = {balance} WHERE id = {user_id}")
+            return True
+        return False
+    return False</code></pre>
+    </div>
+
+    <p><b>What you should see:</b> Claude applies the checklist, catching several issues:</p>
+    <ul>
+      <li><b>Security:</b> SQL injection vulnerability (string interpolation instead of parameterized queries)</li>
+      <li><b>Correctness:</b> Race condition (balance check and update aren't atomic)</li>
+      <li><b>Testing:</b> What about insufficient balance? What about missing user?</li>
+      <li><b>Documentation:</b> No docstring, unclear return type</li>
+    </ul>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Your skill was applied and the review was thorough and structured.
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>Example 5: Decide: Skill vs. Command vs. Subagent</h3>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+
+    <p><b>Setup:</b> You have a recurring workflow. Should it be a skill, custom command, or subagent?</p>
+
+    <p><b>Step 1:</b> Describe your workflow and ask Claude to decide:</p>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>I have this workflow I want to automate: Before any code goes to main,
+I want to check if there are uncommitted changes, run the test suite,
+check if the branch is up-to-date with main, and then verify the commit
+message follows our conventions.
+
+Should I implement this as:
+1. A custom slash command (/pre-commit)?
+2. A skill that runs automatically before edits?
+3. A subagent that runs in isolation?
+
+Explain why one is better than the others for this specific workflow.</code></pre>
+    </div>
+
+    <p><b>What Claude should explain:</b> This is a procedural check that should block actions—a skill is wrong (skills don't block). A slash command is good if you want to call it manually. A subagent is overkill for this. Best answer: a custom hook (Topic 06) that runs automatically, or a custom command you trigger explicitly before commits.</p>
+
+    <p><b>Key insight:</b> The right tool depends on whether you want automatic enforcement (skill), manual triggers (command), or isolation (subagent).</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      You've thought through the differences and can now choose the right tool for your own workflows.
+    </div>
+  </div>
+
 </section>
 
 </main>

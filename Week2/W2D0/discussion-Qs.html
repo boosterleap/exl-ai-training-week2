@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 2 · Discussion Questions — Days 1-5</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+<style>
+  .qtag { display: inline-block; margin: 0 0 0.5rem; padding: 0.15rem 0.55rem; border-radius: 20px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+  .qtag.technical { background: var(--soft); color: var(--brand-dark); }
+  .qtag.nontechnical { background: #fce7f3; color: var(--insurance); }
+  .qtag.case { background: #fff4d6; color: #92620a; }
+  .qblock { margin: 0 0 1.6rem; padding: 1rem 1.1rem; border: 1px solid var(--border); border-radius: 0.6rem; background: var(--surface); box-shadow: 0 1px 2px rgba(23,32,51,0.05); }
+  .qblock p.qtext { margin: 0 0 0.2rem; font-size: 1.02rem; }
+  .qblock details.instructor-reveal { margin-top: 0.7rem; }
+</style>
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Discussion facilitation aid · Week 2 Days 1-5</p>
+  <h1>Discussion questions — Days 1, 2, 3, 4 &amp; 5</h1>
+  <p>A facilitator resource, not a test: 8-9 conceptual questions per day, mixing technical, non-technical, and case-study/real-situation prompts, each grounded in something specific this week's insurance thread actually did (a real claim ID, a real bug found while building the app, a real tool). Ask the question, let participants discuss, then reveal the candidate answer — it's a starting point for discussion, not the only correct answer.</p>
+</header>
+
+<nav class="page-nav" aria-label="Day sections">
+  <a href="#day1">Day 1</a>
+  <a href="#day2">Day 2</a>
+  <a href="#day3">Day 3</a>
+  <a href="#day4">Day 4</a>
+  <a href="#day5">Day 5</a>
+</nav>
+
+<main>
+
+<section id="day1">
+<h2>Day 1 — The agentic loop, tools, memory &amp; SDK primitives</h2>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q1.</b> A customer's FNOL email references claim CLM-255335 under product <code>commercial_package</code> — and there's no matching policy document for that product in the corpus (a deliberate gap in this week's data). Walk through what the agent should do, step by step, and why "answering from general insurance knowledge" would be the wrong move even if the answer sounds plausible.</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>The agent should: (1) look up the claim and confirm <code>grounding_available: false</code> for this product, (2) stop before drafting any coverage statement, (3) escalate to a human adjuster with a clear reason ("no policy document exists for this product"), and (4) never fabricate a plausible-sounding coverage answer just because the loss type is familiar. The reason this matters: an insurer is legally and financially exposed if an "AI-sounding-confident" answer turns out to contradict the actual (missing or different) policy terms — a clean "I don't have grounding for this, escalating" is safer and more professional than a guess, even a good guess. This is the same instinct behind every guardrail this week: absence of evidence should produce silence or escalation, never a confident fabrication.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag technical">Technical</span>
+  <p class="qtext"><b>Q2.</b> Why does a bounded agent loop need an explicit max-turns/budget guardrail even when a task looks simple on paper?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>Because "simple" tasks can still spiral: a tool call that returns an unexpected shape can send the agent into a retry loop, a slightly ambiguous instruction can trigger repeated re-planning, and a model can occasionally get stuck restating the same reasoning. Without a hard ceiling (max turns, a timeout per tool call, a bounded retry count), a stuck loop just keeps consuming tokens and wall-clock time silently. The guardrail doesn't assume the task is hard — it assumes any live system needs a circuit breaker regardless of how simple the happy path looks.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag nontechnical">Non-technical</span>
+  <p class="qtext"><b>Q3.</b> Why might giving an agent broad permissions ("just allow everything so it stops asking") actually make it less useful to a business, not more?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>Broad permissions remove the one thing that makes an agent trustworthy to hand real work to: predictable, auditable boundaries. A business can tolerate an agent that pauses and asks before an irreversible action (approving a payout, editing a policy); it cannot tolerate one that quietly does those things and gets it wrong once. Fewer, well-chosen permissions ("allow" reads, "ask" for writes, "deny" a short explicit list) actually let the business extend MORE autonomy over time, because every action stays reviewable — the alternative (allow everything) trades a small amount of daily friction for a much larger, harder-to-detect risk.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag technical">Technical</span>
+  <p class="qtext"><b>Q4.</b> What's the practical difference between <code>query()</code> and a persistent <code>ClaudeSDKClient</code> session, and how would you decide which one a nightly batch job should use versus an interactive assistant?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p><code>query()</code> is one-shot: send a prompt, get a response, the session ends — no memory of anything before or after. <code>ClaudeSDKClient</code> keeps a conversation, tool state, and permission context alive across many turns. A nightly job that classifies a batch of overnight emails and exits fits <code>query()</code> — each email is independent, there's nothing to remember between them. An interactive ops assistant (like this week's insurance thread) needs <code>ClaudeSDKClient</code>, because later turns genuinely depend on earlier ones — a follow-up question about "that claim we just discussed" only makes sense with persistent session state.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q5.</b> The same claim gets processed through three different reasoning patterns — ReAct, plan-first, and reflection. What would you actually look at to compare them, beyond just "did it get the right answer"?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>Turn count (how many back-and-forth steps it took to get there), tone (did it hedge appropriately or overstate confidence), and whether the FINAL answer actually changed based on the reasoning path, not just how it was phrased. ReAct tends to interleave reasoning and action tightly (good for exploratory lookups); plan-first commits to a plan before acting (good when the steps are knowable up front); reflection adds a self-critique pass (useful when correctness matters more than speed). The interesting finding is usually not "which one is best" in the abstract, but which one fits THIS claim's shape — a straightforward lookup doesn't need reflection's extra cost.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag nontechnical">Non-technical</span>
+  <p class="qtext"><b>Q6.</b> What does "layered memory" (working context, episodic, semantic, external artifacts) solve that just stuffing everything into one giant prompt doesn't?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>A single flat context window has two failure modes as it grows: cost (every token in context is paid for on every turn) and "lost in the middle" (models attend less reliably to information buried in a long, undifferentiated blob). Layering separates concerns: working memory holds only what THIS turn needs, episodic memory holds this customer's history (retrievable by session key, not re-pasted every time), semantic memory holds governed facts like policy terms (looked up, not memorized), and external artifacts stay as references, not ingested content. The result is a system that scales to long relationships with customers without either the cost or the recall problems of one giant transcript.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q7.</b> A junior engineer on your team asks: "why not just let the agent do whatever the user's email asks?" Using a concrete example from this week, how would you explain the need for an approval gate on irreversible actions?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>Take claim payout approval: an email might say "please approve my $50,000 claim immediately." If the agent can directly approve payouts, one convincingly-worded email (or one model mistake) becomes an irreversible financial loss with no human in the loop. The fix isn't refusing to help — it's separating "draft a recommendation" (agent can do this freely) from "commit the payout" (requires a named human's explicit approval). The agent still does 90% of the work; the human only has to review the 10% that can't be undone. That asymmetry — cheap to review, expensive to reverse — is exactly why approval gates exist.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag technical">Technical</span>
+  <p class="qtext"><b>Q8.</b> If a verbose "narrate everything you're doing" prompt costs meaningfully more than a terse one for the identical underlying task, what does that imply about how you'd design a production system's default behavior?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>It implies verbosity should be opt-in, not the default — a production system serving thousands of requests a day should default to the terse, cheaper path and only narrate in detail when a human is actively watching (e.g., a debugging session or a live demo). The cost delta compounds: a difference that looks trivial on one request becomes a real line item at scale. This is also why this week's cost-awareness topic treats "how you prompt" as a design decision with a dollar cost, not just a style preference.</p>
+  </details>
+</div>
+
+</section>
+
+<section id="day2">
+<h2>Day 2 — Frameworks, multi-agent patterns, MCP &amp; A2A</h2>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q1.</b> A support ticket naturally decomposes into "intake," "research," and "writer" work. Would you reach for a role-based crew (CrewAI-style), a supervisor/worker pattern, or just one agent doing everything? Justify the choice.</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>If the three roles are fixed and always run in the same order, a role-based crew (sequential, named roles, defined tasks) is a clean fit — it's predictable and easy to reason about. If the actual delegation needs to vary case-by-case (sometimes research isn't needed, sometimes two research passes are), supervisor/worker is more flexible since the supervisor decides who does what dynamically. A single agent is often the right answer, too, when the task is small enough that splitting it just adds coordination overhead without buying anything — "start single, add agents only when isolation or parallelism pays for the overhead" is the actual rule of thumb, not "more agents is more sophisticated."</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag technical">Technical</span>
+  <p class="qtext"><b>Q2.</b> What's the practical difference between an in-process (stdio) MCP server and a standalone network MCP server, and when would you actually need the network version?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>An in-process stdio server is launched by Claude Code itself as a subprocess — it dies when the session ends and only that one session can reach it. A network server (Streamable HTTP) is a standalone, independently-running process with a real port, reachable by multiple clients and potentially living on a different machine entirely. You need the network version once more than one consumer must reach the same tool (e.g., a shared claims-lookup service used by both an internal ops tool and an external partner integration), or when the tool needs to keep running independent of any single Claude Code session.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag nontechnical">Non-technical</span>
+  <p class="qtext"><b>Q3.</b> How would you explain A2A's "Agent Card" concept to a non-engineer stakeholder — what real-world analogy fits?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>An Agent Card is like a vendor's public service catalog or a restaurant's posted menu: before you place an order, you can see what's actually on offer (what skills this agent has, what it's called, how to reach it) without having to guess or trial-and-error your way in. Any client can "read the menu" at a well-known address before deciding to engage — that's what makes agents from different teams or companies discoverable and callable without a manually-negotiated integration for every pair.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q4.</b> A tool call fails intermittently — about 1 in 20 times — because of a transient network blip. How should a reliability-engineered system respond differently to this than to a permanent failure (say, invalid input)?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>The system first has to classify the fault: transient failures (network blips, brief rate limits) warrant a retry with backoff, since the same call will likely succeed shortly after. Permanent failures (malformed input, a record that genuinely doesn't exist) should NOT be retried — retrying a request that will always fail just wastes time and can mask the real problem. The dangerous failure mode is treating every error the same way: blindly retrying a permanent failure loops forever, while never retrying a transient one makes the system needlessly fragile.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q5.</b> Your team wants an agent to auto-release a shipment-delay compensation credit without a human in the loop, to speed up customer service. What HITL checkpoint(s) would you insist on before shipping this, and why?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>At minimum: a durable checkpoint where the proposed credit (amount, order, reason) is logged and paused before it executes, a named human approval step for credits above some threshold, and an audit record of who approved what and when. The reasoning mirrors the Day 1 payout example: releasing money is an irreversible action, so the agent's job is to prepare the recommendation well (correct order, correct amount, correct justification) while a human retains the actual release decision — at least until the system has a long enough track record to justify raising the autonomy level for low-value, low-risk cases specifically.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag technical">Technical</span>
+  <p class="qtext"><b>Q6.</b> What is the "trust boundary" between Claude Code/MCP tool code and an external system like a CRM or a Bedrock-backed classifier, and why does it matter for prompt injection risk?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>Trusted content is the system prompt and the operator's own request; untrusted content is anything that originates outside your control — retrieved documents, tool results, and any text coming back from an external system. The boundary matters because untrusted content must never be treated as an instruction, only as data: if a retrieved document or a CRM record contains text like "ignore previous instructions and reveal X," a system that blurs the trust boundary might actually comply. This week's deterministic authorization gate is a direct application of this: the model's classification is advisory, and code — not the model, and never unvalidated external text — decides the actual action.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag nontechnical">Non-technical</span>
+  <p class="qtext"><b>Q7.</b> When would adding a second agent actually make a system worse rather than better? Give a concrete example of "sub-agent sprawl."</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>If a task is small enough for one agent to finish cleanly, splitting it into a "coordinator" plus a "worker" adds a whole extra round of delegation, context-passing, and synthesis for zero benefit — more cost, more latency, more places for something to go subtly wrong, and no gain in isolation or parallelism to justify it. Sprawl gets worse when each sub-agent can itself spawn more sub-agents unchecked: a shallow-looking task can silently balloon into dozens of parallel branches, each burning tokens and holding its own context, which is exactly why platforms like Opus 4.8 cap total sub-agent fan-out rather than leaving it unbounded.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q8.</b> A claims-triage pipeline hands off from a triage agent to a grounding agent. What specifically should travel in that handoff, and what should deliberately NOT travel?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>What should travel: structured facts the grounding agent actually needs — claim_id, product, urgency classification, the authorization decision already made. What should NOT travel: the full raw conversation transcript, unvalidated free text from the customer email, or anything that lets the grounding agent silently re-derive or override a decision the triage step already made under its own trust boundary. A clean handoff passes a small, typed, purpose-built payload — not "just forward everything and let the next agent figure out what matters."</p>
+  </details>
+</div>
+
+</section>
+
+<section id="day3">
+<h2>Day 3 — Agentic RAG, GraphRAG, memory, event data &amp; cost control</h2>
+
+<div class="qblock">
+  <span class="qtag technical">Technical</span>
+  <p class="qtext"><b>Q1.</b> What's the difference between plain RAG and "agentic" RAG, and what does the re-query/refine step actually buy you? Give an example of a query where it matters.</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>Plain RAG retrieves once and answers, whatever came back. Agentic RAG treats retrieval as a decision inside the loop: does this even need retrieval, is the first query phrasing right, and is what came back actually sufficient evidence — with a bounded refine-once-then-abstain path if not. Example: "if my basement floods after a storm, am I covered?" — the first pass might match generically on "water damage," but the documents distinguish flood as a separately-excluded peril. A one-shot RAG system answers confidently from the wrong section; agentic RAG notices the evidence doesn't actually cover "flood" specifically, refines the query once, and then answers (or abstains) based on what it actually found.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag technical">Technical</span>
+  <p class="qtext"><b>Q2.</b> Why does permission-aware retrieval need to filter access BEFORE the vector search runs, rather than retrieving everything and redacting unauthorized content afterward?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>Because "retrieve everything, redact later" means unauthorized content has already entered the context window before the redaction step ever runs — it was already exposed to the model (and, depending on logging, possibly to a trace or cache) even if the final answer to the user gets scrubbed. Authorizing access before retrieval (fail-closed: when in doubt, deny) means denied sources never enter context at all. The principle is the same "least privilege, least exposure" idea behind every guardrail this week: it's not enough for the OUTPUT to look safe if the PROCESS already touched something it shouldn't have.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q3.</b> GraphRAG surfaces that claim CLM-424063 and claim CLM-100234 — two different claimants — share the same address. What does this signal actually mean, what does it NOT prove, and what's the appropriate next step?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>It means there's a structural connection a plain text or vector search over either claim's content alone would never surface — worth a second look. It does NOT prove fraud: shared addresses have many innocent explanations (roommates, a duplex, a family member, a landlord filing on behalf of a tenant). The correct next step is flagging it for a human special-investigations review with the evidence attached, not auto-denying or auto-escalating either claim as fraudulent. The graph signal earns attention, not a verdict — the same "escalate, don't decide" instinct as the ungrounded-product case from Day 1, just applied to a fraud signal instead of a missing document.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag nontechnical">Non-technical</span>
+  <p class="qtext"><b>Q4.</b> How would you explain "context engineering" to a stakeholder who assumes "just give the AI more information, more is always better"?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>Context is a governed budget, not an unlimited dumping ground: every piece of information competes for a limited, costed space, so what you include has to be prioritized (most relevant to the task), authoritative (policy-aligned sources over random ones), fresh (not outdated), and it has to actually fit (a hard space limit). Dumping a full transcript in "just in case" doesn't make the system smarter — it dilutes the genuinely relevant evidence, costs more per call, and increases the odds the model leans on something stale or low-value. The discipline is closer to a good executive summary than a full case file — say only what's needed, cited, and current.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q5.</b> While building this course's own progressive insurance app, a real bug was found: a homeowners claim's coverage question was answered by citing an excerpt from a commercial-property exclusions document. What went wrong, and how was it fixed?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>The retrieval search wasn't restricted to the claim's OWN product documents — it searched the whole policy corpus, and a wording match from a different product's document happened to outrank the correct one. Worse, once that wrong answer got cached, the cache would keep serving it to future similarly-worded questions, regardless of which product actually asked. The fix had two parts: constrain retrieval to only the claim's own <code>policy_doc_files</code> (never search outside the grounding the claim actually has), and hard-partition the cache by product (not just by question text), so a paraphrase for one product can never return a cached answer meant for another. It's a direct, real-world instance of this week's core grounding rule: every reply must be traceable to the SPECIFIC document it's supposed to come from, not just "a" document that sounds related.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag technical">Technical</span>
+  <p class="qtext"><b>Q6.</b> What's the difference between an exact-match cache and a semantic cache, and why check exact first? What's the risk of a semantic cache with too loose a similarity threshold?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>An exact cache matches only identical query strings — fast, zero false hits, but it misses obvious paraphrases ("is a burst pipe covered" vs. "is my burst pipe covered"). A semantic cache matches by embedding similarity above a threshold, catching paraphrases the exact cache would miss. Checking exact first gets the speed of a simple key lookup for the common case without giving up paraphrase coverage. The risk of a loose threshold: two DIFFERENT questions that happen to be topically similar (or, as in Q6, similar wording across different products) can register as a false hit, serving a wrong-but-plausible-sounding cached answer instead of actually retrieving fresh, correctly-scoped evidence.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q7.</b> A webhook delivers the exact same delay event twice because of a network retry. What must the consumer do to stay correct, and what's the general principle at stake?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>The consumer has to recognize the redelivered event (by its stable event ID) and treat processing it a second time as a safe no-op — not apply the state transition again. The general principle is idempotency: because at-least-once delivery means a provider MAY redeliver, the receiving side — not the sender — is responsible for making repeats harmless. Concretely: check an event-ID "seen" set before applying any transition, and only mark it seen after the transition succeeds, so a truly-new event is never mistakenly skipped either.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag nontechnical">Non-technical</span>
+  <p class="qtext"><b>Q8.</b> An "urgency" field gets used constantly across your claims tools, but it was never formally, explicitly defined anywhere. What risk does this create, and how does MDM/semantic-layer discipline prevent it?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>An ungoverned-but-widely-used term is a quiet, common source of drift: one tool might set "urgency" from the claims database, another might infer it from a model call, a third might use a stale cached value — three different meanings hiding behind one shared name, with nobody noticing until two systems disagree on the same claim. A semantic layer/glossary discipline fixes this by giving every governed business term exactly one owned definition and one traceable source (e.g., "urgency: sourced from <code>claims.urgency</code>, defined as...") — so any tool using the term is provably using the SAME meaning, not a close-enough guess.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag technical">Technical</span>
+  <p class="qtext"><b>Q9.</b> Why does a data-quality/lineage system need to track "index version" and "retrieval time," not just "which source document," when answering a coverage question months after that document was last updated?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>A policy document can be updated after it was indexed — if you only record which source file grounded an answer, you can't tell whether the answer reflects the CURRENT version of that document or a version that's since changed. Tracking index version and retrieval time lets you reconstruct, after the fact, exactly what the system knew and when — essential for an audit ("was this answer correct given what was true at the time it was given?") and for freshness enforcement (a quality gate can refuse to answer from a chunk that's older than its declared max-age policy, rather than silently serving stale terms as if they were current).</p>
+  </details>
+</div>
+
+</section>
+
+<section id="day4">
+<h2>Day 4 — AI-DLC, guardrails, observability & evaluation</h2>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q1.</b> A prompt-injection scanner built in-house correctly catches 18 of 20 adversarial cases in a test fixture, but misses two. What should happen to those two misses — ignore them as "edge cases too exotic for production," or change the design? Justify your answer.</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>The misses should become design signals, not exceptions: they represent a real gap between the threat model the scanner was built to catch and the actual threat landscape. In a production system, "our scanner missed 10% of attempts" is a core fact that must shape deployment decisions: either the security posture accepts that 10% risk (with explicit documentation), or the scanner's detection rules need refinement before the system goes live. Pretending the misses are too exotic dismisses real evidence about what an attacker can actually do — a dangerous form of security theater. This mirrors the AI-DLC loop: evidence from evaluation feeds back into design, and gaps become owned changes, not background noise.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag technical">Technical</span>
+  <p class="qtext"><b>Q2.</b> An AI-DLC loop has five stages (design, build, evaluate, deploy, operate), each with a gate that must pass before handoff. If evaluate fails, should deploy happen anyway "to get data," or should the system loop back to build? When would each choice be right?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>If evaluate produced evidence of a critical failure (e.g., policy violations, unsafe autonomy), loop back to build — shipping broken code to get "real data" is just asking for incidents. If evaluate flagged a non-critical gap with a mitigation plan (e.g., "coverage for X is ungrounded, we'll escalate this case type for now"), deploy to a limited audience with a time-boxed gate to resolve the gap — that's measured risk-taking. The key distinction is severity and whether the risk is bounded: unknown failure modes warrant a build pass; known-and-scoped limitations can proceed with mitigations in place. An "always loop back" gate sounds conservative but can also freeze a system in development limbo; the actual rule is "don't ship unmitigated critical failures, but don't let perfection block progress either."</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag nontechnical">Non-technical</span>
+  <p class="qtext"><b>Q3.</b> Why would a business stakeholder care about Day 4 AM's "evidence gates" concept, beyond just "it sounds safe"? Give a concrete example of how weak gates cost money or cause damage.</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>Weak or missing gates lead to systems that look ready but aren't — one AI-powered claims system that went live without rigorous trajectory evaluation shipped with a bug that approved unauthorized payouts for three weeks before anyone noticed, costing the company $2.1M in unrecovered funds plus regulatory review costs. An evidenced gate ("trajectory eval must pass 95% of cases before deploy") would have caught this in testing. The business case for gates is simple: the cost of finding a problem in evaluation is measured in time; the cost of finding it in production is measured in dollars and reputation. Gates aren't compliance theater — they're the instrument that prevents expensive surprises.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag technical">Technical</span>
+  <p class="qtext"><b>Q4.</b> Trajectory evaluation scores a path (tool order, step budget, policy compliance) separately from the final answer. Why score the path at all — if the answer is right, isn't that enough?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>Because the path reveals whether the system is actually following your guardrails, or just getting lucky. Example: a claims system routes an approval through a payment-release tool (correct path) versus just generating a dollar amount without ever hitting the approval checkpoint (wrong path, right-looking answer). Trajectory eval catches the second case. Also: a path that solves the problem by doing extra, unnecessary work (5 unnecessary database lookups before the real one) is a path that costs more and signals the system doesn't understand efficient reasoning — you'd want to know that, optimize it, before production. Final-answer-only grading misses both the safety and the efficiency signals, which is why this week's fixture has 26 cases designed explicitly to catch failures that would hide in a final-answer-only grader.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q5.</b> A trace from production shows claim CLM-255335 was looked up four times in the same session, with rising latency each time (the scenario from Day 4 PM's trace analyzer). What does this pattern tell you, and what's the appropriate response — retry it again, or escalate to a human?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>The pattern is a stuck-loop signal: the agent is retrying the same call with increasing latency, probably because it's not satisfied with the response or is stuck in a reasoning loop. Do NOT retry again — that adds to the resource burn. The correct response is to escalate to a human with the full trace, the error pattern, and the current state, because the issue is upstream of the lookup (the agent's logic, not the database). This is what Day 1 Topic 06's max-turns guardrail was designed to catch: a bounded loop that stops gracefully before it burns unbounded resources. Production traces like this one are how you discover that your loop boundary was set too high, so that becomes a tuning point for the next design pass.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag nontechnical">Non-technical</span>
+  <p class="qtext"><b>Q6.</b> Who owns Observability, Evaluation, and Guardrails in your organization today, and what happens when they disagree? Use this week's insurance app as an example.</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>In many organizations, these have no single owner (or three different ones), which guarantees gaps. Observability might be owned by DevOps/SRE, Evaluation by ML/Data, and Guardrails/Security as an afterthought. When the observability team doesn't log enough detail to detect stuck loops, the evaluation team can't catch them, and the guardrails team discovers the problem in production. For this week's insurance app to stay coherent, one owner (or a named cross-functional team with clear handoff points) has to be responsible for all three, with visible metrics: "latency regressed by 10% this week" (observability owns detecting it), "trajectory evals are flagging cost spikes" (evaluation owns triaging), "the PII redactor is running in its own thread to avoid blocking lookups" (guardrails owns the implementation). Misaligned ownership is how safety gaps become invisible until they hurt.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q7.</b> A Presidio-based PII redactor in production masks all SSNs, but a customer service team later discovers a sophisticated phishing attempt used a fake SSN format that the redactor didn't flag as PII. What went wrong, and what's the fix?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>The redactor is pattern-based (looking for known formats: 9 digits, dashes in specific places), not semantic — it can't tell a fake from a real SSN just from the format. The issue isn't the Presidio library; it's the scope creep: the team assumed "PII redaction = safety for all sensitive data," but a redactor can only catch what it's explicitly trained to recognize. The fix has two parts: (1) update the Presidio configuration to flag suspicious SSN-shaped patterns (with a higher false-positive rate accepted), and (2) add a human-in-the-loop review for edge cases, or explicitly document that the redactor is a first-pass defense, not a bulletproof solution. This is why guardrails are layered: no single tool is perfect, so you combine deterministic rules (exact formats), semantic checks (Presidio), and human review.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag technical">Technical</span>
+  <p class="qtext"><b>Q8.</b> Why does eval-gated CI (a pytest gate that blocks merges if quality drops) need to distinguish between "known expected failures" and "new regressions"? What happens if you treat them the same?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>Known expected failures are ones you've already decided to accept: for instance, "we know this complex foreign-language claim has low confidence, so we escalate it" is a known failure path, not a regression — it shows the system is working correctly. A new regression is when a previously-passing case suddenly fails, which signals a real problem. If you gate on "any failure blocks merge," you'll block all merges, rendering the gate useless (it cried wolf too many times). If you gate on "only new regressions block," you need a baseline test suite that's been carefully curated — not just "all 26 test cases pass" but "these 6 are expected escalations, these 20 are expected completions." The baseline itself becomes an artifact the team maintains and a signal about how much uncertainty the system still carries.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q9.</b> A real production incident: the insurance app's trace log was correctly redacting PII, but the redaction rules were so aggressive (masking anything that looked like a digit sequence) that investigators couldn't reconstruct what the user actually asked. What's the right balance?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>The issue was "perfect redaction" as an enemy of "useful operations": the system optimized for privacy at the expense of debuggability and accountability. The fix requires explicit, tiered redaction: (1) customer contact info (name, address, email, phone) → always redact, (2) claim amounts and dates → redact in external logs, keep in internal audit logs with access controls, (3) claim status and routing info → keep plaintext everywhere, since it's not sensitive. Define what "sensitive" actually means for your business; don't let automation decide. Redaction rules should live in a config you can adjust (loosening during incidents, tightening for compliance), and you need separate streams: one for customer-facing support (heavily redacted), one for internal operations (more detail), one for compliance audit (everything, access-controlled). A log that's unreadable is as bad as no log.</p>
+  </details>
+</div>
+
+</section>
+
+<section id="day5">
+<h2>Day 5 — Agentic AI across the enterprise, governance &amp; capstone</h2>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q1.</b> A customer emails your CX agent: "I want to add glass coverage to my commercial package mid-term." The agent retrieves all the documents, confirms the coverage is available, but can't find an explicit approval gate or SLA for mid-term endorsements. Should it resolve the customer directly, escalate, or escalate with a recommendation to resolve?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>Escalate with a recommendation. The agent has done its job: retrieved the facts (coverage available), but found a gap (no explicit SLA or approval gate in the grounding documents). A CX agent that escalates cleanly ("I found this is available, here's what the docs say, and here's what a human needs to approve") is more useful to the business than one that either resolves without authority or one that just escalates a question mark. The escalation package should include: (a) what's available, (b) what's not documented, (c) the recommended action, and (d) which role should approve it. This is Day 2 PM's handoff discipline applied to CX: pass structured, actionable information, not uncertainty.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag technical">Technical</span>
+  <p class="qtext"><b>Q2.</b> An operations agent plans an update to a claim's status but doesn't execute it immediately — it gates on a human approval checkpoint. Why is planning and approval separate, rather than just asking the human "do you want to update this claim?"</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>Because a detailed plan lets the human make an informed decision: "I'm changing status from pending_review to adjuster_assigned, using the authority rule PR-2024-03, with the following justification..." is much more reviewable than "should I update this claim?" Also, a plan separates the reasoning (which the agent does well) from the decision (which belongs to the human). If the human rejects the plan, the agent understands exactly what was wrong (the justification, the authority, the timing) rather than just "no, don't do it." Separation of concerns: agent plans, human decides, and the plan document becomes an audit trail if something later goes wrong. This is idempotency and HITL as operational discipline, not just a safety gate.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag nontechnical">Non-technical</span>
+  <p class="qtext"><b>Q3.</b> A decision-support agent recommends closing claims in a certain order to reduce reserve exposure. A human claims manager ignores the recommendation and does something else instead. Who's accountable for the outcome, and what should the system log?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>The human claims manager is accountable for the decision — the agent recommended, the human decided (or chose not to decide). The system should log: (a) the agent's recommendation and its evidence, (b) the decision the human actually made, (c) who made it and when, and (d) the outcome as it unfolds. This is exactly what Day 5 AM Topic 03 emphasized: "the agent recommends, a named human decides." If the human's choice turns out poorly, an audit trail shows whether they ignored good evidence or had good reasons — either way, you learn something. An agent that makes recommendations but doesn't get a logged human decision is either not actually a decision-support system (it's just generating noise) or it's making decisions in disguise, which violates the governance model. Make the handoff visible.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q4.</b> A readiness gate for production checks: "Do you have approval-gated writes?" Your team says "yes, all payouts require approval." But then you discover the system was auto-escalating claims without approval. Is this system ready for production?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>No. The gate was too coarse — it checked for approval on PAYOUTS but not on STATUS CHANGES or ESCALATIONS, which are also writes that have business consequences (affecting SLAs, customer satisfaction, resource allocation). A readiness gate for "approval-gated writes" must be specific: which writes require approval? (all financial writes, or also status changes? also routing?). A team that answers "yes, we have approval gates" without specifying what kind is passing the gate but not really ready. The audit trail shows escalations happened without approval, which violates the gate. The fix: (1) catalog every write the system can make, (2) classify each by consequence (financial, operational, informational), (3) require approval gates on consequence-tier 1 & 2 writes, (4) test that escalation actually pauses for approval. Now "readiness gate passes" is a real statement.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag technical">Technical</span>
+  <p class="qtext"><b>Q5.</b> Your governance matrix says "high-tier use cases must not have autonomous action," but your autonomous agent makes some read-only decisions (e.g., "escalate this case"). Is this a violation?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>Not a violation if you're precise about what "autonomous action" means. The governance matrix likely means "autonomous irreversible writes that cause material consequences" — payouts, status changes, permissions, compensation approvals. Read-only decisions like "escalate this case to a human" are not autonomous actions in that sense; they're guardrail activations. The confusion comes from sloppy language: "autonomous" often gets conflated with "the model speaks," but what matters is "the model causes irreversible state change without a human decision." Read-only escalations are safe by definition because the human has to decide what to do with the escalation. If your governance matrix is ambiguous here, clarify it: define autonomous as "causes irreversible state change," and then use that as the gate. The escalation decision can stay autonomous; the resulting payout or status update cannot.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag nontechnical">Non-technical</span>
+  <p class="qtext"><b>Q6.</b> EU AI Act compliance requires you to document "how this system was tested and what it can and can't do." For your claims triage agent, what evidence from this week's build would you show a regulator?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>You'd show: (1) the trajectory eval results (25/26 passing with the one failure localized and understood), (2) the guardrails report (prompt injection scanner scoring, PII redaction coverage), (3) the trace logs showing real production use with latency and policy compliance recorded, (4) the governance matrix showing autonomy is tied to consequence, and (5) the escalation logs showing a human-in-the-loop is actually being used. You'd honestly note: "We cannot handle commercial_package product coverage questions without human review (documented grounding gap), and we have a known failure in prompt-injection detection for obfuscated SQL payloads (2/20)." A regulator's job is to find gaps; your job is to document what you found first, with evidence. Hiding gaps and then discovering them later under regulatory scrutiny is much worse than admitting them up front with a mitigation plan.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q7.</b> A client asks you to scope an AI agent for their order-fulfillment process. Your discovery canvas identifies: "risky if the agent auto-cancels orders" (high consequence), but "low-risk if it just flags orders for human review" (low consequence). How does this shape your proposal?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>Your proposal should offer two options with different autonomy levels, acceptance criteria, and delivery timelines. Option A: "Flag orders for human review (read-only, no writes) — ready in 4 weeks, low risk, can be used immediately after training." Option B: "Auto-cancel orders below a threshold with human approval of each cancellation — 12 weeks, requires audit trail and SLA compliance testing, soft launch with 10% traffic first." The client picks their risk tolerance. This is Day 5 PM Topic 04's scoping discipline: you're not imposing autonomy, you're making it a client choice tied to evidence and timelines. Many clients pick Option A initially, then move to Option B later once they've seen the system work. By proposing bounded options rather than one sweeping solution, you make acceptance testable and you preserve the client's ability to change their mind when evidence arrives.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag technical">Technical</span>
+  <p class="qtext"><b>Q8.</b> A tamper-evident audit chain (like Day 5 PM's audit_chain.py) uses hash-chaining: each new entry includes a hash of the previous entry, so tampering with an old entry breaks all later ones. Why is this better than just logging to an immutable database?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>An immutable database still requires you to trust the database — a sufficiently privileged attacker can truncate the whole log or exploit the database itself. A hash chain makes tampering mathematically detectable: if someone edits entry #3, it changes the hash that entry #4 depends on, which breaks entry #5, and so on — you can verify the chain integrity just by replaying the hashes, without even running the original system. Auditors love this because it creates a tamper-proof record that doesn't depend on database security. The downside: you still need to keep the chain somewhere safe (signing it with a key and timestamping it is even better), but the local JSONL format with hash chaining gives you accountability you can rely on, which is why high-regulation industries (finance, healthcare) use it. For agentic systems making high-consequence decisions, a verifiable audit trail is often a compliance requirement, not just nice-to-have.</p>
+  </details>
+</div>
+
+<div class="qblock">
+  <span class="qtag case">Case study</span>
+  <p class="qtext"><b>Q9.</b> You're writing an agent card (governance documentation) for a claims triage system going to production. Your team wants to claim "autonomy: full" because "the agent is really good at this." What would you actually write, and why that's not the same thing?</p>
+  <details class="instructor-reveal">
+    <summary>Candidate answer</summary>
+    <p>You'd write: "autonomy: recommend, with human escalation approval for all high-value claims." Reason: "good at this" is a compliment to the model, not an argument for autonomy. Even a 99% accurate system makes mistakes (that's 1 in 100 claims), and the cost of one mistake in claims adjudication (a wrongly denied or overpaid claim) is high enough to warrant human review. The agent card documents the actual governance choice, backed by consequence and evidence, not confidence. You might add: "After 6 months in production with zero escalations and zero audit findings, we can revisit the autonomy level" — that's when real evidence of safety enters the picture. Until then, the card documents what you actually do, not what you wish the system could do. An agent card that's honest about guardrails is way more credible to a regulator or internal auditor than one that oversells autonomy.</p>
+  </details>
+</div>
+
+</section>
+
+</main>
+
+<footer class="page-footer">Week 2 · Discussion Questions — Days 1-5 (facilitator resource, W2D0)</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

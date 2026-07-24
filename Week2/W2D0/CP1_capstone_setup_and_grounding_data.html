@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · Capstone Phase 1 · Setup &amp; Grounding Data</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Capstone Phase 1 of 6 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="13_artifacts.html" style="color:#cbd8ff;">← Topic 13</a> · <a href="CP2_capstone_agentic_tools_and_rag.html" style="color:#cbd8ff;">Phase 2 →</a></p>
+  <h1>Capstone Phase 1 — Setup &amp; Grounding Data</h1>
+  <p>Thirteen topics in, you've used Claude Code to build, test, and guard small pieces of software. Now you direct it to build a six-phase capstone that is a microcosm of the whole week: a <b>Bank Loan Approval Assistant</b> that resolves inbound applicant emails the same way the insurance/logistics threads do all week — look up the real record, cite the real policy, never invent a term. Phase 1 builds the ground truth every later phase depends on.</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept: Why this capstone, and why it starts with data</h2>
+  <div class="step">
+    <h3>The shape of the assistant</h3>
+    <p><code>CLAUDE.md</code>'s ground rules for this whole course apply here too: never invent a policy term or a decision status; every reply must cite a specific record and a specific document; approving, denying, or overriding a loan decision requires an explicit human approval step (built in Phase 5); prefer a small number of clearly-named tools over one do-everything tool.</p>
+
+    <h3>What Phase 1 produces</h3>
+    <ul>
+      <li><b><code>loans.db</code></b> (SQLite: <code>applicants</code>, <code>loans</code>) seeded from a real public dataset</li>
+      <li><b>4 underwriting policy documents</b> — one per loan product, plus one product with <b>no document at all, on purpose</b></li>
+      <li><b><code>inbound_emails.csv</code></b> — 12 synthetic customer emails referencing real loan IDs from the database</li>
+      <li><b>A data README</b> documenting the schema, the product→policy mapping, and the deliberate gap</li>
+    </ul>
+
+    <h3>Real data, not a toy CSV</h3>
+    <p>Rather than hand-inventing applicant records, this phase fetches the real, public <b>Analytics Vidhya Loan Prediction</b> dataset — 491 unique applicants with genuine messiness (missing credit history, missing loan amounts, missing self-employment status on dozens of rows). That messiness is the point: a production assistant has to handle incomplete records gracefully, not just clean textbook ones.</p>
+
+    <h3>The deliberate grounding gap</h3>
+    <p>Exactly like the insurance thread's <code>commercial_package</code> product (no policy doc) and the logistics thread's <code>air</code> mode (no SLA doc), this capstone gives one loan product — <code>gold_loan</code> — <b>no underwriting policy document at all</b>. Three of the twelve "live" cases in <code>inbound_emails.csv</code> are <code>gold_loan</code> cases. The assistant must recognize it has no grounding for that product and escalate rather than fabricate an eligibility rule — that behavior is exercised for real starting in Phase 2.</p>
+  </div>
+</section>
+
+<section id="use-cases">
+  <h2>Key Learning Objectives</h2>
+  <div class="step">
+    <h3>By the end of Phase 1, you will:</h3>
+    <ul>
+      <li>Pull a real public dataset over the network and turn it into a queryable SQLite database</li>
+      <li>Design a two-table schema (<code>applicants</code>/<code>loans</code>) that separates stable demographic facts from case-state facts</li>
+      <li>Write short, specific policy documents with numeric, citable terms (ratios, SLAs, surcharges) — not vague prose</li>
+      <li>Understand why a deliberate grounding gap is a teaching tool, not an oversight</li>
+      <li>Produce a data contract (a README) that every later phase can trust without re-deriving it</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">0</span><span class="step-title">Environment check</span></div>
+    <span class="where-tag where-vm">VM · VS Code terminal</span>
+    <pre><code>"C:\Users\Asus\.venv\Scripts\python.exe" -c "import pandas, requests, sqlite3; print('capstone data libs OK')"</code></pre>
+    <p>This project uses the <code>uv</code>-managed venv at <code>C:\Users\Asus\.venv</code> per this repo's <code>CLAUDE.md</code> — no <code>pip</code> in that venv, so any missing package gets added with <code>uv pip install &lt;package&gt;</code> run against that same venv.</p>
+
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Direct Claude Code to build the seed script</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>I'm starting Phase 1 of a new capstone: a Bank Loan Approval Assistant, built in
+W2D0/capstone/ (parallel folder structure to W2D0/capstone_ref/, which is a
+verified reference implementation you can compare against but shouldn't copy
+from directly). Build W2D0/capstone/data/seed_loans_db.py that:
+
+1. Fetches the real public Analytics Vidhya Loan Prediction dataset via pandas
+   from https://raw.githubusercontent.com/dphi-official/Datasets/master/Loan_Data/loan_train.csv
+   (columns: Loan_ID, Gender, Married, Dependents, Education, Self_Employed,
+   ApplicantIncome, CoapplicantIncome, LoanAmount, Loan_Amount_Term,
+   Credit_History, Property_Area, Loan_Status). Drop any stray unnamed index
+   column, drop duplicate Loan_IDs.
+2. Splits it into two SQLite tables in W2D0/capstone/data/loans.db:
+   - applicants: Loan_ID (PK) + the demographic/financial columns
+   - loans: Loan_ID (FK), LoanAmount, Loan_Amount_Term, a derived "product"
+     column, historical_status (map Loan_Status Y/N -> approved/rejected),
+     and a "stage" column that is NULL for almost every row
+3. Derives "product" deterministically per Loan_ID (e.g. hash the Loan_ID
+   string into one of 5 buckets: home_loan, personal_loan, business_loan,
+   education_loan, gold_loan) so re-running the script is stable.
+4. Marks exactly these 12 Loan_IDs as "live" cases with a specific stage
+   (force product to gold_loan for the three marked below, regardless of
+   the hash):
+   LP002305:approved, LP001318:approved, LP001715:under_review,
+   LP001493:under_review, LP002448:under_review(force product=gold_loan),
+   LP002086:rejected, LP001849:rejected, LP001577:rejected,
+   LP002113:rejected, LP001136:document_pending, LP002209:document_pending,
+   LP001091:escalated_fraud_review(force product=gold_loan)
+5. Prints row counts, how many live cases got a stage, and the product
+   distribution, so I can sanity-check against a reference run before
+   moving on.
+
+Ask me before overwriting anything in W2D0/capstone/data/ if it already has
+files in it.</code></pre>
+    </div>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Predict, then run</span></div>
+    <div class="callout predict">
+      <b class="tag">Predict first</b>
+      Before running the script: this dataset has 491 unique applicants and only 12 are marked "live." Why might a production loan-assistant database look like this — mostly historical/background records, with a small number of actually-open cases — rather than a database that's <i>only</i> the open cases?
+    </div>
+    <span class="where-tag where-vm">VM terminal</span>
+    <pre><code>"C:\Users\Asus\.venv\Scripts\python.exe" W2D0/capstone/data/seed_loans_db.py</code></pre>
+    <div class="callout">
+      <b class="tag">Debrief</b>
+      A real underwriting system never sees only the open cases — it needs the historical book (rates of approval, typical income ranges, prior status) as context for scoring new and in-flight applications, and a tool call resolving <code>Loan_ID</code> shouldn't have to know in advance whether that ID is "live" or historical. The insurance thread's <code>claims.db</code> works the same way: most claims aren't the ones in <code>fnol_emails.csv</code>.
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Write the policy documents — with a deliberate gap</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Now write 4 short underwriting policy documents as Markdown files in
+W2D0/capstone/data/policies/, one per loan product except gold_loan (which
+gets NO document — that's deliberate, don't create one):
+
+- LOAN-HOME-010_underwriting.md (home_loan): Credit_History must be 1 to
+  auto-process; combined monthly obligations (LoanAmount*1000/Loan_Amount_Term)
+  must not exceed 40% of combined monthly income; Rural properties get a 0.25pt
+  rate surcharge (not an eligibility change); document checklist; 10-business-day SLA.
+- LOAN-PERSONAL-020_underwriting.md (personal_loan): Credit_History 0 is a firm
+  decline (no manual-review path, since it's unsecured); 35% income ratio cap;
+  3+ Dependents get a 0.15pt surcharge; 3-business-day SLA.
+- LOAN-BUSINESS-030_underwriting.md (business_loan): Self_Employed=Yes applicants
+  need Credit_History=1 AND combined income >= 4000 for auto-processing, else
+  manual review; 40% income ratio cap; a rejected applicant may request ONE
+  re-review within 30 days with new income documentation, but the re-review
+  itself needs human sign-off; document checklist including 2 years of tax
+  filings for self-employed applicants; 7-business-day SLA.
+- LOAN-EDU-040_underwriting.md (education_loan): Credit_History 0/missing is
+  still eligible for auto-processing IF a co-applicant is present
+  (CoapplicantIncome > 0), otherwise manual review; 45% income ratio cap (most
+  permissive of the four); document checklist including enrollment
+  confirmation; 5-business-day SLA.
+
+Keep each document short and concrete -- specific numbers a reply can cite,
+not vague language like "generally" or "in most cases."</code></pre>
+    </div>
+    <p>Have Claude Code explain, in its own words, why <code>gold_loan</code> getting no document matters — you want to hear it describe this as "the assistant should refuse/escalate here," not shrug past it.</p>
+
+    <div class="step-head"><span class="step-num">4</span><span class="step-title">Generate the inbound emails and the data README</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Create W2D0/capstone/data/inbound_emails.csv with one row per live case (12
+rows), columns: email_id, subject, body, email_category, urgency_ground_truth,
+loan_id_ground_truth, route_queue_ground_truth, product_ground_truth,
+expected_action_ground_truth. Use realistic customer voice per case:
+status inquiries for the two approved cases and one gold_loan under-review
+case, a rate/surcharge question for the rural home_loan case, an eligibility-
+criteria question for the other gold_loan under-review case (this is the
+gap case -- expected_action should say to escalate, not answer from a policy
+that doesn't exist), rejection appeals for the four rejected cases, document-
+status questions for the two document_pending cases, and a fraud-escalation
+check-in for the escalated_fraud_review case. Quote any subject or body field
+containing a comma so the CSV parses cleanly.
+
+Then write W2D0/capstone/data/_CAPSTONE_DATA_README.md documenting the
+applicants/loans schema, the product-to-policy-doc mapping table, which
+product has no document and why, and the two known data-quality wrinkles
+(LP002113 has a missing LoanAmount; LP001091 is missing both Credit_History
+and Self_Employed) -- so nobody has to rediscover these by trial and error
+in a later phase.</code></pre>
+    </div>
+
+    <div class="step-head"><span class="step-num">5</span><span class="step-title">Sanity-check the handoff to Phase 2</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <p>Ask Claude Code to open <code>inbound_emails.csv</code>, confirm all 12 rows load with pandas without a parser error, and cross-check that every <code>loan_id_ground_truth</code> value actually exists in <code>loans.db</code>.</p>
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Verified reference run: <b>491</b> unique applicants loaded, <b>491</b> rows in both <code>applicants</code> and <code>loans</code>, exactly <b>12</b> rows with a non-null <code>stage</code>. Product distribution: <code>business_loan</code> 107, <code>personal_loan</code> 102, <code>home_loan</code> 100, <code>education_loan</code> 94, <code>gold_loan</code> 88. <code>data/policies/</code> has exactly 4 files (no <code>gold_loan</code> doc). <code>inbound_emails.csv</code> has 12 rows covering 12 distinct <code>Loan_ID</code>s, including 3 <code>gold_loan</code> live cases (<code>LP001493</code>, <code>LP002448</code>, <code>LP001091</code>) and one data-quality wrinkle each on <code>LP002113</code> (missing <code>LoanAmount</code>) and <code>LP001091</code> (missing <code>Credit_History</code> and <code>Self_Employed</code>).
+    </div>
+  </div>
+
+  <p>Next: Phase 2 builds the actual tool-use loop that reads these emails, calls tools against <code>loans.db</code> and the policy docs, and drafts a grounded, cited reply — including the refusal behavior on the three <code>gold_loan</code> cases.</p>
+
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>A tested version is at <a href="capstone_ref/data/seed_loans_db.py">capstone_ref/data/seed_loans_db.py</a>, <a href="capstone_ref/data/policies/">capstone_ref/data/policies/</a>, <a href="capstone_ref/data/inbound_emails.csv">capstone_ref/data/inbound_emails.csv</a>, and <a href="capstone_ref/data/_CAPSTONE_DATA_README.md">capstone_ref/data/_CAPSTONE_DATA_README.md</a> — verified end to end against the numbers above. Use it to compare, not as the first attempt.</p>
+  </details>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — Capstone Phase 1: Setup &amp; Grounding Data</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>

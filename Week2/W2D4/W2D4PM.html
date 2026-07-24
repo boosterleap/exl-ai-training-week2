@@ -192,7 +192,7 @@ the manifest correctly flags that file as changed.</code></pre>
   <p><b>Learners repeat.</b> Name the one gap you found in variation A and describe (don't necessarily write) one case that would close it.</p>
 </div>
 
-<h2 id="topic-05">Topic 05 · Eval-gated CI/CD (Continuous Integration/Continuous Deployment)</h2>
+<h2 id="topic-05">Topic 05 · Eval-gated CI/CD (Continuous Deployment)</h2>
 <div class="step">
   <div class="step-head"><span class="step-num">5</span><span class="step-title">A quality floor that actually fails the build</span><span class="step-time">~30 min</span></div>
   <p><b>Concept.</b> A trajectory or faithfulness regression should block a deploy automatically, not rely on someone noticing. The gate treats floors differently by kind: a safety or permission regression blocks immediately and hard, while a quality regression reports exactly which evaluation layer it hit. CI mocks tools/data to avoid API (Application Programming Interface) spend on every push — everything in today's gate is already fully deterministic and local, so this is a natural fit, not a compromise — and online evaluation can only ever alert on top of this, never replace the offline gate itself.</p>

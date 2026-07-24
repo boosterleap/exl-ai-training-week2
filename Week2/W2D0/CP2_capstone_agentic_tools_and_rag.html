@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W2D0 · Capstone Phase 2 · Agentic Tools &amp; RAG</title>
+<link rel="stylesheet" href="../css/session-guide.css">
+</head>
+<body>
+<p class="site-index-link"><a href="../index.html">← Week 2 course index</a></p>
+
+<header class="hero">
+  <p class="eyebrow">W2D0 · Capstone Phase 2 of 6 · <a href="00_orientation.html" style="color:#cbd8ff;">index</a> · <a href="CP1_capstone_setup_and_grounding_data.html" style="color:#cbd8ff;">← Phase 1</a> · <a href="CP3_capstone_multiagent_mcp.html" style="color:#cbd8ff;">Phase 3 →</a></p>
+  <h1>Capstone Phase 2 — Agentic Tools &amp; RAG</h1>
+  <p>Phase 1 built the ground truth: a real database, four policy documents, and one deliberate gap. Phase 2 builds the assistant itself — a bounded tool-use loop (Day 1's agentic loop, run on your own Claude Code) that reads each inbound email, calls a small number of grounding tools, and drafts a reply that cites a specific record and a specific document. This is also where the <code>gold_loan</code> gap gets exercised for real: does the assistant escalate, or does it fabricate a policy?</p>
+</header>
+
+<main>
+
+<section id="concept">
+  <h2>Concept: Grounding tools + a bounded tool-use loop</h2>
+  <div class="step">
+    <h3>Two tools, not one do-everything tool</h3>
+    <p>Per <code>CLAUDE.md</code>'s ground rules, this phase builds exactly two small, clearly-named tools:</p>
+    <ul>
+      <li><b><code>get_loan_record(loan_id)</code></b> — looks up the applicant + loan row, and reports a <code>grounding_available</code> flag plus which policy file (if any) governs this product. Mirrors <code>W2D1/snippets/insurance_lookup_server.py</code>'s <code>get_claim_and_policy</code> exactly.</li>
+      <li><b><code>search_policy(query, product)</code></b> — semantic search (sentence-transformer embeddings, cosine similarity) over the policy chunks, scoped to one product's document so a 4-document corpus doesn't return a plausible-but-wrong-product match.</li>
+    </ul>
+
+    <h3>The loop</h3>
+    <p>A bounded (max 6 iterations) tool-use loop: send the email, let Claude call <code>get_loan_record</code>, then — only if <code>grounding_available</code> is true — <code>search_policy</code>, then produce a final JSON object: the drafted reply, whether the case was escalated, and which policy files were actually cited. The system prompt states the same ground rules as <code>CLAUDE.md</code>: never invent a term, always ground a claim in a tool result, and never state or imply a final approve/deny decision — that's reserved for a human underwriter, built in Phase 5.</p>
+
+    <h3>Why product-scoped search matters</h3>
+    <p>With only 4 short policy documents, an unscoped semantic search can return a plausible-looking chunk from the <i>wrong</i> product — e.g. a "surcharge" question about a rural <code>home_loan</code> case pulling back the <code>personal_loan</code> doc's dependents-surcharge section instead. Passing <code>product</code> (already known from <code>get_loan_record</code>) restricts the candidate set to that product's own document before scoring similarity.</p>
+  </div>
+</section>
+
+<section id="use-cases">
+  <h2>Key Learning Objectives</h2>
+  <div class="step">
+    <h3>By the end of Phase 2, you will:</h3>
+    <ul>
+      <li>Build a small, typed tool surface instead of one catch-all function</li>
+      <li>Wire a real bounded tool-use loop against the Claude API (not the Agent SDK harness — that's a deliberate contrast point for later topics)</li>
+      <li>Implement product-scoped semantic search over a small policy corpus</li>
+      <li>Verify — with real output, not a hope — that the assistant escalates instead of fabricating when grounding is unavailable</li>
+      <li>Parse a model's final answer defensively (models sometimes wrap requested JSON in reasoning prose despite being told not to)</li>
+    </ul>
+  </div>
+</section>
+
+<section id="handson">
+  <h2>Hands-on</h2>
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><span class="step-title">Direct Claude Code to build the two tools</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Phase 1 of my capstone built W2D0/capstone/data/loans.db and
+data/policies/*.md. Now build W2D0/capstone/tools.py with two functions:
+
+1. get_loan_record(loan_id: str) -> a dataclass with: loan_id, stage,
+   product, loan_amount, loan_amount_term, applicant_income,
+   coapplicant_income, credit_history, self_employed, property_area,
+   dependents, grounding_available (bool), policy_doc_files (list[str]).
+   Look up Loan_ID by joining the loans and applicants tables. Resolve
+   policy_doc_files by mapping product -> a filename prefix (home_loan ->
+   LOAN-HOME-010, personal_loan -> LOAN-PERSONAL-020, business_loan ->
+   LOAN-BUSINESS-030, education_loan -> LOAN-EDU-040, gold_loan -> no
+   prefix, on purpose) and globbing data/policies/. grounding_available is
+   true only if at least one file matched.
+
+2. search_policy(query: str, k: int = 3, product: str | None = None) ->
+   list of {source_file, heading, text, score}. Chunk each policy doc by
+   "## " heading. Embed chunks with sentence-transformers
+   (all-MiniLM-L6-v2) once and cache the embeddings module-level. If
+   product is given, restrict candidates to that product's document
+   before computing cosine similarity -- with only 4 short docs, an
+   unscoped search can return a plausible-looking wrong-product chunk.
+
+Add a __main__ block that looks up one grounded loan (should show
+grounding_available=True) and one gold_loan (grounding_available=False),
+and runs one product-scoped search, so I can sanity-check the module
+before wiring it into an agent loop.</code></pre>
+    </div>
+
+    <div class="step-head"><span class="step-num">2</span><span class="step-title">Run it and confirm the gap is visible</span></div>
+    <span class="where-tag where-vm">VM terminal</span>
+    <pre><code>"C:\Users\Asus\.venv\Scripts\python.exe" W2D0/capstone/tools.py</code></pre>
+    <div class="callout predict">
+      <b class="tag">Predict first</b>
+      Before running: for a <code>gold_loan</code> case, what should <code>policy_doc_files</code> contain? What should happen if code elsewhere calls <code>search_policy</code> for that product anyway?
+    </div>
+    <div class="callout">
+      <b class="tag">Debrief</b>
+      <code>policy_doc_files</code> should be an empty list and <code>grounding_available</code> should be <code>False</code> — there is genuinely nothing to find. <code>search_policy(product="gold_loan")</code> should return an empty list too (no candidates to score), not an empty-but-plausible result. The tool is deliberately unhelpful here; that's the point.
+    </div>
+
+    <div class="step-head"><span class="step-num">3</span><span class="step-title">Build the tool-use loop</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <div class="prompt-box">
+      <div class="prompt-label">Prompt</div>
+      <pre><code>Now build W2D0/capstone/agent_loop.py: a bounded tool-use loop (max 6
+iterations) against the Claude API (anthropic SDK, model
+"claude-opus-4-8") that processes every row of
+W2D0/capstone/data/inbound_emails.csv.
+
+System prompt ground rules (word these firmly, they're the whole point):
+1. Never invent a policy term, ratio, surcharge, SLA, or decision status --
+   every factual claim must come from an actual tool result.
+2. Always call get_loan_record first.
+3. If grounding_available is false, do NOT call search_policy and do NOT
+   answer any eligibility/rate/criteria question from general knowledge --
+   draft a reply that escalates to a human underwriter instead.
+4. If grounding_available is true and the question concerns policy terms,
+   call search_policy (passing product) and cite the specific policy
+   filename in the reply.
+5. Never state or imply a final approve/deny decision -- report stage
+   only; decision framing belongs to a human underwriter.
+
+Final message must be ONLY a JSON object: "reply" (string), "escalated"
+(bool), "cited_sources" (list of filenames). Parse it defensively -- find
+the last balanced {...} block in the response text rather than assuming
+clean json.loads(), since models sometimes wrap JSON in reasoning prose
+despite being told not to.
+
+Save all 12 results to W2D0/capstone/outputs/draft_replies.json, and
+print, for each email, its escalated status and cited_sources. At the
+end, print how many of the 3 gold_loan cases were correctly escalated and
+how many fabricated a citation (cited_sources non-empty on a gold_loan
+case would be a fabrication -- that must be 0).</code></pre>
+    </div>
+
+    <div class="step-head"><span class="step-num">4</span><span class="step-title">Predict, then run against the real API</span></div>
+    <div class="callout predict">
+      <b class="tag">Predict first</b>
+      Three of the twelve emails are <code>gold_loan</code> cases (<code>LN-004</code>, <code>LN-005</code>, <code>LN-012</code>). Before running: do you expect all three to escalate, or do you think a plain status-check email (no policy question in it) might get answered without escalating, since it doesn't actually need policy terms?
+    </div>
+    <span class="where-tag where-vm">VM terminal — this makes real, billed API calls</span>
+    <pre><code>"C:\Users\Asus\.venv\Scripts\python.exe" W2D0/capstone/agent_loop.py</code></pre>
+    <div class="callout">
+      <b class="tag">Debrief</b>
+      The verified reference run escalated all three <code>gold_loan</code> cases, including <code>LN-004</code>'s plain "any update on my application" — the assistant treated the product itself as reason enough to route to a human rather than assume no policy question would ever follow. That's the conservative failure mode you want: it's fine to escalate a question that turned out not to need policy grounding, but never fine to answer one that did from thin air.
+    </div>
+
+    <div class="step-head"><span class="step-num">5</span><span class="step-title">Read two real replies side by side</span></div>
+    <span class="where-tag where-claude">Claude Code chat panel</span>
+    <p>Ask Claude Code to print the full <code>reply</code> text for <code>LN-003</code> (rural home_loan rate question) and <code>LN-005</code> (gold_loan eligibility-criteria question) from <code>outputs/draft_replies.json</code>. Compare how each one is grounded — one cites <code>LOAN-HOME-010_underwriting.md</code>'s rural surcharge by name, the other explains it has no policy terms available and is escalating.</p>
+
+    <div class="checkpoint">
+      <b class="tag">Checkpoint</b>
+      Verified reference run: <b>12/12</b> emails processed. All <b>3</b> <code>gold_loan</code> cases escalated correctly with <b>0</b> fabricated citations. All <b>9</b> documented-product cases cited their own product's policy file (e.g. <code>LN-003</code> → <code>LOAN-HOME-010_underwriting.md</code>, <code>LN-009</code>'s rejection reply correctly names the applicant's actual <code>Credit_History</code> value of 0 pulled from <code>get_loan_record</code>, not a guessed number). No reply stated or implied a final approve/deny decision.
+    </div>
+  </div>
+
+  <p>Next: Phase 3 splits this single agent into an intake/classifier + underwriting subagent pair, coordinated by an orchestrator, and moves the two tools behind a real network MCP server instead of calling them in-process.</p>
+
+  <details class="instructor-reveal">
+    <summary>Reference implementation (only if the build gets stuck)</summary>
+    <p>A tested version is at <a href="capstone_ref/tools.py">capstone_ref/tools.py</a> and <a href="capstone_ref/agent_loop.py">capstone_ref/agent_loop.py</a> — verified end to end against the numbers above (real API run, not simulated). Use it to compare, not as the first attempt.</p>
+  </details>
+</section>
+
+</main>
+
+<footer class="page-footer">W2D0 · Claude Code Foundations — Capstone Phase 2: Agentic Tools &amp; RAG</footer>
+<p class="site-index-link bottom"><a href="../index.html">← Back to course index</a></p>
+<script src="../css/lab-readme.js"></script>
+</body>
+</html>
